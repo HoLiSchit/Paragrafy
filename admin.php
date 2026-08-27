@@ -1,6 +1,6 @@
 <?php
 /**
- * Paragrafy v1.5.4 - Admin Command Center, Multi-Project Manager & Compliance Engine
+ * Paragrafy v1.5.5 - Admin Command Center, Multi-Project Manager & Compliance Engine
  */
 declare(strict_types=1);
 
@@ -142,7 +142,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$newName, $newDomain, $newColor, $newLang]);
             $newProjectId = (int)$db->lastInsertId();
 
-            // Automatisch alle vorhandenen Dokumenttypen für das neue Projekt verknüpfen
             $docTypes = $db->query("SELECT id FROM doc_types")->fetchAll();
             foreach ($docTypes as $dt) {
                 $insDoc = $db->prepare("INSERT INTO documents (project_id, doc_type_id) VALUES (?, ?)");
@@ -421,6 +420,9 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
             .btn-new-proj { background: #0f172a; color: #38bdf8; border: 1px solid #334155; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.875rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; }
             .btn-new-proj:hover { background: #1e293b; color: #7dd3fc; }
             
+            .btn-copy { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.2rem 0.45rem; cursor: pointer; color: #64748b; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.2s; margin-left: 0.35rem; }
+            .btn-copy:hover { background: #e2e8f0; color: #0f172a; border-color: #94a3b8; }
+            
             .grid-add { display: grid; grid-template-columns: 2fr 1.5fr auto auto; gap: 0.75rem; align-items: center; margin-top: 1rem; }
             
             .alert-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; color: #92400e; font-size: 0.875rem; }
@@ -431,7 +433,6 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
             .toast { position: fixed; bottom: 2rem; right: 2rem; background: #0f172a; color: #fff; padding: 0.85rem 1.5rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 99999; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
             .toast.show { transform: translateY(0); opacity: 1; }
             
-            /* Modal Backdrop */
             .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 999990; display: none; align-items: center; justify-content: center; padding: 1rem; }
             .modal { background: #fff; border-radius: 16px; padding: 2rem; width: 100%; max-width: 520px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); box-sizing: border-box; }
         </style>
@@ -520,7 +521,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
             <!-- Matrix -->
             <div class="card">
                 <h3 style="margin-top:0; font-size:1.2rem; font-weight:800;">Pflichtseiten & Status-Matrix</h3>
-                <p style="color:#64748b; font-size:0.875rem; margin-top:0;">Klicke auf den Status zum Umschalten. Klicke auf Badges zum Bearbeiten oder auf das Pfeil-Symbol zur Live-Ansicht.</p>
+                <p style="color:#64748b; font-size:0.875rem; margin-top:0;">Klicke auf den Status zum Umschalten. Klicke auf Badges zum Bearbeiten, das Pfeil-Symbol zur Live-Ansicht oder das Link-Symbol zum Kopieren der URL.</p>
                 <table>
                     <thead>
                         <tr>
@@ -550,14 +551,19 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                             $stmt->execute([$docId, $primaryLang]);
                             $sourceRow = $stmt->fetch();
                             $currentSourceHash = $sourceRow ? md5($sourceRow['content']) : '';
+                            
+                            $primaryUrl = "https://" . $project['domain'] . "/" . $type['slug'];
                             ?>
                             <tr>
                                 <td>
                                     <strong style="font-size:0.95rem;"><?= htmlspecialchars($type['title']) ?></strong>
-                                    <div style="font-size:0.75rem;">
+                                    <div style="font-size:0.75rem; display:flex; align-items:center; margin-top:0.2rem;">
                                         <a href="/<?= htmlspecialchars($type['slug']) ?>" target="_blank" style="color:#64748b; text-decoration:none; display:inline-flex; align-items:center; gap:0.25rem;" title="Direktlink in Hauptsprache">
                                             /<?= htmlspecialchars($type['slug']) ?> <?= svg_icon('external', '', 12) ?>
                                         </a>
+                                        <button type="button" class="btn-copy" onclick="copyToClipboard('<?= htmlspecialchars($primaryUrl) ?>', 'Direktlink kopiert!')" title="Vollständige URL in Zwischenablage kopieren">
+                                            <?= svg_icon('link', '', 11) ?> Copy URL
+                                        </button>
                                     </div>
                                 </td>
                                 <td>
@@ -581,18 +587,23 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                                             $isOutdated = true;
                                         }
                                     }
+                                    
+                                    $langUrl = "https://" . $project['domain'] . "/" . $lang . "/" . ($trans['slug'] ?? $type['slug']);
                                     ?>
                                     <td>
-                                        <div style="display:inline-flex; align-items:center; gap:0.4rem;">
+                                        <div style="display:inline-flex; align-items:center; gap:0.35rem;">
                                             <?php if ($trans && $trans['status'] === 'published'): ?>
                                                 <?php if ($isOutdated): ?>
                                                     <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="badge badge-outdated" title="Das deutsche Original wurde geändert!"><span class="pulse-dot dot-outdated"></span> Veraltet</a>
                                                 <?php else: ?>
                                                     <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="badge badge-green" title="<?= htmlspecialchars($trans['title']) ?> - Bearbeiten"><span class="pulse-dot dot-green"></span> Live</a>
                                                 <?php endif; ?>
-                                                <a href="/<?= $lang ?>/<?= htmlspecialchars($trans['slug'] ?: $type['slug']) ?>" target="_blank" title="Öffentliche Seite öffnen" style="color:#2563eb; font-weight:bold; text-decoration:none; display:inline-flex; align-items:center;">
-                                                    <?= svg_icon('external', '', 14) ?>
+                                                <a href="/<?= $lang ?>/<?= htmlspecialchars($trans['slug'] ?: $type['slug']) ?>" target="_blank" title="Öffentliche Seite öffnen" style="color:#2563eb; font-weight:bold; text-decoration:none; display:inline-flex; align-items:center; padding:0 0.15rem;">
+                                                    <?= svg_icon('external', '', 13) ?>
                                                 </a>
+                                                <button type="button" class="btn-copy" style="margin-left:0; padding:0.25rem 0.35rem;" onclick="copyToClipboard('<?= htmlspecialchars($langUrl) ?>', '<?= strtoupper($lang) ?>-Link kopiert!')" title="<?= strtoupper($lang) ?>-URL kopieren">
+                                                    <?= svg_icon('link', '', 11) ?>
+                                                </button>
                                             <?php elseif ($trans && $trans['status'] === 'draft'): ?>
                                                 <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="badge badge-yellow"><span class="pulse-dot dot-yellow"></span> Entwurf</a>
                                             <?php else: ?>
@@ -702,6 +713,35 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                 document.getElementById('toastMsg').innerText = msg;
                 toast.classList.add('show');
                 setTimeout(() => { toast.classList.remove('show'); }, 2500);
+            }
+
+            function copyToClipboard(text, successMsg = 'In Zwischenablage kopiert!') {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showToast(successMsg);
+                    }).catch(() => {
+                        fallbackCopy(text, successMsg);
+                    });
+                } else {
+                    fallbackCopy(text, successMsg);
+                }
+            }
+
+            function fallbackCopy(text, successMsg) {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast(successMsg);
+                } catch (err) {
+                    alert('Kopieren fehlgeschlagen.');
+                }
+                document.body.removeChild(textArea);
             }
 
             async function ajaxToggleRequired(id) {
