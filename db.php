@@ -134,6 +134,33 @@ function ensure_schema_migrations(PDO $pdo): void {
                 activated_at DATETIME DEFAULT NULL
             );
         ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER DEFAULT NULL,
+                project_name TEXT DEFAULT '',
+                user_name TEXT DEFAULT 'Admin',
+                action TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS translation_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_id INTEGER NOT NULL,
+                lang TEXT NOT NULL,
+                title TEXT NOT NULL,
+                slug TEXT NOT NULL,
+                content TEXT NOT NULL,
+                change_note TEXT DEFAULT '',
+                status TEXT DEFAULT 'published',
+                user_name TEXT DEFAULT 'Admin',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+            );
+        ");
     } catch (Throwable $e) {
     }
 }
@@ -232,6 +259,29 @@ function init_database_schema(PDO $pdo): void {
             invited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             activated_at DATETIME DEFAULT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER DEFAULT NULL,
+            project_name TEXT DEFAULT '',
+            user_name TEXT DEFAULT 'Admin',
+            action TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS translation_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL,
+            lang TEXT NOT NULL,
+            title TEXT NOT NULL,
+            slug TEXT NOT NULL,
+            content TEXT NOT NULL,
+            change_note TEXT DEFAULT '',
+            status TEXT DEFAULT 'published',
+            user_name TEXT DEFAULT 'Admin',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+        );
     ");
 }
 
@@ -240,7 +290,7 @@ function check_and_publish_scheduled(PDO $pdo, ?array $project = null): array {
     try {
         $nowStr = date('Y-m-d H:i:s');
         $sql = "
-            SELECT t.id, t.document_id, t.lang, t.title, t.slug, t.scheduled_title, t.scheduled_slug, t.scheduled_content, t.scheduled_note, t.scheduled_at,
+            SELECT t.id, t.document_id, t.lang, t.title, t.slug, t.content, t.scheduled_title, t.scheduled_slug, t.scheduled_content, t.scheduled_note, t.scheduled_at,
                    d.project_id, p.name as project_name, p.domain, p.webhook_url, p.webhook_secret
             FROM translations t
             JOIN documents d ON t.document_id = d.id
@@ -279,6 +329,18 @@ function check_and_publish_scheduled(PDO $pdo, ?array $project = null): array {
             ");
             $upd->execute([$row['id']]);
             $publishedCount++;
+
+            record_translation_version(
+                $pdo,
+                (int)$row['document_id'],
+                $row['lang'],
+                $finalTitle,
+                $finalSlug,
+                $row['scheduled_content'] !== '' ? $row['scheduled_content'] : $row['content'],
+                $row['scheduled_note'],
+                'published',
+                'Geplante Veröffentlichung'
+            );
 
             dispatch_webhook($row, [
                 'event_type' => 'legal_text.updated',
@@ -642,6 +704,24 @@ function lang_meta(string $code): array {
     return $map[$code] ?? ['flag' => '', 'label' => strtoupper($code)];
 }
 
+function log_audit(?int $projectId, string $projectName, string $action): void {
+    try {
+        $db = get_db();
+        $userName = $_SESSION['paragrafy_user_name'] ?? 'Admin';
+        $stmt = $db->prepare("INSERT INTO audit_log (project_id, project_name, user_name, action) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$projectId, $projectName, $userName, $action]);
+    } catch (Throwable $e) {
+    }
+}
+
+function record_translation_version(PDO $db, int $documentId, string $lang, string $title, string $slug, string $content, string $changeNote, string $status, ?string $userName = null): void {
+    try {
+        $stmt = $db->prepare("INSERT INTO translation_versions (document_id, lang, title, slug, content, change_note, status, user_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$documentId, $lang, $title, $slug, $content, $changeNote, $status, $userName ?? ($_SESSION['paragrafy_user_name'] ?? 'Admin')]);
+    } catch (Throwable $e) {
+    }
+}
+
 /**
  * Shared visual theme (fonts, base tokens, admin shell) for the redesigned UI.
  * $accent is the project's brand_color (hex) and drives primary buttons/links.
@@ -769,6 +849,7 @@ function render_sidebar(string $active, array $project, array $projects): string
         'dashboard' => ['/admin', 'Dashboard', 'grid'],
         'settings' => ['/admin/settings?project_id=' . $project['id'], 'Einstellungen', 'dot'],
         'users' => ['/admin/users', 'Benutzer', 'users'],
+        'audit' => ['/admin/audit?project_id=' . $project['id'], 'Protokoll', 'clock'],
     ];
     $currentUserName = $_SESSION['paragrafy_user_name'] ?? 'Admin';
     $initials = '';
@@ -798,6 +879,8 @@ function render_sidebar(string $active, array $project, array $projects): string
                         <span class="pg-nav-grid"><span></span><span></span><span></span><span></span></span>
                     <?php elseif ($icon === 'users'): ?>
                         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.85"><circle cx="6" cy="5.2" r="2.2"/><path d="M1.6 13c.5-2.6 2.4-4 4.4-4s3.9 1.4 4.4 4"/><circle cx="11.3" cy="5.8" r="1.7"/><path d="M10.5 9.3c1.7.2 3 1.4 3.4 3.7"/></svg>
+                    <?php elseif ($icon === 'clock'): ?>
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.85"><circle cx="8" cy="8" r="6.3"/><path d="M8 4.6V8l2.6 1.6"/></svg>
                     <?php else: ?>
                         <span class="pg-nav-dot"></span>
                     <?php endif; ?>

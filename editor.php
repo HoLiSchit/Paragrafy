@@ -126,6 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'scheduled_at' => date('c', strtotime($scheduledAt)),
                 'effective_date' => date('c', strtotime($scheduledAt))
             ]);
+            log_audit((int)$doc['project_id'], $doc['project_name'], "„$title\" (" . strtoupper($targetLang) . ") geplant für " . date('d.m.Y H:i', strtotime($scheduledAt)));
         } else {
             $prevContent = $oldRow ? $oldRow['content'] : $content;
             $stmt = $db->prepare("
@@ -135,6 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 title=excluded.title, slug=excluded.slug, previous_content=translations.content, content=excluded.content, status=excluded.status, change_note=excluded.change_note, source_hash=excluded.source_hash, scheduled_at=NULL, scheduled_title='', scheduled_slug='', scheduled_content='', scheduled_note='', updated_at=CURRENT_TIMESTAMP
             ");
             $stmt->execute([$docId, $targetLang, $title, $slug, $content, $prevContent, $status, $changeNote, $sourceHashToSave]);
+            record_translation_version($db, $docId, $targetLang, $title, $slug, $content, $changeNote, $status);
 
             if ($status === 'published') {
                 dispatch_webhook($doc, [
@@ -150,9 +152,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'updated_at' => date('c')
                 ]);
             }
+            $statusLabel = $status === 'published' ? 'veröffentlicht' : 'als Entwurf gespeichert';
+            log_audit((int)$doc['project_id'], $doc['project_name'], "„$title\" (" . strtoupper($targetLang) . ") $statusLabel");
         }
 
         header("Location: /admin?project_id=" . ((int)$_POST['project_id']) . "&msg=saved");
+        exit;
+    }
+
+    if ($action === 'restore_version') {
+        $versionId = (int)($_POST['version_id'] ?? 0);
+        $stmtV = $db->prepare("SELECT * FROM translation_versions WHERE id = ? AND document_id = ? AND lang = ?");
+        $stmtV->execute([$versionId, $docId, $targetLang]);
+        $version = $stmtV->fetch();
+
+        if ($version) {
+            $stmtOld = $db->prepare("SELECT content FROM translations WHERE document_id = ? AND lang = ?");
+            $stmtOld->execute([$docId, $targetLang]);
+            $oldRow = $stmtOld->fetch();
+            $prevContent = $oldRow ? $oldRow['content'] : $version['content'];
+            $noteRestored = 'Wiederhergestellt aus Version vom ' . date('d.m.Y H:i', strtotime($version['created_at']));
+
+            $stmt = $db->prepare("
+                INSERT INTO translations (document_id, lang, title, slug, content, previous_content, status, change_note, source_hash, scheduled_at, scheduled_title, scheduled_slug, scheduled_content, scheduled_note, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'published', ?, ?, NULL, '', '', '', '', CURRENT_TIMESTAMP)
+                ON CONFLICT(document_id, lang) DO UPDATE SET
+                title=excluded.title, slug=excluded.slug, previous_content=translations.content, content=excluded.content, status='published', change_note=excluded.change_note, source_hash=excluded.source_hash, scheduled_at=NULL, scheduled_title='', scheduled_slug='', scheduled_content='', scheduled_note='', updated_at=CURRENT_TIMESTAMP
+            ");
+            $stmt->execute([$docId, $targetLang, $version['title'], $version['slug'], $version['content'], $prevContent, $noteRestored, $currentSourceHash]);
+            record_translation_version($db, $docId, $targetLang, $version['title'], $version['slug'], $version['content'], $noteRestored, 'published');
+
+            dispatch_webhook($doc, [
+                'event_type' => 'legal_text.updated',
+                'document_id' => $docId,
+                'slug' => $version['slug'],
+                'lang' => $targetLang,
+                'title' => $version['title'],
+                'status' => 'published',
+                'change_note' => $noteRestored,
+                'was_scheduled' => false,
+                'effective_date' => date('c'),
+                'updated_at' => date('c')
+            ]);
+            log_audit((int)$doc['project_id'], $doc['project_name'], "„" . $version['title'] . "\" (" . strtoupper($targetLang) . ") $noteRestored");
+        }
+
+        header("Location: /admin/edit?doc_id=$docId&lang=$targetLang&msg=restored");
         exit;
     }
 }
@@ -182,6 +227,10 @@ $displayNote = $hasScheduled && !empty($targetTrans['scheduled_note']) ? $target
 
 $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']) && $targetTrans['source_hash'] !== $currentSourceHash);
 $showRef = count($activeLangs) > 1 && ($_GET['showRef'] ?? '0') === '1';
+
+$stmtVersions = $db->prepare("SELECT * FROM translation_versions WHERE document_id = ? AND lang = ? ORDER BY created_at DESC LIMIT 50");
+$stmtVersions->execute([$docId, $targetLang]);
+$versions = $stmtVersions->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -251,6 +300,15 @@ $showRef = count($activeLangs) > 1 && ($_GET['showRef'] ?? '0') === '1';
         <div class="pg-crumb"><?= htmlspecialchars($doc['project_name']) ?> <span style="margin:0 4px">/</span> <strong>Editor: <?= htmlspecialchars($doc['type_title']) ?></strong></div>
         <a href="/admin?project_id=<?= $doc['project_id'] ?>" style="margin-left:auto;font-size:13px;font-weight:600">&larr; Zurück zur Matrix</a>
     </div>
+
+    <?php if (($_GET['msg'] ?? '') === 'restored'): ?>
+    <div style="max-width:1440px;margin:24px auto 0;padding:0 28px">
+        <div class="scheduled-strip" style="border-radius:8px">
+            <?= svg_icon('check', '', 16) ?>
+            <span>Version wiederhergestellt und veröffentlicht.</span>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <?php if ($hasScheduled || $isOutdated): ?>
     <div style="max-width:1440px;margin:24px auto 0;padding:0 28px">
@@ -332,11 +390,14 @@ $showRef = count($activeLangs) > 1 && ($_GET['showRef'] ?? '0') === '1';
 
                     <div class="pane-header">
                         <h3>Wird bearbeitet &middot; <?= strtoupper(htmlspecialchars($targetLang)) ?></h3>
-                        <?php if ($targetLang !== $sourceLang): ?>
-                            <button type="button" class="btn-deepl" id="deeplBtn" onclick="translateWithDeepL()">
-                                Mit DeepL übersetzen (<?= strtoupper($sourceLang) ?> &rarr; <?= strtoupper($targetLang) ?>)
-                            </button>
-                        <?php endif; ?>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap">
+                            <button type="button" class="btn-diff" onclick="openVersionsModal()"><?= svg_icon('clock', '', 13) ?> Verlauf (<?= count($versions) ?>)</button>
+                            <?php if ($targetLang !== $sourceLang): ?>
+                                <button type="button" class="btn-deepl" id="deeplBtn" onclick="translateWithDeepL()">
+                                    Mit DeepL übersetzen (<?= strtoupper($sourceLang) ?> &rarr; <?= strtoupper($targetLang) ?>)
+                                </button>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     
                     <div class="tokens">
@@ -403,6 +464,46 @@ $showRef = count($activeLangs) > 1 && ($_GET['showRef'] ?? '0') === '1';
     </div>
 
     <div class="pg-footer-note">Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.</div>
+
+    <textarea id="currentTargetRaw" style="display:none;"><?= htmlspecialchars($targetTrans['content'] ?? '') ?></textarea>
+
+    <!-- Modal: Versionsverlauf -->
+    <div id="versionsModal" class="pg-modal-backdrop" onclick="if(event.target === this) closeVersionsModal()">
+        <div class="pg-modal" style="width:640px;max-height:80vh;display:flex;flex-direction:column">
+            <h2 style="font-size:19px;font-weight:800;margin:0 0 6px">Versionsverlauf &middot; <?= strtoupper(htmlspecialchars($targetLang)) ?></h2>
+            <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px">Jede Veröffentlichung legt eine neue Version an. Stelle eine frühere Fassung wieder her oder vergleiche sie mit dem aktuellen Stand.</p>
+
+            <div style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px">
+                <?php if (empty($versions)): ?>
+                    <div style="color:var(--text-faint);font-size:13px;font-style:italic">Noch keine gespeicherten Versionen für diese Sprache.</div>
+                <?php endif; ?>
+                <?php foreach ($versions as $v): ?>
+                    <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+                            <div>
+                                <div style="font-size:13px;font-weight:600"><?= date('d.m.Y H:i', strtotime($v['created_at'])) ?> Uhr &middot; <span style="color:var(--text-muted);font-weight:500"><?= htmlspecialchars($v['user_name']) ?></span></div>
+                                <?php if (!empty($v['change_note'])): ?><div style="font-size:12px;color:var(--text-faint);margin-top:2px"><?= htmlspecialchars($v['change_note']) ?></div><?php endif; ?>
+                            </div>
+                            <div style="display:flex;gap:6px;flex-shrink:0">
+                                <button type="button" class="pg-btn-secondary" style="padding:5px 10px;font-size:11.5px" onclick="toggleVersionDiff(<?= $v['id'] ?>)">Diff</button>
+                                <form method="post" onsubmit="return confirm('Diese Version wiederherstellen? Der aktuelle Stand wird dabei als neue Version gesichert.');" style="margin:0">
+                                    <input type="hidden" name="action" value="restore_version">
+                                    <input type="hidden" name="version_id" value="<?= $v['id'] ?>">
+                                    <button type="submit" class="pg-btn-secondary" style="padding:5px 10px;font-size:11.5px">Wiederherstellen</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div id="version_diff_<?= $v['id'] ?>" style="display:none;margin-top:10px;padding:12px;border-top:1px solid var(--border-soft);font-size:13px;line-height:1.6;max-height:260px;overflow-y:auto"></div>
+                        <textarea id="version_raw_<?= $v['id'] ?>" style="display:none;"><?= htmlspecialchars($v['content']) ?></textarea>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;margin-top:16px">
+                <button type="button" class="pg-btn-secondary" onclick="closeVersionsModal()">Schließen</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         let isCodeMode = false;
@@ -493,6 +594,25 @@ $showRef = count($activeLangs) > 1 && ($_GET['showRef'] ?? '0') === '1';
                 btn.innerText = '</> HTML Code';
             }
             updateWordCounts();
+        }
+
+        function openVersionsModal() {
+            document.getElementById('versionsModal').style.display = 'flex';
+        }
+        function closeVersionsModal() {
+            document.getElementById('versionsModal').style.display = 'none';
+        }
+
+        function toggleVersionDiff(id) {
+            const box = document.getElementById('version_diff_' + id);
+            if (box.style.display === 'block') {
+                box.style.display = 'none';
+                return;
+            }
+            const versionText = document.getElementById('version_raw_' + id).value;
+            const currentText = document.getElementById('currentTargetRaw').value;
+            box.innerHTML = computeSimpleDiff(versionText, currentText);
+            box.style.display = 'block';
         }
 
         function prepareSubmit() {

@@ -182,6 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insDoc->execute([$newProjectId, $dt['id']]);
             }
 
+            log_audit($newProjectId, $newName, 'Projekt erstellt');
             header("Location: /admin?project_id=$newProjectId&msg=project_created");
             exit;
         }
@@ -191,8 +192,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'delete_project') {
         $delId = (int)$_POST['delete_project_id'];
         if (count($projects) > 1) {
+            $delName = '';
+            foreach ($projects as $p) { if ((int)$p['id'] === $delId) { $delName = $p['name']; break; } }
             $stmt = $db->prepare("DELETE FROM projects WHERE id = ?");
             $stmt->execute([$delId]);
+            log_audit(null, $delName, 'Projekt gelöscht');
             header("Location: /admin?msg=project_deleted");
             exit;
         }
@@ -254,6 +258,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['company_name'], $_POST['address'], $_POST['email'], $_POST['phone'], $_POST['representative'], $_POST['register_info'],
             $projectId
         ]);
+        log_audit($projectId, $_POST['name'], 'Einstellungen aktualisiert');
         header("Location: /admin/settings?project_id=$projectId&msg=saved");
         exit;
     }
@@ -276,6 +281,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $docStmt = $db->prepare("INSERT INTO documents (project_id, doc_type_id) VALUES (?, ?)");
                 $docStmt->execute([$p['id'], $newTypeId]);
             }
+
+            log_audit(null, '', "Rechtstext-Typ „$title\" angelegt");
         }
         header("Location: /admin?project_id=$projectId&msg=type_created");
         exit;
@@ -283,8 +290,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'delete_doc_type') {
         $typeId = (int)$_POST['doc_type_id'];
+        $typeTitle = (string)($db->query("SELECT title FROM doc_types WHERE id = " . (int)$typeId)->fetchColumn() ?: '');
         $stmt = $db->prepare("DELETE FROM doc_types WHERE id = ?");
         $stmt->execute([$typeId]);
+        log_audit(null, '', "Rechtstext-Typ „$typeTitle\" gelöscht");
         header("Location: /admin?project_id=$projectId&msg=type_deleted");
         exit;
     }
@@ -309,6 +318,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = bin2hex(random_bytes(32));
         $ins = $db->prepare("INSERT INTO users (name, email, status, invite_token) VALUES (?, ?, 'invited', ?)");
         $ins->execute([$name, $email, $token]);
+        log_audit(null, '', "Person eingeladen: $name ($email)");
 
         $res = send_invite_mail($project, $name, $email, $token);
         header("Location: /admin/users?msg=" . ($res['success'] ? 'invited' : 'invite_mail_failed'));
@@ -338,8 +348,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'delete_user') {
         $uid = (int)($_POST['user_id'] ?? 0);
         if ($uid !== (int)($_SESSION['paragrafy_user_id'] ?? 0)) {
+            $delUserName = (string)($db->query("SELECT name FROM users WHERE id = " . (int)$uid)->fetchColumn() ?: '');
             $del = $db->prepare("DELETE FROM users WHERE id = ?");
             $del->execute([$uid]);
+            log_audit(null, '', "Zugang entfernt: $delUserName");
         }
         header("Location: /admin/users?msg=user_deleted");
         exit;
@@ -450,6 +462,11 @@ if (str_starts_with($subRoute, '/admin/settings')) {
 
 if (str_starts_with($subRoute, '/admin/users')) {
     render_users_view($db, $project, $projects);
+    exit;
+}
+
+if (str_starts_with($subRoute, '/admin/audit')) {
+    render_audit_view($db, $project, $projects);
     exit;
 }
 
@@ -1456,6 +1473,67 @@ function render_users_view(PDO $db, array $project, array $projects): void {
                 document.getElementById('inviteModal').style.display = 'none';
             }
         </script>
+    </body>
+    </html>
+    <?php
+}
+
+function render_audit_view(PDO $db, array $project, array $projects): void {
+    $stmt = $db->prepare("SELECT * FROM audit_log WHERE project_id = ? OR project_id IS NULL ORDER BY created_at DESC LIMIT 200");
+    $stmt->execute([$project['id']]);
+    $entries = $stmt->fetchAll();
+    ?>
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="utf-8"><title>Protokoll - <?= htmlspecialchars($project['name']) ?></title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
+        <?= theme_head_tags() ?>
+        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
+    </head>
+    <body>
+        <div class="pg-shell">
+            <?= render_sidebar('audit', $project, $projects) ?>
+
+            <div class="pg-main">
+                <div class="pg-topbar">
+                    <div class="pg-crumb"><?= htmlspecialchars($project['name']) ?> <span style="margin:0 4px">/</span> <strong>Protokoll</strong></div>
+                </div>
+
+                <div class="pg-content" style="max-width:840px">
+                    <div class="pg-card pg-card-pad" style="margin-bottom:0">
+                        <h2>Änderungsprotokoll</h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px">Wer hat wann was geändert — Projekteinstellungen, Rechtstexte und Benutzerverwaltung. Zeigt die letzten 200 Einträge.</p>
+
+                        <?php if (empty($entries)): ?>
+                            <div style="color:var(--text-faint);font-size:13px;font-style:italic;padding:1rem 0;">Noch keine Einträge vorhanden.</div>
+                        <?php else: ?>
+                            <table class="pg-table" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                                <thead>
+                                    <tr>
+                                        <th>Zeitpunkt</th>
+                                        <th>Benutzer</th>
+                                        <th>Aktion</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($entries as $e): ?>
+                                        <tr>
+                                            <td style="color:var(--text-muted);white-space:nowrap"><?= date('d.m.Y H:i', strtotime($e['created_at'])) ?></td>
+                                            <td style="font-weight:600"><?= htmlspecialchars($e['user_name']) ?></td>
+                                            <td><?= htmlspecialchars($e['action']) ?><?php if (!empty($e['project_name'])): ?> <span style="color:var(--text-faint)">&middot; <?= htmlspecialchars($e['project_name']) ?></span><?php endif; ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <div class="pg-footer-note">Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.</div>
+            </div>
+        </div>
     </body>
     </html>
     <?php
