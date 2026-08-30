@@ -769,7 +769,10 @@ function theme_base_css(string $accent = '#e11d48'): string {
         .pg-nav-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; width: 13px; height: 13px; flex-shrink: 0; }
         .pg-nav-grid span { background: currentColor; border-radius: 2px; opacity: .85; }
         .pg-sidebar-spacer { flex: 1; }
-        .pg-viewer-link { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 10px; }
+        .pg-viewer-link { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 10px; text-decoration: none; }
+        .pg-viewer-link:hover { background: var(--bg); opacity: 1; }
+        .pg-settings-link { margin-bottom: 0; }
+        .pg-settings-link.active { background: var(--accent-bg); color: var(--accent); }
         .pg-user-row { display: flex; align-items: center; gap: 9px; padding: 6px 8px; }
         .pg-user-avatar { width: 26px; height: 26px; border-radius: 50%; background: #2b2732; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
         .pg-user-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -847,7 +850,6 @@ function theme_base_css(string $accent = '#e11d48'): string {
 function render_sidebar(string $active, array $project, array $projects): string {
     $items = [
         'dashboard' => ['/admin', 'Dashboard', 'grid'],
-        'settings' => ['/admin/settings?project_id=' . $project['id'], 'Einstellungen', 'dot'],
         'users' => ['/admin/users', 'Benutzer', 'users'],
         'audit' => ['/admin/audit?project_id=' . $project['id'], 'Protokoll', 'clock'],
     ];
@@ -881,6 +883,8 @@ function render_sidebar(string $active, array $project, array $projects): string
                         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.85"><circle cx="6" cy="5.2" r="2.2"/><path d="M1.6 13c.5-2.6 2.4-4 4.4-4s3.9 1.4 4.4 4"/><circle cx="11.3" cy="5.8" r="1.7"/><path d="M10.5 9.3c1.7.2 3 1.4 3.4 3.7"/></svg>
                     <?php elseif ($icon === 'clock'): ?>
                         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.85"><circle cx="8" cy="8" r="6.3"/><path d="M8 4.6V8l2.6 1.6"/></svg>
+                    <?php elseif ($icon === 'gear'): ?>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.85"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     <?php else: ?>
                         <span class="pg-nav-dot"></span>
                     <?php endif; ?>
@@ -891,7 +895,13 @@ function render_sidebar(string $active, array $project, array $projects): string
 
         <div class="pg-sidebar-spacer"></div>
 
-        <a href="https://<?= htmlspecialchars($project['domain']) ?>" target="_blank" class="pg-viewer-link">Öffentliche Seite ansehen<span>↗</span></a>
+        <div class="pg-user-row">
+            <div class="pg-user-avatar"><?= htmlspecialchars($initials) ?></div>
+            <div style="flex:1;min-width:0">
+                <div class="pg-user-name"><?= htmlspecialchars($currentUserName) ?></div>
+            </div>
+            <a href="/admin?logout=1" class="pg-logout" title="Abmelden">⏻</a>
+        </div>
 
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:10px">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
@@ -901,13 +911,14 @@ function render_sidebar(string $active, array $project, array $projects): string
             <p style="font-size:12px;color:var(--text-faint);margin:0;line-height:1.5">Open Source &amp; unter deiner Kontrolle.</p>
         </div>
 
-        <div class="pg-user-row">
-            <div class="pg-user-avatar"><?= htmlspecialchars($initials) ?></div>
-            <div style="flex:1;min-width:0">
-                <div class="pg-user-name"><?= htmlspecialchars($currentUserName) ?></div>
-            </div>
-            <a href="/admin?logout=1" class="pg-logout" title="Abmelden">⏻</a>
-        </div>
+        <a href="https://<?= htmlspecialchars($project['domain']) ?>" target="_blank" class="pg-viewer-link">Öffentliche Seite ansehen<span>↗</span></a>
+
+        <a href="/admin/settings?project_id=<?= $project['id'] ?>" class="pg-viewer-link pg-settings-link <?= $active === 'settings' ? 'active' : '' ?>">
+            <span style="display:flex;align-items:center;gap:10px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Einstellungen
+            </span>
+        </a>
     </aside>
     <?php
     return ob_get_clean();
