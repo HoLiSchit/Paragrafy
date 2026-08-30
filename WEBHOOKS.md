@@ -21,16 +21,16 @@ Jeder von Paragrafy versendete Webhook wird als `POST`-Request mit folgendem Hea
 
 | Event | Auslöser | Einsatzzweck in deiner App |
 | :--- | :--- | :--- |
-| `legal_text.scheduled` | Eine Textänderung wurde für einen zukünftigen Zeitpunkt geplant. | Interne Vorankündigung planen (z. B. Erinnerung für dein Team), dass sich ein Rechtstext zum Stichtag ändert. Es gibt keine öffentliche Vorschau-URL für die geplante Fassung — der aktuelle Stand bleibt bis zum Stichtag live. |
+| `legal_text.scheduled` | Eine Textänderung wurde für einen zukünftigen Zeitpunkt geplant. | Vorankündigungs-Banner mit **Vorschau-Link** für Nutzer anzeigen (*„AGB ändern sich zum 31.08. [Jetzt Vorab-Fassung lesen]“*). |
 | `legal_text.updated` | Ein Rechtstext wurde sofort live veröffentlicht, ein geplanter Stichtag wurde erreicht, oder eine frühere Version wurde wiederhergestellt. | Neue AGB-Zustimmung im User-Account erzwingen, App-Cache invalidieren. |
 
 ---
 
 ## 3. Payload-Spezifikation
 
-### A. Event: `legal_text.scheduled` (Vorankündigung)
+### A. Event: `legal_text.scheduled` (Vorankündigung mit Vorschau-Link)
 
-Wird gefeuert, wenn im Editor eine zeitgesteuerte Live-Schaltung für die Zukunft geplant wird. `url`/`api_url` verweisen dabei weiterhin auf die aktuell live sichtbare Fassung — es gibt keine separate Vorschau-URL für die geplante Neufassung, diese wird erst zum Stichtag live geschaltet.
+Wird gefeuert, wenn im Editor eine zeitgesteuerte Live-Schaltung für die Zukunft geplant wird. `url`/`api_url` verweisen weiterhin auf die aktuell live sichtbare Fassung (unverändert bis zum Stichtag). Zusätzlich liefert Paragrafy `preview_url`/`preview_api_url` — unter dieser Adresse ist die **geplante Neufassung** schon vor dem Stichtag öffentlich einsehbar (dieselbe Seite hängt lediglich `/preview` an), z. B. um Nutzer:innen vorab über anstehende AGB-Änderungen zu informieren. Die Vorschau-Seite wird mit `noindex` ausgeliefert und verschwindet automatisch, sobald die Fassung live geht (der Pfad zeigt danach wieder 404, weil keine Planung mehr vorliegt).
 
 #### JSON-Payload:
 ```json
@@ -53,6 +53,8 @@ Wird gefeuert, wenn im Editor eine zeitgesteuerte Live-Schaltung für die Zukunf
     "effective_date": "2026-08-31T00:00:00+02:00",
     "url": "https://legal.deinedomain.de/de/agb-b2c",
     "api_url": "https://legal.deinedomain.de/api/de/agb-b2c",
+    "preview_url": "https://legal.deinedomain.de/de/agb-b2c/preview",
+    "preview_api_url": "https://legal.deinedomain.de/api/de/agb-b2c/preview",
     "was_scheduled": false
   }
 }
@@ -103,6 +105,8 @@ Wird gefeuert, sobald ein Rechtstext aktiv geschaltet wurde (sofort oder nach Ab
 | `data.scheduled_at` | `string` (ISO 8601) | Nur bei `scheduled`: Der geplante Umschaltzeitpunkt. |
 | `data.url` | `string` | URL der aktuell gültigen Live-Version. |
 | `data.api_url` | `string` | JSON-API URL der aktuell gültigen Live-Version. |
+| `data.preview_url` | `string` | Nur bei `scheduled`: Öffentliche Vorschau-URL der geplanten Neufassung (`/preview`-Suffix), noch vor dem Stichtag abrufbar. |
+| `data.preview_api_url` | `string` | Nur bei `scheduled`: JSON-API-Variante der Vorschau-URL. |
 | `data.was_scheduled` | `boolean` | `true`, falls diese Veröffentlichung aus einer Planung hervorging. |
 | `data.change_note` | `string` | Die vom Admin vergebene Revisionsnotiz. |
 
@@ -134,6 +138,8 @@ interface ParagrafyWebhookPayload {
     effective_date: string;
     url: string;
     api_url: string;
+    preview_url?: string;
+    preview_api_url?: string;
     updated_at?: string;
   };
 }
@@ -159,8 +165,9 @@ app.post('/api/legal-webhook', express.raw({ type: 'application/json' }), (req: 
   // 2. Event Routing
   switch (payload.event) {
     case 'legal_text.scheduled':
-      // Interne Vorankündigung: der aktuelle Text bleibt bis zum Stichtag live.
+      // Vorankündigungs-Banner schalten mit Vorschau-Link!
       console.log(`[Vorankündigung] ${payload.data.title} ändert sich zum ${payload.data.scheduled_at}`);
+      console.log(`Vorschau-Link für Nutzer: ${payload.data.preview_url}`);
       break;
 
     case 'legal_text.updated':

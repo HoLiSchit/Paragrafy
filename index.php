@@ -63,9 +63,16 @@ if (!empty($parts) && $parts[0] === 'api' && ($parts[1] ?? '') === 'cron' && ($p
     exit;
 }
 
+// Vorschau-Kennzeichnung (.../preview) abtrennen, gilt für Seiten- und API-Routen gleichermaßen
+$isPreview = false;
+if (!empty($parts) && end($parts) === 'preview') {
+    array_pop($parts);
+    $isPreview = true;
+}
+
 // JSON API Endpoint (/api/de/impressum oder /api/impressum)
 if (!empty($parts) && $parts[0] === 'api') {
-    handle_json_api($parts, $project, $db, $primaryLang);
+    handle_json_api($parts, $project, $db, $primaryLang, $isPreview);
     exit;
 }
 
@@ -104,6 +111,21 @@ if (!$trans) {
     exit;
 }
 
+$liveSlug = $trans['slug'];
+
+if ($isPreview) {
+    if (empty($trans['scheduled_at'])) {
+        http_response_code(404);
+        render_public_404($project, $lang);
+        exit;
+    }
+    $trans['title'] = $trans['scheduled_title'] !== '' ? $trans['scheduled_title'] : $trans['title'];
+    $trans['slug'] = $trans['scheduled_slug'] !== '' ? $trans['scheduled_slug'] : $trans['slug'];
+    $previewContent = $trans['scheduled_content'] !== '' ? $trans['scheduled_content'] : $trans['content'];
+} else {
+    $previewContent = $trans['content'];
+}
+
 $stmt = $db->prepare("
     SELECT t.lang, t.slug, dt.slug as default_slug
     FROM translations t
@@ -114,8 +136,8 @@ $stmt = $db->prepare("
 $stmt->execute([$trans['document_id']]);
 $languages = $stmt->fetchAll();
 
-$content = replace_placeholders($trans['content'], $project);
-render_public_document($project, $trans, $content, $languages, $lang);
+$content = replace_placeholders($previewContent, $project);
+render_public_document($project, $trans, $content, $languages, $lang, $isPreview, $liveSlug);
 
 function get_i18n_strings(string $lang): array {
     $dict = [
@@ -247,7 +269,7 @@ function handle_cron_audit(array $project, PDO $db): void {
     echo json_encode($res);
 }
 
-function handle_json_api(array $parts, array $project, PDO $db, string $primaryLang): void {
+function handle_json_api(array $parts, array $project, PDO $db, string $primaryLang, bool $isPreview = false): void {
     header('Content-Type: application/json; charset=utf-8');
     header('Access-Control-Allow-Origin: *');
 
@@ -268,7 +290,7 @@ function handle_json_api(array $parts, array $project, PDO $db, string $primaryL
     }
 
     $stmt = $db->prepare("
-        SELECT t.title, t.slug, t.lang, t.content, t.updated_at, t.change_note
+        SELECT t.title, t.slug, t.lang, t.content, t.updated_at, t.change_note, t.scheduled_at, t.scheduled_title, t.scheduled_slug, t.scheduled_content
         FROM translations t
         JOIN documents d ON t.document_id = d.id
         JOIN doc_types dt ON d.doc_type_id = dt.id
@@ -284,19 +306,36 @@ function handle_json_api(array $parts, array $project, PDO $db, string $primaryL
         return;
     }
 
+    if ($isPreview) {
+        if (empty($doc['scheduled_at'])) {
+            http_response_code(404);
+            echo json_encode(['error' => 'No scheduled preview available for this document']);
+            return;
+        }
+        $doc['title'] = $doc['scheduled_title'] !== '' ? $doc['scheduled_title'] : $doc['title'];
+        $doc['slug'] = $doc['scheduled_slug'] !== '' ? $doc['scheduled_slug'] : $doc['slug'];
+        $doc['content'] = $doc['scheduled_content'] !== '' ? $doc['scheduled_content'] : $doc['content'];
+    }
+
     $doc['rendered_html'] = replace_placeholders($doc['content'], $project);
-    echo json_encode([
+    $response = [
         'project' => $project['name'],
         'title' => $doc['title'],
         'slug' => $doc['slug'],
         'lang' => $doc['lang'],
         'updated_at' => $doc['updated_at'],
         'change_note' => $doc['change_note'],
-        'html' => $doc['rendered_html']
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        'html' => $doc['rendered_html'],
+        'preview' => $isPreview
+    ];
+    if ($isPreview) {
+        $response['effective_date'] = date('c', strtotime($doc['scheduled_at']));
+    }
+    echo json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 }
 
-function render_public_document(array $project, array $trans, string $content, array $languages, string $currentLang): void {
+function render_public_document(array $project, array $trans, string $content, array $languages, string $currentLang, bool $isPreview = false, ?string $liveSlug = null): void {
+    $liveSlug = $liveSlug ?? $trans['slug'];
     $brand = htmlspecialchars($project['brand_color'] ?: '#e11d48');
     $logoUrl = $project['logo_url'] ?: '/paragrafy.svg';
     $i18n = get_i18n_strings($currentLang);
@@ -305,18 +344,23 @@ function render_public_document(array $project, array $trans, string $content, a
     $readMinutes = max(1, (int)ceil($wordCount / 200));
     $readTimeStr = sprintf($i18n['read_time'], $readMinutes);
     $lastUpdatedStr = sprintf($i18n['last_updated'], date('d.m.Y', strtotime($trans['updated_at'])));
+    $hasUpcoming = !$isPreview && !empty($trans['scheduled_at']);
     ?>
     <!DOCTYPE html>
     <html lang="<?= htmlspecialchars($currentLang) ?>">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title><?= htmlspecialchars($trans['title']) ?> - <?= htmlspecialchars($project['name']) ?></title>
+        <?php if ($isPreview): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
+        <title><?= htmlspecialchars($trans['title']) ?><?= $isPreview ? ' (Vorschau)' : '' ?> - <?= htmlspecialchars($project['name']) ?></title>
         <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars($logoUrl) ?>">
         <?= theme_head_tags() ?>
         <?= theme_base_css($project['brand_color'] ?: '#e11d48', false) ?>
         <style>
             body { line-height: 1.7; }
+            .preview-banner { background: oklch(24% 0.05 250); border-radius: 10px; padding: 14px 18px; margin-bottom: 22px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+            .preview-banner span { font-size: 13px; color: oklch(85% 0.04 250); }
+            .preview-banner a.btn-preview { border: none; background: oklch(58% 0.16 250); color: #fff; border-radius: 7px; padding: 7px 14px; font-size: 12px; font-weight: 700; text-decoration: none; margin-left: auto; }
             .hero { background: #17141b; padding: 24px 40px 40px; }
             .hero-inner { max-width: 1160px; margin: 0 auto; }
             .hero-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 1rem; }
@@ -364,7 +408,7 @@ function render_public_document(array $project, array $trans, string $content, a
             .toc-brand span { width: 15px; height: 15px; border-radius: 4px; background: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 9px; color: #fff; }
 
             footer { text-align: center; padding-bottom: 2rem; font-size: 12px; color: var(--text-faint); }
-            @media print { .header-actions, .toc-sidebar, .search-box, .anchor-link, .hero a, footer { display: none; } .hero { background: #fff; padding: 0; } h1, .brand-name { color: #000; } .wrapper { display: block; padding: 0; } body { background: #fff; color: #000; } }
+            @media print { .header-actions, .toc-sidebar, .search-box, .anchor-link, .hero a, .preview-banner, footer { display: none; } .hero { background: #fff; padding: 0; } h1, .brand-name { color: #000; } .wrapper { display: block; padding: 0; } body { background: #fff; color: #000; } }
         </style>
     </head>
     <body>
@@ -378,7 +422,7 @@ function render_public_document(array $project, array $trans, string $content, a
                     <div class="header-actions">
                         <div class="lang-switch">
                             <?php foreach ($languages as $l): ?>
-                                <a href="/<?= htmlspecialchars($l['lang']) ?>/<?= htmlspecialchars($l['slug'] ?: $l['default_slug']) ?>" class="<?= $l['lang'] === $currentLang ? 'active' : '' ?>">
+                                <a href="/<?= htmlspecialchars($l['lang']) ?>/<?= htmlspecialchars($l['slug'] ?: $l['default_slug']) ?><?= $isPreview ? '/preview' : '' ?>" class="<?= $l['lang'] === $currentLang ? 'active' : '' ?>">
                                     <?= strtoupper(htmlspecialchars($l['lang'])) ?>
                                 </a>
                             <?php endforeach; ?>
@@ -388,6 +432,18 @@ function render_public_document(array $project, array $trans, string $content, a
                         </button>
                     </div>
                 </div>
+
+                <?php if ($isPreview): ?>
+                    <div class="preview-banner">
+                        <span><strong>Vorschau:</strong> Dies ist die geplante Neufassung. Sie geht am <strong style="color:#fff"><?= date('d.m.Y \u\m H:i', strtotime($trans['scheduled_at'])) ?></strong> Uhr live. Bis dahin gilt weiterhin die aktuelle Fassung.</span>
+                        <a href="/<?= htmlspecialchars($currentLang) ?>/<?= htmlspecialchars($liveSlug) ?>" class="btn-preview">Aktuelle Fassung ansehen &rarr;</a>
+                    </div>
+                <?php elseif ($hasUpcoming): ?>
+                    <div class="preview-banner">
+                        <span>Geplante Neufassung verfügbar: Diese Bestimmungen werden zum <strong style="color:#fff"><?= date('d.m.Y', strtotime($trans['scheduled_at'])) ?></strong> aktualisiert.</span>
+                        <a href="/<?= htmlspecialchars($currentLang) ?>/<?= htmlspecialchars($trans['slug']) ?>/preview" class="btn-preview">Vorab ansehen &rarr;</a>
+                    </div>
+                <?php endif; ?>
 
                 <h1><?= htmlspecialchars($trans['title']) ?></h1>
                 <div class="meta-bar">

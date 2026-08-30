@@ -115,6 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$docId, $targetLang, $title, $slug, $content, $content, $changeNote, $sourceHashToSave, $scheduledAt, $title, $slug, $content, $changeNote]);
             }
 
+            $currentSlugForPreview = $oldRow['slug'] ?? $slug;
             dispatch_webhook($doc, [
                 'event_type' => 'legal_text.scheduled',
                 'document_id' => $docId,
@@ -124,7 +125,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'status' => 'scheduled',
                 'change_note' => $changeNote,
                 'scheduled_at' => date('c', strtotime($scheduledAt)),
-                'effective_date' => date('c', strtotime($scheduledAt))
+                'effective_date' => date('c', strtotime($scheduledAt)),
+                'preview_url' => 'https://' . $doc['domain'] . '/' . $targetLang . '/' . $currentSlugForPreview . '/preview',
+                'preview_api_url' => 'https://' . $doc['domain'] . '/api/' . $targetLang . '/' . $currentSlugForPreview . '/preview'
             ]);
             log_audit((int)$doc['project_id'], $doc['project_name'], "„$title\" (" . strtoupper($targetLang) . ") geplant für " . date('d.m.Y H:i', strtotime($scheduledAt)));
         } else {
@@ -316,6 +319,7 @@ $versions = $stmtVersions->fetchAll();
             <div class="scheduled-strip" style="border-radius:8px">
                 <?= svg_icon('calendar', '', 16) ?>
                 <span><strong>Zeitgesteuert geplant:</strong> Diese Version geht automatisch am <strong><?= date('d.m.Y \u\m H:i', strtotime($targetTrans['scheduled_at'])) ?> Uhr</strong> live. Bis dahin bleibt der aktuelle Stand öffentlich.</span>
+                <a href="https://<?= htmlspecialchars($doc['domain']) ?>/<?= htmlspecialchars($targetLang) ?>/<?= htmlspecialchars($targetTrans['slug']) ?>/preview" target="_blank" style="margin-left:auto;font-weight:700;white-space:nowrap">Vorschau ansehen &rarr;</a>
             </div>
         <?php endif; ?>
 
