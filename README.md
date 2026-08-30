@@ -145,9 +145,3 @@ GET https://legal.deinedomain.de/api/agb-b2c
 ```html
 <script src="https://legal.deinedomain.de/consent.js"></script>
 ```
-
----
-
-## 📄 Lizenz
-
-Paragrafy ist Open-Source-Software und steht für eigene und kommerzielle Webprojekte zur Verfügung.
