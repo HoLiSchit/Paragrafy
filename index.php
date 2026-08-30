@@ -314,7 +314,7 @@ function render_public_document(array $project, array $trans, string $content, a
         <title><?= htmlspecialchars($trans['title']) ?> - <?= htmlspecialchars($project['name']) ?></title>
         <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars($logoUrl) ?>">
         <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
+        <?= theme_base_css($project['brand_color'] ?: '#e11d48', false) ?>
         <style>
             body { line-height: 1.7; }
             .hero { background: #17141b; padding: 24px 40px 40px; }
@@ -516,7 +516,7 @@ function render_public_overview(array $project, PDO $db, string $lang): void {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars($logoUrl) ?>">
         <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
+        <?= theme_base_css($project['brand_color'] ?: '#e11d48', false) ?>
         <style>
             body { display: flex; align-items: center; justify-content: center; padding: 70px 20px; }
             .box { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 36px; max-width: 460px; width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,.04); }
@@ -567,7 +567,7 @@ function render_public_404(array $project, string $lang): void {
         <meta charset="utf-8"><title>404 - <?= htmlspecialchars($i18n['not_found_title']) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
+        <?= theme_base_css($project['brand_color'] ?: '#e11d48', false) ?>
     </head>
     <body style="text-align:center; padding: 5rem 1rem;">
         <h2 style="font-size:20px;font-weight:800;"><?= htmlspecialchars($i18n['not_found_title']) ?></h2>

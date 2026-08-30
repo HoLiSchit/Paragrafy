@@ -161,6 +161,14 @@ function ensure_schema_migrations(PDO $pdo): void {
                 FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
             );
         ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS login_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                identifier TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        ");
     } catch (Throwable $e) {
     }
 }
@@ -281,6 +289,12 @@ function init_database_schema(PDO $pdo): void {
             user_name TEXT DEFAULT 'Admin',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS login_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            identifier TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
     ");
 }
@@ -726,6 +740,48 @@ function record_translation_version(PDO $db, int $documentId, string $lang, stri
     }
 }
 
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MINUTES = 15;
+
+function get_client_ip(): string {
+    return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+}
+
+/** Seconds to wait, or 0 if login attempts are currently allowed. */
+function login_rate_limit_wait(PDO $db, string $identifier): int {
+    try {
+        $stmt = $db->prepare("SELECT created_at FROM login_attempts WHERE identifier = ? AND created_at >= datetime('now', ?) ORDER BY created_at ASC");
+        $stmt->execute([$identifier, '-' . LOGIN_WINDOW_MINUTES . ' minutes']);
+        $rows = $stmt->fetchAll();
+        if (count($rows) < LOGIN_MAX_ATTEMPTS) {
+            return 0;
+        }
+        $oldest = strtotime($rows[0]['created_at']);
+        $waitUntil = $oldest + (LOGIN_WINDOW_MINUTES * 60);
+        $remaining = $waitUntil - time();
+        return max(0, $remaining);
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+function record_login_failure(PDO $db, string $identifier): void {
+    try {
+        $stmt = $db->prepare("INSERT INTO login_attempts (identifier) VALUES (?)");
+        $stmt->execute([$identifier]);
+        $db->prepare("DELETE FROM login_attempts WHERE created_at < datetime('now', '-1 day')")->execute();
+    } catch (Throwable $e) {
+    }
+}
+
+function clear_login_failures(PDO $db, string $identifier): void {
+    try {
+        $stmt = $db->prepare("DELETE FROM login_attempts WHERE identifier = ?");
+        $stmt->execute([$identifier]);
+    } catch (Throwable $e) {
+    }
+}
+
 /**
  * Shared visual theme (fonts, base tokens, admin shell) for the redesigned UI.
  * $accent is the project's brand_color (hex) and drives primary buttons/links.
@@ -736,8 +792,28 @@ function theme_head_tags(): string {
         . '<script>(function(){try{var t=localStorage.getItem("paragrafy_theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();</script>';
 }
 
-function theme_base_css(string $accent = '#e11d48'): string {
+function theme_base_css(string $accent = '#e11d48', bool $enableDarkMode = true): string {
     $accent = htmlspecialchars($accent, ENT_QUOTES);
+    $darkVars = <<<VARS
+                --accent-bg: color-mix(in srgb, {$accent} 22%, black);
+                --bg: #18151d; --card: #221f27; --border: #34303b; --border-strong: #45404d; --border-soft: #2b2830;
+                --text: #F0EDE9; --text-muted: #ACA6B2; --text-faint: #837d8a; --text-faintest: #5c5763;
+                --green: #3ecf8e; --green-bg: #1c3229; --amber: #e0a950; --amber-bg: #3a2e1a; --red: #ea7b8d;
+                color-scheme: dark;
+    VARS;
+    $darkBlock = '';
+    if ($enableDarkMode) {
+        $darkBlock = <<<CSS
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                {$darkVars}
+            }
+        }
+        :root[data-theme="dark"] {
+            {$darkVars}
+        }
+    CSS;
+    }
     return <<<CSS
     <style>
         :root {
@@ -748,22 +824,7 @@ function theme_base_css(string $accent = '#e11d48'): string {
             --green: #16814f; --green-bg: #E8F6EE; --amber: #92601a; --amber-bg: #FBF0DC; --red: #b3223a;
             color-scheme: light;
         }
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme="light"]) {
-                --accent-bg: color-mix(in srgb, {$accent} 22%, black);
-                --bg: #18151d; --card: #221f27; --border: #34303b; --border-strong: #45404d; --border-soft: #2b2830;
-                --text: #F0EDE9; --text-muted: #ACA6B2; --text-faint: #837d8a; --text-faintest: #5c5763;
-                --green: #3ecf8e; --green-bg: #1c3229; --amber: #e0a950; --amber-bg: #3a2e1a; --red: #ea7b8d;
-                color-scheme: dark;
-            }
-        }
-        :root[data-theme="dark"] {
-            --accent-bg: color-mix(in srgb, {$accent} 22%, black);
-            --bg: #18151d; --card: #221f27; --border: #34303b; --border-strong: #45404d; --border-soft: #2b2830;
-            --text: #F0EDE9; --text-muted: #ACA6B2; --text-faint: #837d8a; --text-faintest: #5c5763;
-            --green: #3ecf8e; --green-bg: #1c3229; --amber: #e0a950; --amber-bg: #3a2e1a; --red: #ea7b8d;
-            color-scheme: dark;
-        }
+        {$darkBlock}
         * { box-sizing: border-box; }
         body { font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
         h1, h2, h3, .heading-font { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.01em; }

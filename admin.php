@@ -22,34 +22,53 @@ if (str_starts_with($earlyRoute, '/admin/accept-invite')) {
     exit;
 }
 
-if (isset($_POST['action']) && $_POST['action'] === 'login') {
-    $email = trim(strtolower($_POST['email'] ?? ''));
-    $pass = $_POST['password'] ?? '';
-    $loggedIn = false;
+if (str_starts_with($earlyRoute, '/admin/forgot-password')) {
+    handle_forgot_password($db);
+    exit;
+}
 
-    if ($email !== '') {
-        $stmt = $db->prepare("SELECT * FROM users WHERE email = ? AND status = 'active'");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch();
-        if ($user && !empty($user['password_hash']) && password_verify($pass, $user['password_hash'])) {
+if (str_starts_with($earlyRoute, '/admin/reset-password')) {
+    handle_reset_password($db);
+    exit;
+}
+
+if (isset($_POST['action']) && $_POST['action'] === 'login') {
+    $clientIp = get_client_ip();
+    $waitSeconds = login_rate_limit_wait($db, $clientIp);
+
+    if ($waitSeconds > 0) {
+        $error = "Zu viele fehlgeschlagene Versuche. Bitte warte " . (int)ceil($waitSeconds / 60) . " Minute(n) und versuche es erneut.";
+    } else {
+        $email = trim(strtolower($_POST['email'] ?? ''));
+        $pass = $_POST['password'] ?? '';
+        $loggedIn = false;
+
+        if ($email !== '') {
+            $stmt = $db->prepare("SELECT * FROM users WHERE email = ? AND status = 'active'");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
+            if ($user && !empty($user['password_hash']) && password_verify($pass, $user['password_hash'])) {
+                $_SESSION['paragrafy_admin'] = true;
+                $_SESSION['paragrafy_user_id'] = (int)$user['id'];
+                $_SESSION['paragrafy_user_name'] = $user['name'];
+                $_SESSION['paragrafy_user_email'] = $user['email'];
+                $loggedIn = true;
+            }
+        } elseif (password_verify($pass, $config['admin_password_hash'] ?? '')) {
             $_SESSION['paragrafy_admin'] = true;
-            $_SESSION['paragrafy_user_id'] = (int)$user['id'];
-            $_SESSION['paragrafy_user_name'] = $user['name'];
-            $_SESSION['paragrafy_user_email'] = $user['email'];
+            $_SESSION['paragrafy_user_name'] = 'Admin';
+            unset($_SESSION['paragrafy_user_id'], $_SESSION['paragrafy_user_email']);
             $loggedIn = true;
         }
-    } elseif (password_verify($pass, $config['admin_password_hash'] ?? '')) {
-        $_SESSION['paragrafy_admin'] = true;
-        $_SESSION['paragrafy_user_name'] = 'Admin';
-        unset($_SESSION['paragrafy_user_id'], $_SESSION['paragrafy_user_email']);
-        $loggedIn = true;
-    }
 
-    if ($loggedIn) {
-        header('Location: /admin');
-        exit;
+        if ($loggedIn) {
+            clear_login_failures($db, $clientIp);
+            header('Location: /admin');
+            exit;
+        }
+        record_login_failure($db, $clientIp);
+        $error = "Falsche Zugangsdaten.";
     }
-    $error = "Falsche Zugangsdaten.";
 }
 
 if (isset($_GET['logout'])) {
@@ -124,6 +143,24 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_markdown') {
         }
         exit;
     }
+}
+
+// 2b. Änderungsprotokoll als CSV herunterladen
+if (isset($_GET['action']) && $_GET['action'] === 'export_audit_csv') {
+    $stmt = $db->prepare("SELECT * FROM audit_log WHERE project_id = ? OR project_id IS NULL ORDER BY created_at DESC LIMIT 1000");
+    $stmt->execute([$projectId]);
+    $entries = $stmt->fetchAll();
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . preg_replace('/[^a-zA-Z0-9]+/', '_', $project['name']) . '_protokoll.csv"');
+    $out = fopen('php://output', 'w');
+    fputs($out, "\xEF\xBB\xBF");
+    fputcsv($out, ['Zeitpunkt', 'Benutzer', 'Aktion', 'Projekt']);
+    foreach ($entries as $e) {
+        fputcsv($out, [$e['created_at'], $e['user_name'], $e['action'], $e['project_name']]);
+    }
+    fclose($out);
+    exit;
 }
 
 // 3. Webhook Test Trigger mit detailliertem Protokoll
@@ -449,6 +486,167 @@ function render_accept_invite_view(?array $user, ?string $error): void {
     <?php
 }
 
+function handle_forgot_password(PDO $db): void {
+    $sent = false;
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $email = trim(strtolower($_POST['email'] ?? ''));
+        if ($email !== '') {
+            $stmt = $db->prepare("SELECT * FROM users WHERE email = ? AND status = 'active'");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
+
+            if ($user) {
+                $token = bin2hex(random_bytes(32));
+                $upd = $db->prepare("UPDATE users SET invite_token = ? WHERE id = ?");
+                $upd->execute([$token, $user['id']]);
+
+                $project = $db->query("SELECT * FROM projects ORDER BY id ASC LIMIT 1")->fetch();
+                if ($project) {
+                    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                    $host = $_SERVER['HTTP_HOST'] ?? $project['domain'];
+                    $resetLink = $scheme . '://' . $host . '/admin/reset-password?token=' . $token;
+                    $html = "<h2>Passwort zurücksetzen</h2>"
+                        . "<p>Hallo " . htmlspecialchars($user['name']) . ",</p>"
+                        . "<p>klicke auf den folgenden Link, um ein neues Passwort für dein Paragrafy-Konto festzulegen:</p>"
+                        . "<p><a href='" . htmlspecialchars($resetLink) . "' style='background:#e11d48;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Neues Passwort festlegen</a></p>"
+                        . "<p>Falls du das nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>";
+                    send_smtp_mail($project, $user['email'], "Paragrafy: Passwort zurücksetzen", $html);
+                }
+            }
+        }
+        $sent = true;
+    }
+
+    render_forgot_password_view($sent);
+}
+
+function render_forgot_password_view(bool $sent): void {
+    ?>
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="utf-8"><title>Passwort vergessen - Paragrafy</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
+        <?= theme_head_tags() ?>
+        <?= theme_base_css() ?>
+        <style>
+            body { display: flex; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; gap: 20px; }
+            .login-card { background: var(--card); padding: 2.25rem; border-radius: 16px; width: 360px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); border: 1px solid var(--border); }
+            .logo-header { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem; }
+            .logo-header img { width: 34px; height: 34px; border-radius: 8px; }
+            .logo-header h2 { margin: 0; font-size: 1.3rem; font-weight: 800; }
+        </style>
+    </head>
+    <body>
+        <div class="login-card">
+            <div class="logo-header">
+                <img src="/paragrafy.svg" alt="Paragrafy">
+                <h2>Passwort vergessen</h2>
+            </div>
+            <?php if ($sent): ?>
+                <p style="font-size:13px;color:var(--text-muted)">Falls zu dieser E-Mail-Adresse ein aktiver Zugang existiert, haben wir gerade einen Link zum Zurücksetzen verschickt. Bitte prüfe dein Postfach.</p>
+                <div style="text-align:center;margin-top:14px">
+                    <a href="/admin" style="font-size:12.5px;color:var(--text-faint)">&larr; Zurück zum Login</a>
+                </div>
+            <?php else: ?>
+                <p style="font-size:13px;color:var(--text-muted);margin:0 0 6px">Gib deine E-Mail-Adresse ein. Wenn ein aktiver Zugang existiert, schicken wir dir einen Link zum Zurücksetzen.</p>
+                <form method="post">
+                    <label class="pg-label" style="margin-top:0;">E-Mail</label>
+                    <input type="email" name="email" placeholder="name@firma.de" required autofocus style="width:100%;margin-bottom:1rem;">
+                    <button type="submit" class="pg-btn" style="width:100%;justify-content:center;">Link anfordern &rarr;</button>
+                </form>
+                <div style="text-align:center;margin-top:14px">
+                    <a href="/admin" style="font-size:12.5px;color:var(--text-faint)">&larr; Zurück zum Login</a>
+                </div>
+            <?php endif; ?>
+        </div>
+    </body>
+    </html>
+    <?php
+}
+
+function handle_reset_password(PDO $db): void {
+    $token = trim($_GET['token'] ?? $_POST['token'] ?? '');
+    $stmt = $db->prepare("SELECT * FROM users WHERE invite_token = ? AND status = 'active'");
+    $stmt->execute([$token]);
+    $user = $stmt->fetch();
+
+    $error = null;
+    if ($user && isset($_POST['action']) && $_POST['action'] === 'set_new_password') {
+        $pass = $_POST['password'] ?? '';
+        $confirm = $_POST['password_confirm'] ?? '';
+        if (strlen($pass) < 8) {
+            $error = "Das Passwort muss mindestens 8 Zeichen lang sein.";
+        } elseif ($pass !== $confirm) {
+            $error = "Die Passwörter stimmen nicht überein.";
+        } else {
+            $upd = $db->prepare("UPDATE users SET password_hash = ?, invite_token = '' WHERE id = ?");
+            $upd->execute([password_hash($pass, PASSWORD_DEFAULT), $user['id']]);
+            log_audit(null, '', "Passwort zurückgesetzt: " . $user['name']);
+
+            $_SESSION['paragrafy_admin'] = true;
+            $_SESSION['paragrafy_user_id'] = (int)$user['id'];
+            $_SESSION['paragrafy_user_name'] = $user['name'];
+            $_SESSION['paragrafy_user_email'] = $user['email'];
+            header('Location: /admin');
+            exit;
+        }
+    }
+
+    render_reset_password_view($user, $error);
+}
+
+function render_reset_password_view(?array $user, ?string $error): void {
+    ?>
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="utf-8"><title>Neues Passwort - Paragrafy</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
+        <?= theme_head_tags() ?>
+        <?= theme_base_css() ?>
+        <style>
+            body { display: flex; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; gap: 20px; }
+            .login-card { background: var(--card); padding: 2.25rem; border-radius: 16px; width: 360px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); border: 1px solid var(--border); }
+            .logo-header { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem; }
+            .logo-header img { width: 34px; height: 34px; border-radius: 8px; }
+            .logo-header h2 { margin: 0; font-size: 1.3rem; font-weight: 800; }
+            .err { color: var(--red); font-size: 0.8125rem; margin-bottom: 0.5rem; }
+        </style>
+    </head>
+    <body>
+        <div class="login-card">
+            <div class="logo-header">
+                <img src="/paragrafy.svg" alt="Paragrafy">
+                <h2>Neues Passwort</h2>
+            </div>
+            <?php if (!$user): ?>
+                <p style="font-size:13px;color:var(--text-muted)">Dieser Link ist ungültig oder abgelaufen. Fordere über „Passwort vergessen" einen neuen Link an.</p>
+                <div style="text-align:center;margin-top:14px">
+                    <a href="/admin/forgot-password" style="font-size:12.5px;color:var(--text-faint)">&larr; Neuen Link anfordern</a>
+                </div>
+            <?php else: ?>
+                <p style="font-size:13px;color:var(--text-muted);margin:0 0 6px">Lege ein neues Passwort für <strong style="color:var(--text)"><?= htmlspecialchars($user['email']) ?></strong> fest.</p>
+                <?php if ($error): ?><div class="err"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+                <form method="post">
+                    <input type="hidden" name="action" value="set_new_password">
+                    <input type="hidden" name="token" value="<?= htmlspecialchars($_GET['token'] ?? '') ?>">
+                    <label class="pg-label" style="margin-top:0;">Neues Passwort (mind. 8 Zeichen)</label>
+                    <input type="password" name="password" required style="width:100%;margin-bottom:10px;">
+                    <label class="pg-label" style="margin-top:0;">Passwort bestätigen</label>
+                    <input type="password" name="password_confirm" required style="width:100%;margin-bottom:1rem;">
+                    <button type="submit" class="pg-btn" style="width:100%;justify-content:center;">Passwort speichern &rarr;</button>
+                </form>
+            <?php endif; ?>
+        </div>
+    </body>
+    </html>
+    <?php
+}
+
 $subRoute = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 
 if (str_starts_with($subRoute, '/admin/edit')) {
@@ -508,6 +706,9 @@ function render_login_view(?string $error): void {
                 <input type="password" name="password" placeholder="Passwort eingeben" autofocus required style="width:100%;margin-bottom:1rem;">
                 <button type="submit" class="pg-btn" style="width:100%;justify-content:center;">Anmelden &rarr;</button>
             </form>
+            <div style="text-align:center;margin-top:14px">
+                <a href="/admin/forgot-password" style="font-size:12.5px;color:var(--text-faint)">Passwort vergessen?</a>
+            </div>
         </div>
         <div class="login-disclaimer">Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.</div>
     </body>
@@ -1588,8 +1789,13 @@ function render_audit_view(PDO $db, array $project, array $projects): void {
 
                 <div class="pg-content" style="max-width:840px">
                     <div class="pg-card pg-card-pad" style="margin-bottom:0">
-                        <h2>Änderungsprotokoll</h2>
-                        <p class="pg-card-sub" style="margin-bottom:16px">Wer hat wann was geändert — Projekteinstellungen, Rechtstexte und Benutzerverwaltung. Zeigt die letzten 200 Einträge.</p>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                            <h2 style="margin:0">Änderungsprotokoll</h2>
+                            <?php if (!empty($entries)): ?>
+                                <a href="/admin?project_id=<?= $project['id'] ?>&action=export_audit_csv" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px"><?= svg_icon('folder', '', 13) ?> Als CSV herunterladen</a>
+                            <?php endif; ?>
+                        </div>
+                        <p class="pg-card-sub" style="margin:5px 0 16px">Wer hat wann was geändert — Projekteinstellungen, Rechtstexte und Benutzerverwaltung. Zeigt die letzten 200 Einträge.</p>
 
                         <?php if (empty($entries)): ?>
                             <div style="color:var(--text-faint);font-size:13px;font-style:italic;padding:1rem 0;">Noch keine Einträge vorhanden.</div>
