@@ -1010,21 +1010,14 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                 </div>
                             </div>
 
-                            <div style="display:flex;align-items:center;gap:24px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border-soft)">
-                                <div style="flex:1">
-                                    <label class="pg-label" style="margin-top:0">Audit-Intervall (Monate)</label>
-                                    <input type="number" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>" min="1" max="36" required style="width:100px">
-                                    <div class="pg-hint">Warnt im Dashboard nach X Monaten vor ungeprüften Texten.</div>
-                                </div>
-                                <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;cursor:pointer">
-                                    <input type="checkbox" name="cookie_banner_enabled" value="1" <?= !empty($project['cookie_banner_enabled']) ? 'checked' : '' ?>>
-                                    DSGVO-Cookie-Banner (/consent.js) aktivieren
-                                </label>
+                            <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border-soft)">
+                                <label class="pg-label" style="margin-top:0">Audit-Intervall (Monate)</label>
+                                <input type="number" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>" min="1" max="36" required style="width:100px">
+                                <div class="pg-hint">Warnt im Dashboard nach X Monaten vor ungeprüften Texten.</div>
                             </div>
 
-                            <label class="pg-label">Cookie-Banner-Text <span style="color:var(--text-faint);font-weight:400">(optional, sonst Standardtext)</span><?= help_icon('Dieser Text erscheint im Banner, das /consent.js auf deiner Website einblendet. Bindest du das Skript nicht ein, hat dieser Text keine Wirkung.') ?></label>
-                            <textarea name="cookie_banner_text" rows="2" style="width:100%" placeholder="Diese Website verwendet Cookies, um grundlegende Funktionen bereitzustellen und die Nutzung zu verbessern."><?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?></textarea>
-
+                            <input type="hidden" name="cookie_banner_enabled" value="<?= !empty($project['cookie_banner_enabled']) ? '1' : '0' ?>">
+                            <input type="hidden" name="cookie_banner_text" value="<?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?>">
                             <input type="hidden" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>">
                             <input type="hidden" name="smtp_port" value="<?= htmlspecialchars((string)($project['smtp_port'] ?? 587)) ?>">
                             <input type="hidden" name="smtp_user" value="<?= htmlspecialchars($project['smtp_user'] ?? '') ?>">
@@ -1043,6 +1036,49 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="register_info" value="<?= htmlspecialchars($project['register_info'] ?? '') ?>">
 
                             <div style="margin-top:18px">
+                                <button type="submit" class="pg-btn"><?= svg_icon('disk', '', 16) ?> Speichern</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="pg-card pg-card-pad">
+                        <h2>Cookie-Banner (DSGVO)</h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px">Blendet über <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">/consent.js</code> einen Consent-Banner auf deiner Website ein. Aktivieren allein reicht nicht — binde das Skript zusätzlich in deine Website ein (siehe README).</p>
+                        <form method="post">
+                            <input type="hidden" name="action" value="save_project">
+                            <input type="hidden" name="name" value="<?= htmlspecialchars($project['name']) ?>">
+                            <input type="hidden" name="domain" value="<?= htmlspecialchars($project['domain']) ?>">
+                            <input type="hidden" name="primary_lang" value="<?= htmlspecialchars($project['primary_lang']) ?>">
+                            <input type="hidden" name="active_languages" value="<?= htmlspecialchars($project['active_languages']) ?>">
+                            <input type="hidden" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#e11d48') ?>">
+                            <input type="hidden" name="logo_url" value="<?= htmlspecialchars($project['logo_url'] ?? '') ?>">
+                            <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
+                            <input type="hidden" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>">
+                            <input type="hidden" name="smtp_port" value="<?= htmlspecialchars((string)($project['smtp_port'] ?? 587)) ?>">
+                            <input type="hidden" name="smtp_user" value="<?= htmlspecialchars($project['smtp_user'] ?? '') ?>">
+                            <input type="hidden" name="smtp_pass" value="<?= htmlspecialchars($project['smtp_pass'] ?? '') ?>">
+                            <input type="hidden" name="smtp_secure" value="<?= htmlspecialchars($project['smtp_secure'] ?? 'tls') ?>">
+                            <input type="hidden" name="smtp_from" value="<?= htmlspecialchars($project['smtp_from'] ?? '') ?>">
+                            <input type="hidden" name="audit_email_recipient" value="<?= htmlspecialchars($project['audit_email_recipient'] ?? '') ?>">
+                            <input type="hidden" name="webhook_url" value="<?= htmlspecialchars($project['webhook_url'] ?? '') ?>">
+                            <input type="hidden" name="webhook_secret" value="<?= htmlspecialchars($project['webhook_secret'] ?? '') ?>">
+                            <input type="hidden" name="deepl_api_key" value="<?= htmlspecialchars($project['deepl_api_key'] ?? '') ?>">
+                            <input type="hidden" name="company_name" value="<?= htmlspecialchars($project['company_name'] ?? '') ?>">
+                            <input type="hidden" name="representative" value="<?= htmlspecialchars($project['representative'] ?? '') ?>">
+                            <input type="hidden" name="address" value="<?= htmlspecialchars($project['address'] ?? '') ?>">
+                            <input type="hidden" name="email" value="<?= htmlspecialchars($project['email'] ?? '') ?>">
+                            <input type="hidden" name="phone" value="<?= htmlspecialchars($project['phone'] ?? '') ?>">
+                            <input type="hidden" name="register_info" value="<?= htmlspecialchars($project['register_info'] ?? '') ?>">
+
+                            <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;cursor:pointer">
+                                <input type="checkbox" name="cookie_banner_enabled" value="1" <?= !empty($project['cookie_banner_enabled']) ? 'checked' : '' ?>>
+                                DSGVO-Cookie-Banner aktivieren
+                            </label>
+
+                            <label class="pg-label">Banner-Text <span style="color:var(--text-faint);font-weight:400">(optional, sonst Standardtext)</span><?= help_icon('Dieser Text erscheint im Banner, das /consent.js auf deiner Website einblendet. Bindest du das Skript nicht ein, hat dieser Text keine Wirkung.') ?></label>
+                            <textarea name="cookie_banner_text" rows="2" style="width:100%" placeholder="Diese Website verwendet Cookies, um grundlegende Funktionen bereitzustellen und die Nutzung zu verbessern."><?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?></textarea>
+
+                            <div style="margin-top:16px">
                                 <button type="submit" class="pg-btn"><?= svg_icon('disk', '', 16) ?> Speichern</button>
                             </div>
                         </form>
