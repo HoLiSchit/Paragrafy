@@ -1,6 +1,6 @@
 <?php
 /**
- * Paragrafy v1.6.0 - Side-by-Side WYSIWYG & Translation Editor with Scheduled Publishing
+ * Paragrafy v1.6.2 - Side-by-Side WYSIWYG & Translation Editor with Scheduled Publishing
  */
 declare(strict_types=1);
 
@@ -28,7 +28,6 @@ if (!$doc) {
     exit;
 }
 
-// Alle vorhandenen Übersetzungen für dieses Dokument laden
 $stmtAll = $db->prepare("SELECT lang, title, content, updated_at, scheduled_at FROM translations WHERE document_id = ?");
 $stmtAll->execute([$docId]);
 $allTranslations = [];
@@ -36,7 +35,6 @@ foreach ($stmtAll->fetchAll() as $row) {
     $allTranslations[$row['lang']] = $row;
 }
 
-// Standard-Referenzsprache bestimmen
 $activeLangs = array_filter(array_map('trim', explode(',', $doc['active_languages'] ?? 'de,en')));
 $defaultRefLang = $doc['primary_lang'] ?: 'de';
 if ($targetLang === $defaultRefLang) {
@@ -49,7 +47,6 @@ if ($targetLang === $defaultRefLang) {
 }
 $sourceLang = strtolower($_GET['ref_lang'] ?? $defaultRefLang);
 
-// Quelltext laden
 $sourceTrans = $allTranslations[$sourceLang] ?? ['title' => $doc['type_title'], 'content' => 'Noch kein Text in dieser Sprache vorhanden.'];
 $currentSourceHash = md5($sourceTrans['content'] ?? '');
 
@@ -81,7 +78,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'deepl_translate') {
     exit;
 }
 
-// Speichern (Sofort live, Zeitgesteuert oder Entwurf)
+// Speichern
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     if ($action === 'save_translation') {
@@ -99,7 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $oldRow = $stmtOld->fetch();
 
         if ($status === 'scheduled' && !empty($scheduledAt)) {
-            // Geplante Veröffentlichung: Aktuelle Live-Inhalte bleiben unberührt, geplante Daten werden gesichert
             if ($oldRow) {
                 $stmt = $db->prepare("
                     UPDATE translations SET
@@ -119,18 +115,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$docId, $targetLang, $title, $slug, $content, $content, $changeNote, $sourceHashToSave, $scheduledAt, $title, $slug, $content, $changeNote]);
             }
 
-            // Webhook für Vorankündigung triggern
             dispatch_webhook($doc, [
                 'event_type' => 'legal_text.scheduled',
                 'document_id' => $docId,
                 'slug' => $slug,
                 'lang' => $targetLang,
                 'title' => $title,
+                'status' => 'scheduled',
+                'change_note' => $changeNote,
                 'scheduled_at' => date('c', strtotime($scheduledAt)),
-                'change_note' => $changeNote
+                'effective_date' => date('c', strtotime($scheduledAt))
             ]);
         } else {
-            // Sofortige Veröffentlichung oder Entwurf
             $prevContent = $oldRow ? $oldRow['content'] : $content;
             $stmt = $db->prepare("
                 INSERT INTO translations (document_id, lang, title, slug, content, previous_content, status, change_note, source_hash, scheduled_at, scheduled_title, scheduled_slug, scheduled_content, scheduled_note, updated_at)
@@ -147,8 +143,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'slug' => $slug,
                     'lang' => $targetLang,
                     'title' => $title,
-                    'status' => $status,
+                    'status' => 'published',
                     'change_note' => $changeNote,
+                    'was_scheduled' => false,
+                    'effective_date' => date('c'),
                     'updated_at' => date('c')
                 ]);
             }
@@ -248,7 +246,7 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
         <?php if ($hasScheduled): ?>
             <div class="scheduled-strip">
                 <?= svg_icon('calendar', '', 16) ?>
-                <span><strong>Zeitgesteuert geplant:</strong> Diese Version geht automatisch am <strong><?= date('d.m.Y', strtotime($targetTrans['scheduled_at'])) . ' um ' . date('H:i', strtotime($targetTrans['scheduled_at'])) ?> Uhr</strong> live. Bis dahin bleibt der aktuelle Stand öffentlich.</span>
+                <span><strong>Zeitgesteuert geplant:</strong> Diese Version geht automatisch am <strong><?= date('d.m.Y \u\m H:i', strtotime($targetTrans['scheduled_at'])) ?> Uhr</strong> live. Bis dahin bleibt der aktuelle Stand öffentlich.</span>
             </div>
         <?php endif; ?>
 
@@ -260,7 +258,6 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
         <?php endif; ?>
 
         <div class="grid">
-            <!-- Linke Spalte: Referenz / Quelltext mit Sprachwähler -->
             <div class="pane pane-source">
                 <div class="pane-header">
                     <h3>
@@ -296,7 +293,6 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                 <textarea id="previousSourceRaw" style="display:none;"><?= htmlspecialchars($sourceTrans['previous_content'] ?: $sourceTrans['content']) ?></textarea>
             </div>
 
-            <!-- Rechte Spalte: WYSIWYG & Zieltext Editor -->
             <div class="pane">
                 <form id="editForm" method="post" action="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $targetLang ?>&ref_lang=<?= $sourceLang ?>" onsubmit="prepareSubmit()">
                     <input type="hidden" name="action" value="save_translation">

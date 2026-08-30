@@ -1,10 +1,10 @@
 <?php
 /**
- * Paragrafy v1.6.0 - Database, Helper, Scheduled Publishing & SMTP Core
+ * Paragrafy v1.6.2 - Database, Helper, Scheduled Publishing, SMTP & Full-Spec Webhook Logger Core
  */
 declare(strict_types=1);
 
-define('PARAGRAFY_VERSION', '1.6.0');
+define('PARAGRAFY_VERSION', '1.6.2');
 define('PARAGRAFY_DIR', __DIR__);
 define('DB_FILE', PARAGRAFY_DIR . '/paragrafy_data.sqlite');
 define('CONFIG_FILE', PARAGRAFY_DIR . '/config.php');
@@ -105,6 +105,22 @@ function ensure_schema_migrations(PDO $pdo): void {
                 }
             }
         }
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS webhook_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                event_name TEXT NOT NULL,
+                url TEXT NOT NULL,
+                status_code INTEGER DEFAULT 0,
+                request_payload TEXT DEFAULT '',
+                response_body TEXT DEFAULT '',
+                error_message TEXT DEFAULT '',
+                duration_ms INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+        ");
     } catch (Throwable $e) {
     }
 }
@@ -178,6 +194,20 @@ function init_database_schema(PDO $pdo): void {
             FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
             UNIQUE(document_id, lang)
         );
+
+        CREATE TABLE IF NOT EXISTS webhook_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            event_name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            status_code INTEGER DEFAULT 0,
+            request_payload TEXT DEFAULT '',
+            response_body TEXT DEFAULT '',
+            error_message TEXT DEFAULT '',
+            duration_ms INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
     ");
 }
 
@@ -186,7 +216,7 @@ function check_and_publish_scheduled(PDO $pdo, ?array $project = null): array {
     try {
         $nowStr = date('Y-m-d H:i:s');
         $sql = "
-            SELECT t.id, t.document_id, t.lang, t.scheduled_title, t.scheduled_slug, t.scheduled_content, t.scheduled_note, t.scheduled_at,
+            SELECT t.id, t.document_id, t.lang, t.title, t.slug, t.scheduled_title, t.scheduled_slug, t.scheduled_content, t.scheduled_note, t.scheduled_at,
                    d.project_id, p.name as project_name, p.domain, p.webhook_url, p.webhook_secret
             FROM translations t
             JOIN documents d ON t.document_id = d.id
@@ -204,6 +234,9 @@ function check_and_publish_scheduled(PDO $pdo, ?array $project = null): array {
         $due = $stmt->fetchAll();
 
         foreach ($due as $row) {
+            $finalTitle = $row['scheduled_title'] !== '' ? $row['scheduled_title'] : $row['title'];
+            $finalSlug = $row['scheduled_slug'] !== '' ? $row['scheduled_slug'] : $row['slug'];
+
             $upd = $pdo->prepare("
                 UPDATE translations SET
                     title = CASE WHEN scheduled_title != '' THEN scheduled_title ELSE title END,
@@ -225,14 +258,15 @@ function check_and_publish_scheduled(PDO $pdo, ?array $project = null): array {
 
             dispatch_webhook($row, [
                 'event_type' => 'legal_text.updated',
-                'document_id' => $row['document_id'],
-                'slug' => $row['scheduled_slug'] ?: $row['slug'],
+                'document_id' => (int)$row['document_id'],
+                'slug' => $finalSlug,
                 'lang' => $row['lang'],
-                'title' => $row['scheduled_title'] ?: $row['title'],
+                'title' => $finalTitle,
                 'status' => 'published',
                 'change_note' => $row['scheduled_note'],
                 'was_scheduled' => true,
-                'published_at' => date('c')
+                'effective_date' => date('c'),
+                'updated_at' => date('c')
             ]);
         }
     } catch (Throwable $e) {
@@ -257,7 +291,8 @@ function svg_icon(string $name, string $extraClass = '', int $size = 16): string
         'edit' => '<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
         'search' => '<circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
         'shield' => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
-        'sync' => '<path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+        'sync' => '<path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+        'terminal' => '<polyline points="4 17 10 11 4 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="19" x2="20" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
     ];
     $path = $icons[$name] ?? '';
     return '<svg viewBox="0 0 24 24" width="' . $size . '" height="' . $size . '" fill="none" class="' . $extraClass . '" style="vertical-align:middle; display:inline-block;">' . $path . '</svg>';
@@ -393,20 +428,46 @@ function send_smtp_mail(array $project, string $to, string $subject, string $bod
     return ['success' => false, 'error' => "E-Mail Senden fehlgeschlagen: $dataRes"];
 }
 
-function dispatch_webhook(array $project, array $eventData): void {
+function dispatch_webhook(array $project, array $eventData): array {
     $url = trim($project['webhook_url'] ?? '');
+    $projectId = (int)($project['id'] ?? ($project['project_id'] ?? 1));
+    $projectName = $project['name'] ?? ($project['project_name'] ?? 'Paragrafy');
+    $projectDomain = $project['domain'] ?? '';
+    $eventName = $eventData['event_type'] ?? 'legal_text.updated';
+
     if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
-        return;
+        return ['success' => false, 'error' => 'Keine gültige Webhook-URL konfiguriert.'];
     }
 
-    $eventName = $eventData['event_type'] ?? 'legal_text.updated';
+    // Vollständiges Daten-Mapping gemäß Spezifikation
+    $lang = $eventData['lang'] ?? ($project['primary_lang'] ?? 'de');
+    $slug = $eventData['slug'] ?? '';
+    
+    if (!isset($eventData['url']) && !empty($slug) && !empty($projectDomain)) {
+        $eventData['url'] = 'https://' . $projectDomain . '/' . $lang . '/' . $slug;
+    }
+    if (!isset($eventData['api_url']) && !empty($slug) && !empty($projectDomain)) {
+        $eventData['api_url'] = 'https://' . $projectDomain . '/api/' . $lang . '/' . $slug;
+    }
+    if (!isset($eventData['status'])) {
+        $eventData['status'] = ($eventName === 'legal_text.scheduled') ? 'scheduled' : 'published';
+    }
+    if (!isset($eventData['effective_date'])) {
+        $eventData['effective_date'] = $eventData['scheduled_at'] ?? ($eventData['updated_at'] ?? date('c'));
+    }
+    if (!isset($eventData['was_scheduled'])) {
+        $eventData['was_scheduled'] = false;
+    }
+
+    unset($eventData['event_type']);
+
     $payload = json_encode([
         'event' => $eventName,
         'timestamp' => date('c'),
         'project' => [
-            'id' => $project['id'] ?? ($project['project_id'] ?? 1),
-            'name' => $project['name'] ?? ($project['project_name'] ?? 'Paragrafy'),
-            'domain' => $project['domain'] ?? ''
+            'id' => $projectId,
+            'name' => $projectName,
+            'domain' => $projectDomain
         ],
         'data' => $eventData
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -416,12 +477,17 @@ function dispatch_webhook(array $project, array $eventData): void {
 
     $headers = [
         'Content-Type: application/json',
-        'User-Agent: Paragrafy-Webhook/1.6.0',
+        'User-Agent: Paragrafy-Webhook/1.6.2',
         'X-Paragrafy-Event: ' . $eventName
     ];
     if ($signature !== '') {
         $headers[] = 'X-Paragrafy-Signature: ' . $signature;
     }
+
+    $startTime = microtime(true);
+    $statusCode = 0;
+    $responseBody = '';
+    $errorMessage = '';
 
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
@@ -430,12 +496,46 @@ function dispatch_webhook(array $project, array $eventData): void {
             CURLOPT_POSTFIELDS => $payload,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => 4,
-            CURLOPT_CONNECTTIMEOUT => 2
+            CURLOPT_TIMEOUT => 6,
+            CURLOPT_CONNECTTIMEOUT => 3
         ]);
-        curl_exec($ch);
+        $responseBody = (string)curl_exec($ch);
+        $statusCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $errorMessage = curl_error($ch);
         curl_close($ch);
+    } else {
+        $errorMessage = 'cURL PHP-Erweiterung nicht verfügbar';
     }
+
+    $durationMs = (int)round((microtime(true) - $startTime) * 1000);
+
+    try {
+        $db = get_db();
+        $ins = $db->prepare("
+            INSERT INTO webhook_logs (project_id, event_name, url, status_code, request_payload, response_body, error_message, duration_ms)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $ins->execute([
+            $projectId,
+            $eventName,
+            $url,
+            $statusCode,
+            $payload,
+            substr($responseBody, 0, 1000),
+            $errorMessage,
+            $durationMs
+        ]);
+    } catch (Throwable $e) {
+    }
+
+    $success = ($statusCode >= 200 && $statusCode < 300);
+    return [
+        'success' => $success,
+        'status_code' => $statusCode,
+        'duration_ms' => $durationMs,
+        'response' => substr($responseBody, 0, 500),
+        'error' => $errorMessage ?: ($success ? '' : "HTTP-Status $statusCode erhalten")
+    ];
 }
 
 function translate_with_deepl(string $text, string $sourceLang, string $targetLang, string $apiKey): array {

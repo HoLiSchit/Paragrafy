@@ -12,8 +12,8 @@ Paragrafy ist ein leichtgewichtiges, selbstgehostetes Content-Management-System 
   Das Admin-Dashboard visualisiert auf einen Blick, welche Pflichttexte in welchen Sprachen (`DE`, `EN`, `ES`, `FR` etc.) vorhanden, als Entwurf gespeichert oder noch unvollständig sind. Mit Instant-Toggles und 1-Klick-Kopierbuttons für alle Sprach-URLs.
 - **Zeitgesteuerte Veröffentlichung (Scheduled Publishing)**:
   Änderungen an AGB oder Datenschutzerklärungen können im Voraus mit einem Stichtag (z. B. `31.08. 00:00`) geplant werden. Die bestehende Fassung bleibt bis zum Stichtag live und wird zum Zielzeitpunkt automatisch abgelöst.
-- **Echtzeit-Webhooks mit HMAC-Signatur**:
-  Benachrichtigt verbundene Web-Apps per `POST`-Webhook bei Live-Schaltungen (`legal_text.updated`) und Vorankündigungen (`legal_text.scheduled`). *(Siehe [WEBHOOKS.md](WEBHOOKS.md) für die vollständige Spezifikation).*
+- **Vollwertige Webhooks mit Delivery-Logs**:
+  Benachrichtigt verbundene Web-Apps per `POST`-Webhook bei Live-Schaltungen (`legal_text.updated`) und Vorankündigungen (`legal_text.scheduled`) mit vollständigen Feldern (`effective_date`, `url`, `api_url`, `status`, `was_scheduled`). Ein integriertes Protokoll im Admin-Bereich zeigt HTTP-Statuscodes, Server-Antworten und Latenzen an. *(Siehe [WEBHOOKS.md](WEBHOOKS.md) für die Spezifikation).*
 - **Vollwertiger WYSIWYG & Code-Editor**:
   Visuelle Formatierungsleiste (H2, H3, Fett, Kursiv, Listen, Links) mit 1-Klick-Umschaltung zum reinen HTML-Quellcode.
 - **Bidirektionale DeepL-Übersetzung**:
@@ -36,11 +36,11 @@ Paragrafy ist ein leichtgewichtiges, selbstgehostetes Content-Management-System 
 ```text
 /var/www/paragrafy/
 ├── index.php             # Öffentlicher Router, Viewer, JSON-API & Cron-Handler
-├── admin.php             # Admin-Dashboard, Compliance-Matrix & Einstellungen
-├── editor.php            # Side-by-Side WYSIWYG- & Übersetzungs-Editor
+├── admin.php             # Admin-Dashboard, Compliance-Matrix, Webhook-Logs & Einstellungen
+├── editor.php            # Side-by-Side WYSIWYG- & Übersetzungs-Editor mit Scheduled Publishing
 ├── install.php           # Interaktiver Setup-Wizard für die Erstinstallation
-├── db.php                # SQLite-Datenbankanbindung, Migrationen & SMTP-Client
-├── WEBHOOKS.md           # Detaillierte Webhook-Dokumentation & Payloads
+├── db.php                # SQLite-Datenbankanbindung, Migrationen, Webhooks & SMTP-Client
+├── WEBHOOKS.md           # Detaillierte Webhook-Dokumentation, Spezifikation & Payloads
 ├── paragrafy.svg         # Vektor-Logo
 ├── .htaccess             # Apache Routing & Schutz sensibler Dateien
 ├── .gitignore            # Git-Ausschlussregeln

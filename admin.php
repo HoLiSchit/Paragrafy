@@ -1,6 +1,6 @@
 <?php
 /**
- * Paragrafy v1.5.5 - Admin Command Center, Multi-Project Manager & Compliance Engine
+ * Paragrafy v1.6.1 - Admin Command Center, Multi-Project Manager, Compliance Engine & Webhook Logger
  */
 declare(strict_types=1);
 
@@ -100,15 +100,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_markdown') {
     }
 }
 
-// 3. Webhook Test Trigger
+// 3. Webhook Test Trigger mit detailliertem Protokoll
 if (isset($_POST['action']) && $_POST['action'] === 'test_webhook') {
     header('Content-Type: application/json');
-    dispatch_webhook($project, [
+    $result = dispatch_webhook($project, [
         'test' => true,
         'message' => 'Paragrafy Webhook Test erfolgreich ausgelöst',
         'triggered_at' => date('c')
     ]);
-    echo json_encode(['success' => true]);
+    echo json_encode($result);
     exit;
 }
 
@@ -123,6 +123,14 @@ if (isset($_POST['action']) && $_POST['action'] === 'test_smtp') {
     $html = "<h2>Paragrafy SMTP-Test</h2><p>Deine E-Mail-Serverkonfiguration für <strong>" . htmlspecialchars($project['name']) . "</strong> funktioniert einwandfrei!</p>";
     $res = send_smtp_mail($project, $recipient, "[Paragrafy] SMTP Test-E-Mail", $html);
     echo json_encode($res);
+    exit;
+}
+
+// 5. Webhook Logs leeren
+if (isset($_POST['action']) && $_POST['action'] === 'clear_webhook_logs') {
+    $del = $db->prepare("DELETE FROM webhook_logs WHERE project_id = ?");
+    $del->execute([$projectId]);
+    header("Location: /admin/settings?project_id=$projectId&msg=logs_cleared");
     exit;
 }
 
@@ -795,6 +803,11 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
 function render_settings_view(PDO $db, array $project, array $projects): void {
     $env = load_env_file();
     $envDeepl = $env['DEEPL_API_KEY'] ?? '';
+
+    // Letzte Webhook-Logs für dieses Projekt laden
+    $stmtLogs = $db->prepare("SELECT * FROM webhook_logs WHERE project_id = ? ORDER BY created_at DESC LIMIT 10");
+    $stmtLogs->execute([$project['id']]);
+    $logs = $stmtLogs->fetchAll();
     ?>
     <!DOCTYPE html>
     <html lang="de">
@@ -808,7 +821,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
             .brand-box { display: flex; align-items: center; gap: 0.65rem; }
             .brand-box img { width: 28px; height: 28px; border-radius: 6px; }
             .nav a { color: #94a3b8; text-decoration: none; margin-left: 1.25rem; font-size: 0.9rem; font-weight: 600; }
-            .container { max-width: 860px; margin: 2rem auto; padding: 0 1.5rem; }
+            .container { max-width: 920px; margin: 2rem auto; padding: 0 1.5rem; }
             .card { background: #fff; border-radius: 14px; border: 1px solid #e2e8f0; padding: 2.25rem; margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
             label { font-size: 0.8125rem; font-weight: 700; color: #475569; display: block; margin-top: 1rem; margin-bottom: 0.35rem; }
             input[type=text], input[type=password], input[type=email], input[type=number], textarea, select { width: 100%; box-sizing: border-box; padding: 0.7rem 0.9rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; }
@@ -819,6 +832,15 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
             .btn-danger { background: #7f1d1d; color: #fecaca; }
             .btn-danger:hover { background: #991b1b; }
             .hint { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; }
+
+            /* Webhook Log Table */
+            .log-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8125rem; }
+            .log-table th, .log-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left; }
+            .log-table th { background: #f8fafc; color: #64748b; font-weight: 700; }
+            .status-badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 700; font-family: monospace; font-size: 0.75rem; }
+            .status-200 { background: #dcfce7; color: #166534; }
+            .status-err { background: #fee2e2; color: #991b1b; }
+            .payload-preview { font-family: monospace; font-size: 0.75rem; color: #475569; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         </style>
     </head>
     <body>
@@ -947,7 +969,9 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     <input type="text" name="webhook_secret" value="<?= htmlspecialchars($project['webhook_secret'] ?? '') ?>" placeholder="z. B. ein geheimer Schlüssel">
 
                     <?php if (!empty($project['webhook_url'])): ?>
-                        <button type="button" class="btn-test" onclick="triggerTestWebhook()"><?= svg_icon('lightning', '', 14) ?> Test-Webhook jetzt senden</button>
+                        <div style="display:flex; gap:0.5rem; align-items:center;">
+                            <button type="button" class="btn-test" onclick="triggerTestWebhook()"><?= svg_icon('lightning', '', 14) ?> Test-Webhook jetzt senden & prüfen</button>
+                        </div>
                     <?php endif; ?>
 
                     <label>DeepL API-Key:</label>
@@ -1002,6 +1026,62 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     </div>
                 </form>
             </div>
+
+            <!-- Webhook Protokoll & Delivery Logs -->
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin:0; font-size:1.2rem; font-weight:800;"><?= svg_icon('terminal', '', 16) ?> Webhook-Protokoll & Zustellungs-Logs</h3>
+                    <?php if (!empty($logs)): ?>
+                        <form method="post" style="margin:0;">
+                            <input type="hidden" name="action" value="clear_webhook_logs">
+                            <button type="submit" class="btn-test" style="background:#f1f5f9; color:#475569; border-color:#cbd5e1;">Logs leeren</button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+                <p style="color:#64748b; font-size:0.875rem; margin-top:0.35rem;">Live-Protokoll der letzten 10 ausgehenden Webhook-Zustellungen inklusive HTTP-Status, Server-Antwort und Latenz:</p>
+
+                <?php if (empty($logs)): ?>
+                    <div style="color:#94a3b8; font-size:0.875rem; font-style:italic; padding:1rem 0;">Noch keine Webhook-Aktivitäten für dieses Projekt protokolliert. Klicke oben auf „Test-Webhook jetzt senden“, um einen ersten Eintrag zu erzeugen.</div>
+                <?php else: ?>
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th>Zeitpunkt</th>
+                                <th>Event</th>
+                                <th>Status</th>
+                                <th>Latenz</th>
+                                <th>Server-Antwort / Fehler</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($logs as $l): ?>
+                                <?php $isSuccess = ($l['status_code'] >= 200 && $l['status_code'] < 300); ?>
+                                <tr>
+                                    <td><small><?= date('d.m. H:i:s', strtotime($l['created_at'])) ?></small></td>
+                                    <td><code><?= htmlspecialchars($l['event_name']) ?></code></td>
+                                    <td>
+                                        <span class="status-badge <?= $isSuccess ? 'status-200' : 'status-err' ?>">
+                                            <?= $l['status_code'] ?: 'ERR' ?>
+                                        </span>
+                                    </td>
+                                    <td><small><?= $l['duration_ms'] ?> ms</small></td>
+                                    <td>
+                                        <?php if (!empty($l['error_message'])): ?>
+                                            <span style="color:#dc2626; font-weight:600;"><?= htmlspecialchars($l['error_message']) ?></span>
+                                        <?php elseif (!empty($l['response_body'])): ?>
+                                            <div class="payload-preview" title="<?= htmlspecialchars($l['response_body']) ?>">
+                                                <?= htmlspecialchars($l['response_body']) ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span style="color:#64748b; font-style:italic;">(Leere Antwort)</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
         </div>
 
         <script>
@@ -1010,10 +1090,13 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                 formData.append('action', 'test_webhook');
                 try {
                     const res = await fetch(window.location.href, { method: 'POST', body: formData });
-                    if (res.ok) {
-                        alert('Test-Webhook erfolgreich an deine URL gesendet!');
+                    const data = await res.json();
+                    if (data.success) {
+                        alert(`Webhook erfolgreich zugestellt!\nHTTP-Status: ${data.status_code}\nDauer: ${data.duration_ms} ms\nAntwort: ${data.response || '(leer)'}`);
+                        location.reload();
                     } else {
-                        alert('Fehler beim Senden des Webhooks.');
+                        alert(`Fehler bei der Webhook-Zustellung:\nHTTP-Status: ${data.status_code}\nFehler: ${data.error || 'Unbekannt'}\nAntwort: ${data.response || '(leer)'}`);
+                        location.reload();
                     }
                 } catch (e) {
                     alert('Netzwerkfehler: ' + e.message);

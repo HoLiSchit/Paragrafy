@@ -1,6 +1,6 @@
 # § Paragrafy Webhook Referenz & Spezifikation
 
-Dieses Dokument beschreibt die Webhook-Schnittstelle von Paragrafy zur automatisierten Synchronisation von Rechtstexten (AGB, Datenschutzerklärung, Impressum etc.) mit angebundenen Web- und Mobile-Anwendungen.
+Dieses Dokument beschreibt die Webhook-Schnittstelle von Paragrafy (v1.6.2) zur automatisierten Synchronisation von Rechtstexten (AGB, Datenschutzerklärung, Impressum etc.) mit angebundenen Web- und Mobile-Anwendungen.
 
 ---
 
@@ -11,7 +11,7 @@ Jeder von Paragrafy versendete Webhook wird als `POST`-Request mit folgendem Hea
 | Header | Beschreibung | Beispiel |
 | :--- | :--- | :--- |
 | `Content-Type` | MIME-Type des Payloads | `application/json` |
-| `User-Agent` | Client-Identifikator | `Paragrafy-Webhook/1.6.0` |
+| `User-Agent` | Client-Identifikator | `Paragrafy-Webhook/1.6.2` |
 | `X-Paragrafy-Event` | Event-Typ | `legal_text.updated` / `legal_text.scheduled` |
 | `X-Paragrafy-Signature` | HMAC-SHA256 Signatur des rohen Body-Strings | `a3f8e... (hex)` *(nur wenn Secret gesetzt)* |
 
@@ -30,7 +30,7 @@ Jeder von Paragrafy versendete Webhook wird als `POST`-Request mit folgendem Hea
 
 ### A. Event: `legal_text.updated` (Live-Veröffentlichung)
 
-Wird gefeuert, sobald ein Rechtstext aktiv geschaltet wurde.
+Wird gefeuert, sobald ein Rechtstext aktiv geschaltet wurde (sofort oder nach Ablauf eines Stichtags).
 
 #### JSON-Payload:
 ```json
@@ -84,7 +84,8 @@ Wird gefeuert, wenn im Editor eine zeitgesteuerte Live-Schaltung für die Zukunf
     "scheduled_at": "2026-08-31T00:00:00+02:00",
     "effective_date": "2026-08-31T00:00:00+02:00",
     "url": "https://legal.deinedomain.de/de/agb-b2c",
-    "api_url": "https://legal.deinedomain.de/api/de/agb-b2c"
+    "api_url": "https://legal.deinedomain.de/api/de/agb-b2c",
+    "was_scheduled": false
   }
 }
 ```
@@ -175,13 +176,13 @@ app.post('/api/legal-webhook', express.raw({ type: 'application/json' }), (req: 
   switch (payload.event) {
     case 'legal_text.scheduled':
       // z.B. In-App-Hinweis: "Neue AGB ab dem 31.08." planen
-      console.log(`[Vorankündigung] ${payload.data.title} geht live am ${payload.data.scheduled_at}`);
+      console.log(`[Vorankündigung] ${payload.data.title} (${payload.data.lang}) geht live am ${payload.data.scheduled_at}`);
       break;
 
     case 'legal_text.updated':
       // z.B. User-Consent-Flag in DB zurücksetzen, wenn es die AGB betrifft
       if (payload.data.slug.startsWith('agb')) {
-        console.log(`[AGB Aktualisiert] Neue Version ${payload.data.effective_date} aktiv.`);
+        console.log(`[AGB Aktiv] Neue Version ${payload.data.effective_date} ist jetzt live.`);
         // await db.users.updateMany({ data: { must_accept_terms: true } });
       }
       break;
