@@ -1,6 +1,6 @@
 # § Paragrafy Webhook Referenz & Spezifikation
 
-Dieses Dokument beschreibt die Webhook-Schnittstelle von Paragrafy (v1.6.2) zur automatisierten Synchronisation von Rechtstexten (AGB, Datenschutzerklärung, Impressum etc.) mit angebundenen Web- und Mobile-Anwendungen.
+Dieses Dokument beschreibt die Webhook-Schnittstelle von Paragrafy (v1.7.0) zur automatisierten Synchronisation von Rechtstexten (AGB, Datenschutzerklärung, Impressum etc.) mit angebundenen Web- und Mobile-Anwendungen.
 
 ---
 
@@ -11,7 +11,7 @@ Jeder von Paragrafy versendete Webhook wird als `POST`-Request mit folgendem Hea
 | Header | Beschreibung | Beispiel |
 | :--- | :--- | :--- |
 | `Content-Type` | MIME-Type des Payloads | `application/json` |
-| `User-Agent` | Client-Identifikator | `Paragrafy-Webhook/1.6.2` |
+| `User-Agent` | Client-Identifikator | `Paragrafy-Webhook/1.7.0` |
 | `X-Paragrafy-Event` | Event-Typ | `legal_text.updated` / `legal_text.scheduled` |
 | `X-Paragrafy-Signature` | HMAC-SHA256 Signatur des rohen Body-Strings | `a3f8e... (hex)` *(nur wenn Secret gesetzt)* |
 
@@ -21,16 +21,50 @@ Jeder von Paragrafy versendete Webhook wird als `POST`-Request mit folgendem Hea
 
 | Event | Auslöser | Einsatzzweck in deiner App |
 | :--- | :--- | :--- |
+| `legal_text.scheduled` | Eine Textänderung wurde für einen zukünftigen Zeitpunkt geplant. | Vorankündigungs-Banner mit **Pre-Release-Link** für Nutzer anzeigen (*„AGB ändern sich zum 31.08. [Jetzt Vorab-Fassung lesen]“*). |
 | `legal_text.updated` | Ein Rechtstext wurde sofort live veröffentlicht oder ein geplanter Stichtag wurde erreicht. | Neue AGB-Zustimmung im User-Account erzwingen, App-Cache invalidieren. |
-| `legal_text.scheduled` | Eine Textänderung wurde für einen zukünftigen Zeitpunkt geplant. | Vorankündigungs-Banner für Nutzer anzeigen (*„AGB ändern sich zum 31.08.“*). |
 
 ---
 
 ## 3. Payload-Spezifikation
 
-### A. Event: `legal_text.updated` (Live-Veröffentlichung)
+### A. Event: `legal_text.scheduled` (Vorankündigung mit Pre-Release-Link)
 
-Wird gefeuert, sobald ein Rechtstext aktiv geschaltet wurde (sofort oder nach Ablauf eines Stichtags).
+Wird gefeuert, wenn im Editor eine zeitgesteuerte Live-Schaltung für die Zukunft geplant wird. Enthält direkte Links zur **Pre-Release-Vorschau** für deine Nutzer.
+
+#### JSON-Payload:
+```json
+{
+  "event": "legal_text.scheduled",
+  "timestamp": "2026-08-30T15:30:00+02:00",
+  "project": {
+    "id": 1,
+    "name": "MeinProjekt",
+    "domain": "legal.deinedomain.de"
+  },
+  "data": {
+    "document_id": 3,
+    "slug": "agb-b2c",
+    "lang": "de",
+    "title": "AGB (Endkunden / B2C)",
+    "status": "scheduled",
+    "change_note": "Aktualisierung der Zahlungsbedingungen zum 31.08.",
+    "scheduled_at": "2026-08-31T00:00:00+02:00",
+    "effective_date": "2026-08-31T00:00:00+02:00",
+    "url": "https://legal.deinedomain.de/de/agb-b2c",
+    "api_url": "https://legal.deinedomain.de/api/de/agb-b2c",
+    "preview_url": "https://legal.deinedomain.de/de/agb-b2c/preview",
+    "preview_api_url": "https://legal.deinedomain.de/api/de/agb-b2c/preview",
+    "was_scheduled": false
+  }
+}
+```
+
+---
+
+### B. Event: `legal_text.updated` (Live-Veröffentlichung)
+
+Wird gefeuert, sobald ein Rechtstext aktiv geschaltet wurde (sofort oder nach Ablauf des Stichtags).
 
 #### JSON-Payload:
 ```json
@@ -49,7 +83,7 @@ Wird gefeuert, sobald ein Rechtstext aktiv geschaltet wurde (sofort oder nach Ab
     "title": "AGB (Endkunden / B2C)",
     "status": "published",
     "change_note": "Aktualisierung der Zahlungsbedingungen zum Monatsende",
-    "was_scheduled": false,
+    "was_scheduled": true,
     "effective_date": "2026-08-30T15:45:00+02:00",
     "url": "https://legal.deinedomain.de/de/agb-b2c",
     "api_url": "https://legal.deinedomain.de/api/de/agb-b2c",
@@ -60,71 +94,25 @@ Wird gefeuert, sobald ein Rechtstext aktiv geschaltet wurde (sofort oder nach Ab
 
 ---
 
-### B. Event: `legal_text.scheduled` (Vorankündigung für Stichtag)
-
-Wird gefeuert, wenn im Editor eine zeitgesteuerte Live-Schaltung für die Zukunft geplant wird.
-
-#### JSON-Payload:
-```json
-{
-  "event": "legal_text.scheduled",
-  "timestamp": "2026-08-30T15:30:00+02:00",
-  "project": {
-    "id": 1,
-    "name": "MeinProjekt",
-    "domain": "legal.deinedomain.de"
-  },
-  "data": {
-    "document_id": 3,
-    "slug": "agb-b2c",
-    "lang": "de",
-    "title": "AGB (Endkunden / B2C)",
-    "status": "scheduled",
-    "change_note": "Inkrafttreten neuer Zahlungsdienstleister zum 31.08.2026",
-    "scheduled_at": "2026-08-31T00:00:00+02:00",
-    "effective_date": "2026-08-31T00:00:00+02:00",
-    "url": "https://legal.deinedomain.de/de/agb-b2c",
-    "api_url": "https://legal.deinedomain.de/api/de/agb-b2c",
-    "was_scheduled": false
-  }
-}
-```
-
----
-
 ## 4. Felddefinitionen (Daten-Mapping)
 
-### Root-Objekt
-
-| Feld | Typ | Beschreibung |
+| Feldname | Typ | Bedeutung |
 | :--- | :--- | :--- |
-| `event` | `string` | Der Name des Ereignisses (`legal_text.updated` oder `legal_text.scheduled`). |
-| `timestamp` | `string` (ISO 8601) | Zeitpunkt des Webhook-Versands. |
-| `project` | `object` | Stammdaten des betroffenen Projekts (`id`, `name`, `domain`). |
-| `data` | `object` | Die inhaltlichen Details des betroffenen Dokuments. |
-
-### `data`-Objekt (Dokumentendetails)
-
-| Feld | Typ | Beschreibung |
-| :--- | :--- | :--- |
-| `document_id` | `integer` | Eindeutige interne ID des Dokuments. |
-| `slug` | `string` | URL-Slug des Dokuments (z. B. `agb-b2c`, `datenschutz`, `impressum`). |
-| `lang` | `string` (2-stellig) | Sprachcode der geänderten Version (z. B. `de`, `en`, `es`, `fr`). |
-| `title` | `string` | Der vom Admin vergebene Titel in der jeweiligen Sprache. |
-| `status` | `string` | Aktueller Veröffentlichungsstatus (`published` oder `scheduled`). |
-| `change_note` | `string` | Optionale Revisionsnotiz des Admins (z. B. Grund der Änderung). |
-| `was_scheduled` | `boolean` | `true`, falls diese Veröffentlichung zuvor zeitgesteuert geplant war. |
-| `scheduled_at` | `string` (ISO 8601) | Nur bei `scheduled`: Der geplante Zeitpunkt des Inkrafttretens. |
-| `effective_date`| `string` (ISO 8601) | Datum des Inkrafttretens (bei Live sofort, bei Scheduled der Stichtag). |
-| `url` | `string` (HTTPS) | Öffentliche Web-URL der entsprechenden Sprachfassung. |
-| `api_url` | `string` (HTTPS) | Headless JSON-API URL zum direkten Abruf des gerenderten HTML-Inhalts. |
-| `updated_at` | `string` (ISO 8601) | Zeitstempel der letzten Speicherung in der Datenbank. |
+| `data.title` | `string` | Der Titel in der jeweiligen Zielsprache. |
+| `data.slug` | `string` | Eindeutiger Bezeichner (`agb-b2c`, `datenschutz`, `impressum`). |
+| `data.lang` | `string` | 2-stelliger Sprachcode (`de`, `en`, `es`, `fr` etc.). |
+| `data.effective_date` | `string` (ISO 8601) | **Inkrafttretungsdatum** (bei Live sofort, bei Scheduled der Stichtag). |
+| `data.scheduled_at` | `string` (ISO 8601) | Nur bei `scheduled`: Der geplante Umschaltzeitpunkt. |
+| `data.url` | `string` | URL der aktuell gültigen Live-Version. |
+| `data.api_url` | `string` | JSON-API URL der aktuell gültigen Live-Version. |
+| `data.preview_url` | `string` | **Pre-Release URL**: Öffentliche Vorschau-URL der geplanten Neufassung für Nutzer (`/preview`). |
+| `data.preview_api_url` | `string` | **Pre-Release API URL**: JSON-API für die geplante Neufassung. |
+| `data.was_scheduled` | `boolean` | `true`, falls diese Veröffentlichung aus einer Planung hervorging. |
+| `data.change_note` | `string` | Die vom Admin vergebene Revisionsnotiz. |
 
 ---
 
-## 5. Implementierungsbeispiel für Empfänger
-
-### In TypeScript / Node.js (Express)
+## 5. Implementierungsbeispiel in TypeScript / Node.js
 
 ```typescript
 import express, { Request, Response } from 'express';
@@ -150,6 +138,8 @@ interface ParagrafyWebhookPayload {
     effective_date: string;
     url: string;
     api_url: string;
+    preview_url?: string;
+    preview_api_url?: string;
     updated_at?: string;
   };
 }
@@ -172,19 +162,17 @@ app.post('/api/legal-webhook', express.raw({ type: 'application/json' }), (req: 
 
   const payload: ParagrafyWebhookPayload = JSON.parse(rawBody);
 
-  // 2. Mapping & Logik ausführen
+  // 2. Event Routing
   switch (payload.event) {
     case 'legal_text.scheduled':
-      // z.B. In-App-Hinweis: "Neue AGB ab dem 31.08." planen
-      console.log(`[Vorankündigung] ${payload.data.title} (${payload.data.lang}) geht live am ${payload.data.scheduled_at}`);
+      // Vorankündigungs-Banner schalten mit Pre-Release-Link!
+      console.log(`[Vorankündigung] ${payload.data.title} ändert sich zum ${payload.data.scheduled_at}`);
+      console.log(`Pre-Release Vorschau-Link für Nutzer: ${payload.data.preview_url}`);
       break;
 
     case 'legal_text.updated':
-      // z.B. User-Consent-Flag in DB zurücksetzen, wenn es die AGB betrifft
-      if (payload.data.slug.startsWith('agb')) {
-        console.log(`[AGB Aktiv] Neue Version ${payload.data.effective_date} ist jetzt live.`);
-        // await db.users.updateMany({ data: { must_accept_terms: true } });
-      }
+      // Neue Version ist aktiv: User-Consent anfordern
+      console.log(`[Live] ${payload.data.title} ist jetzt in Kraft.`);
       break;
   }
 

@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  paragrafy-app:
+    build: .
+    container_name: paragrafy_saas
+    restart: always
+    ports:
+      - "5555:80"
+    volumes:
+      # Sichert den SQLite-Datenordner permanent auf dem Host-Server
+      - ./data:/var/www/html/data
+    environment:
+      - SAAS_MODE=true
