@@ -23,6 +23,13 @@ if ($uri === '/paragrafy.svg') {
     exit;
 }
 
+// Rollierendes Backup (7 Tage) -- per externem Cron täglich aufzurufen, z. B. via crontab oder Uptime-Kuma-Healthcheck
+if ($uri === '/api/cron/backup') {
+    header('Content-Type: application/json');
+    echo json_encode(run_scheduled_backup());
+    exit;
+}
+
 if (str_starts_with($uri, '/admin')) {
     require_once __DIR__ . '/admin.php';
     exit;

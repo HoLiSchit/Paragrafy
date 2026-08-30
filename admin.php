@@ -101,6 +101,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_backup') {
     }
 }
 
+// 1b. Rollierendes Backup herunterladen (7-Tage-Verlauf)
+if (isset($_GET['action']) && $_GET['action'] === 'download_backup_file') {
+    $requested = basename((string)($_GET['file'] ?? ''));
+    $path = BACKUP_DIR . '/' . $requested;
+    if (preg_match('/^paragrafy_backup_[0-9_]+\.sqlite$/', $requested) && file_exists($path)) {
+        header('Content-Type: application/x-sqlite3');
+        header('Content-Disposition: attachment; filename="' . $requested . '"');
+        header('Content-Length: ' . filesize($path));
+        readfile($path);
+        exit;
+    }
+    http_response_code(404);
+    echo 'Backup nicht gefunden.';
+    exit;
+}
+
+// 1c. Rollierendes Backup manuell anstoßen
+if (isset($_POST['action']) && $_POST['action'] === 'run_backup_now') {
+    $result = run_scheduled_backup();
+    log_audit(null, '', $result['success'] ? 'Backup manuell ausgelöst' : 'Backup fehlgeschlagen: ' . ($result['error'] ?? ''));
+    header("Location: /admin/settings?project_id=$projectId&msg=" . ($result['success'] ? 'backup_created' : 'backup_failed'));
+    exit;
+}
+
 // 2. Markdown Export herunterladen
 if (isset($_GET['action']) && $_GET['action'] === 'export_markdown') {
     $stmt = $db->prepare("
@@ -1110,6 +1134,8 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
     $stmtLogs = $db->prepare("SELECT * FROM webhook_logs WHERE project_id = ? ORDER BY created_at DESC LIMIT 10");
     $stmtLogs->execute([$project['id']]);
     $logs = $stmtLogs->fetchAll();
+    $backups = list_backups();
+    $backupMsg = $_GET['msg'] ?? '';
     ?>
     <!DOCTYPE html>
     <html lang="de">
@@ -1478,6 +1504,45 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <a href="/admin?action=download_backup" class="pg-btn-secondary"><?= svg_icon('disk', '', 14) ?> Sicherungskopie herunterladen</a>
                             <a href="/admin?action=export_markdown" class="pg-btn-secondary"><?= svg_icon('folder', '', 14) ?> Als Textdateien exportieren</a>
                             <button type="button" class="pg-btn-secondary" onclick="triggerAuditReport()"><?= svg_icon('mail', '', 14) ?> Prüfbericht per E-Mail</button>
+                        </div>
+
+                        <div style="border-top:1px solid var(--border-soft);margin-top:20px;padding-top:16px">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+                                <h2 style="margin:0;font-size:14px">Automatische Backups (7 Tage rollierend)<?= help_icon('Legt täglich eine Kopie der Datenbank in /backups an und löscht automatisch alles, was älter als 7 Tage ist. Dafür muss ein externer Cron-Job einmal täglich /api/cron/backup aufrufen — genau wie beim Prüfbericht per E-Mail.') ?></h2>
+                                <form method="post" style="margin:0">
+                                    <input type="hidden" name="action" value="run_backup_now">
+                                    <button type="submit" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px">Jetzt sichern</button>
+                                </form>
+                            </div>
+                            <?php if ($backupMsg === 'backup_created'): ?>
+                                <p style="font-size:12px;color:var(--green);margin:4px 0 10px">Backup wurde erstellt.</p>
+                            <?php elseif ($backupMsg === 'backup_failed'): ?>
+                                <p style="font-size:12px;color:var(--red);margin:4px 0 10px">Backup fehlgeschlagen.</p>
+                            <?php endif; ?>
+                            <p class="pg-card-sub" style="margin:0 0 10px">Ohne eingerichteten Cron-Job entstehen hier nur Backups, die du manuell auslöst.</p>
+
+                            <?php if (empty($backups)): ?>
+                                <div style="color:var(--text-faint);font-size:13px;font-style:italic">Noch keine automatischen Backups vorhanden.</div>
+                            <?php else: ?>
+                                <table class="pg-table" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                                    <thead>
+                                        <tr>
+                                            <th>Erstellt</th>
+                                            <th>Größe</th>
+                                            <th style="width:110px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($backups as $b): ?>
+                                            <tr>
+                                                <td style="color:var(--text-muted)"><?= date('d.m.Y H:i', $b['created_at']) ?></td>
+                                                <td style="color:var(--text-muted)"><?= round($b['size'] / 1024 / 1024, 2) ?> MB</td>
+                                                <td><a href="/admin?action=download_backup_file&file=<?= urlencode($b['filename']) ?>" class="pg-btn-secondary" style="padding:4px 10px;font-size:12px">Download</a></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            <?php endif; ?>
                         </div>
                     </div>
 

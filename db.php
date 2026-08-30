@@ -8,6 +8,8 @@ define('PARAGRAFY_VERSION', '1.6.2');
 define('PARAGRAFY_DIR', __DIR__);
 define('DB_FILE', PARAGRAFY_DIR . '/paragrafy_data.sqlite');
 define('CONFIG_FILE', PARAGRAFY_DIR . '/config.php');
+define('BACKUP_DIR', PARAGRAFY_DIR . '/backups');
+define('BACKUP_RETENTION_DAYS', 7);
 
 function load_env_file(): array {
     $env = [];
@@ -780,6 +782,55 @@ function clear_login_failures(PDO $db, string $identifier): void {
         $stmt->execute([$identifier]);
     } catch (Throwable $e) {
     }
+}
+
+/**
+ * Copies the SQLite database into /backups and prunes anything older than
+ * BACKUP_RETENTION_DAYS. Meant to be triggered daily via an external cron
+ * hitting /api/cron/backup (the same pattern as the audit-mail cron).
+ */
+function run_scheduled_backup(): array {
+    try {
+        if (!file_exists(DB_FILE)) {
+            return ['success' => false, 'error' => 'Keine Datenbank gefunden.'];
+        }
+        if (!is_dir(BACKUP_DIR) && !mkdir(BACKUP_DIR, 0755, true) && !is_dir(BACKUP_DIR)) {
+            return ['success' => false, 'error' => 'Backup-Ordner konnte nicht angelegt werden.'];
+        }
+
+        $filename = 'paragrafy_backup_' . date('Y-m-d_His') . '.sqlite';
+        if (!copy(DB_FILE, BACKUP_DIR . '/' . $filename)) {
+            return ['success' => false, 'error' => 'Kopieren der Datenbank fehlgeschlagen.'];
+        }
+
+        $cutoff = time() - (BACKUP_RETENTION_DAYS * 24 * 60 * 60);
+        $deleted = 0;
+        foreach (glob(BACKUP_DIR . '/paragrafy_backup_*.sqlite') ?: [] as $file) {
+            if (filemtime($file) < $cutoff) {
+                @unlink($file);
+                $deleted++;
+            }
+        }
+
+        return ['success' => true, 'file' => $filename, 'deleted_old' => $deleted];
+    } catch (Throwable $e) {
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+/** Returns rolling backups newest-first as [filename, size_bytes, created_at]. */
+function list_backups(): array {
+    $files = glob(BACKUP_DIR . '/paragrafy_backup_*.sqlite') ?: [];
+    $backups = [];
+    foreach ($files as $file) {
+        $backups[] = [
+            'filename' => basename($file),
+            'size' => filesize($file),
+            'created_at' => filemtime($file)
+        ];
+    }
+    usort($backups, fn($a, $b) => $b['created_at'] <=> $a['created_at']);
+    return $backups;
 }
 
 /**
