@@ -29,17 +29,21 @@ Paragrafy ist ein leichtgewichtiges, selbstgehostetes Content-Management-System 
 - **Notion/Stripe-Style Public Viewer**:
   Mitscrollendes Inhaltsverzeichnis (Sticky TOC mit Scroll-Spy), Lesezeit-Berechnung, Direktlink-Anker (`#`) und Live-Textfilter in allen Zielsprachen.
 - **Backups & Exporte**:
-  Lade die komplette SQLite-Datenbank oder alle veröffentlichten Rechtstexte als Markdown-Archiv (ZIP, nach Sprache/Slug sortiert) direkt aus dem Dashboard herunter.
+  Lade in den Einstellungen eine Sicherungskopie der kompletten Datenbank oder alle veröffentlichten Rechtstexte als Textdateien (ZIP, nach Sprache/Slug sortiert) herunter.
 - **Beliebig viele eigene Rechtstext-Typen**:
   Über die Pflichtseiten hinaus lassen sich projektübergreifend zusätzliche Dokumente anlegen (z. B. AGB B2B, Sponsoring-Vereinbarung, Lizenzbedingungen) und optional als Pflichtseite markieren.
 - **Multi-User-Verwaltung mit E-Mail-Einladung**:
-  Lade beliebig viele Personen per E-Mail ein; sie legen über einen Aktivierungslink ihr eigenes Passwort fest. Jede eingeladene Person hat vollen Zugriff auf das gesamte Admin-Panel — es gibt keine Rollen oder Rechte einzustellen.
-- **Änderungsprotokoll (Audit-Trail)**:
-  Ein eigener Tab "Protokoll" zeigt, wer wann was geändert hat — Projekteinstellungen, Rechtstext-Typen, Veröffentlichungen und Benutzerverwaltung.
+  Lade beliebig viele Personen per E-Mail ein; sie legen über einen Aktivierungslink ihr eigenes Passwort fest. Jede eingeladene Person hat vollen Zugriff auf das gesamte Admin-Panel — es gibt keine Rollen oder Rechte einzustellen. Ein "Passwort vergessen"-Link ermöglicht das eigenständige Zurücksetzen.
+- **Änderungsprotokoll (Audit-Trail) mit CSV-Export**:
+  Ein eigener Tab "Protokoll" zeigt, wer wann was geändert hat — Projekteinstellungen, Rechtstext-Typen, Veröffentlichungen und Benutzerverwaltung. Lässt sich als CSV-Datei herunterladen.
 - **Versionshistorie mit Diff & Wiederherstellen**:
   Jede Veröffentlichung eines Rechtstexts legt eine neue Version an. Der Editor zeigt den vollständigen Versionsverlauf pro Sprache inklusive Diff-Ansicht gegen den aktuellen Stand und einer nicht-destruktiven "Wiederherstellen"-Funktion.
 - **Sprachen-Tabs im Editor**:
   Aktive Sprachen erscheinen als Tabs; eine optionale Vergleichsansicht blendet die Referenzsprache bei Bedarf side-by-side ein.
+- **Dunkelmodus**:
+  Hell/Dunkel/Automatisch-Umschalter in den Einstellungen, pro Browser gespeichert — ohne Auswirkung auf andere Personen oder die öffentlichen Rechtstext-Seiten.
+- **Login-Schutz**:
+  Fehlgeschlagene Anmeldeversuche werden pro IP-Adresse gedrosselt (5 Versuche / 15 Minuten), um Brute-Force-Angriffe zu erschweren.
 
 ---
 
