@@ -313,66 +313,64 @@ function render_public_document(array $project, array $trans, string $content, a
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title><?= htmlspecialchars($trans['title']) ?> - <?= htmlspecialchars($project['name']) ?></title>
         <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars($logoUrl) ?>">
+        <?= theme_head_tags() ?>
+        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
         <style>
-            :root { --brand: <?= $brand ?>; --bg: #f8fafc; --text: #0f172a; --card: #ffffff; --border: #e2e8f0; --toc-active: #e11d48; }
-            @media (prefers-color-scheme: dark) {
-                :root { --bg: #090d16; --text: #f1f5f9; --card: #131b2e; --border: #1e293b; --toc-active: #fb7185; }
-            }
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; line-height: 1.7; font-size: 1rem; }
-            
-            .wrapper { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; display: grid; grid-template-columns: 1fr 280px; gap: 2.5rem; align-items: start; }
-            @media (max-width: 980px) { .wrapper { grid-template-columns: 1fr; } .toc-sidebar { display: none; } }
-            
-            .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem 3rem; box-shadow: 0 4px 20px -2px rgba(0,0,0,0.04); }
-            @media (max-width: 600px) { .card { padding: 1.5rem; } }
-            
-            header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
-            .brand-wrap { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
-            .brand-wrap img { width: 32px; height: 32px; border-radius: 8px; }
-            .brand-name { font-weight: 800; font-size: 1.3rem; color: var(--brand); letter-spacing: -0.02em; }
-            
-            .header-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-            .lang-switch a { text-decoration: none; padding: 0.35rem 0.65rem; border-radius: 8px; font-size: 0.8125rem; border: 1px solid var(--border); color: var(--text); font-weight: 700; transition: all 0.2s; }
-            .lang-switch a.active { background: var(--brand); color: #fff; border-color: var(--brand); }
-            
-            .btn-action { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.35rem 0.65rem; border-radius: 8px; font-size: 0.8125rem; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; transition: all 0.2s; }
-            .btn-action:hover { border-color: var(--brand); color: var(--brand); }
-            
-            h1 { font-size: 2.3rem; margin-top: 0; font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; }
-            .meta-bar { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 2rem; font-size: 0.85rem; color: #64748b; }
-            .meta-pill { background: rgba(0,0,0,0.04); padding: 0.25rem 0.6rem; border-radius: 6px; font-weight: 500; display: inline-flex; align-items: center; gap: 0.35rem; }
-            @media (prefers-color-scheme: dark) { .meta-pill { background: rgba(255,255,255,0.06); } }
-            
-            .search-box { position: relative; margin-bottom: 2rem; }
-            .search-box input { width: 100%; box-sizing: border-box; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
-            .search-box input:focus { border-color: var(--brand); }
-            .search-box svg { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #94a3b8; pointer-events: none; }
+            body { line-height: 1.7; }
+            .hero { background: #17141b; padding: 24px 40px 40px; }
+            .hero-inner { max-width: 1160px; margin: 0 auto; }
+            .hero-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 1rem; }
+            .brand-wrap { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+            .brand-wrap img { width: 30px; height: 30px; border-radius: 7px; }
+            .brand-name { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 17px; color: #fff; }
 
-            .content h2, .content h3 { scroll-margin-top: 2rem; position: relative; }
-            .content h2 { font-size: 1.45rem; font-weight: 700; margin-top: 2.5rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
-            .content h3 { font-size: 1.15rem; font-weight: 700; margin-top: 1.75rem; margin-bottom: 0.5rem; }
-            .content a { color: var(--brand); text-decoration: underline; }
-            .content p { margin: 1rem 0; color: var(--text); }
-            
-            .anchor-link { opacity: 0; margin-left: 0.5rem; text-decoration: none !important; color: #94a3b8 !important; font-weight: normal; transition: opacity 0.2s; font-size: 0.9em; }
-            .content h2:hover .anchor-link, .content h3:hover .anchor-link { opacity: 1; }
+            .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+            .lang-switch a { text-decoration: none; padding: 6px 14px; border-radius: 7px; font-size: 12px; border: 1px solid rgba(255,255,255,0.16); color: rgba(255,255,255,0.6); font-weight: 700; }
+            .lang-switch a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+            .btn-action { background: transparent; border: 1px solid rgba(255,255,255,0.16); color: rgba(255,255,255,0.75); padding: 6px 14px; border-radius: 7px; font-size: 12px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-family: 'IBM Plex Sans', sans-serif; }
+            .btn-action:hover { border-color: rgba(255,255,255,0.4); color: #fff; }
 
-            .toc-sidebar { position: sticky; top: 2rem; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 15px -2px rgba(0,0,0,0.03); }
-            .toc-title { font-size: 0.875rem; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.4rem; }
-            .toc-list { list-style: none; padding: 0; margin: 0; max-height: calc(100vh - 12rem); overflow-y: auto; }
-            .toc-item { margin-bottom: 0.5rem; }
-            .toc-link { display: block; font-size: 0.875rem; color: #64748b; text-decoration: none; padding: 0.25rem 0.5rem; border-radius: 6px; border-left: 2px solid transparent; transition: all 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .toc-link:hover { color: var(--text); background: rgba(0,0,0,0.03); }
-            .toc-link.active { color: var(--toc-active); font-weight: 700; border-left-color: var(--toc-active); background: rgba(225,29,72,0.05); }
+            h1 { font-size: 32px; margin: 0 0 14px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; color: #fff; }
+            .meta-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; font-size: 12px; }
+            .meta-pill { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.75); padding: 6px 12px; border-radius: 20px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
 
-            footer { text-align: center; margin-top: 4rem; padding-bottom: 2rem; font-size: 0.8125rem; color: #64748b; }
-            @media print { .header-actions, .toc-sidebar, .search-box, .anchor-link, header a, footer { display: none; } .card { border: none; box-shadow: none; padding: 0; } .wrapper { display: block; padding: 0; } body { background: #fff; color: #000; } }
+            .search-box { position: relative; }
+            .search-box input { width: 100%; box-sizing: border-box; padding: 12px 16px 12px 40px; border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; background: rgba(255,255,255,0.06); color: #fff; font-size: 13px; outline: none; font-family: 'IBM Plex Sans', sans-serif; }
+            .search-box input::placeholder { color: rgba(255,255,255,0.4); }
+            .search-box input:focus { border-color: var(--accent); }
+            .search-box svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.4); pointer-events: none; }
+
+            .wrapper { max-width: 1160px; margin: 0 auto; padding: 36px 40px 90px; display: grid; grid-template-columns: 1fr 280px; gap: 48px; align-items: start; }
+            @media (max-width: 980px) { .wrapper { grid-template-columns: 1fr; } .toc-sidebar { display: none; } .hero { padding: 20px 20px 28px; } .wrapper { padding: 28px 20px 60px; } }
+
+            .content { font-size: 14.5px; color: var(--text); }
+            .content h1, .content h2, .content h3 { scroll-margin-top: 2rem; position: relative; }
+            .content h1 { font-size: 26px; font-weight: 800; margin-top: 2.25rem; margin-bottom: 0.75rem; }
+            .content h2 { font-size: 22px; font-weight: 700; margin-top: 2.25rem; margin-bottom: 0.75rem; }
+            .content h3 { font-size: 16px; font-weight: 700; margin-top: 1.75rem; margin-bottom: 0.5rem; }
+            .content a { text-decoration: underline; }
+            .content p { margin: 1rem 0; }
+
+            .anchor-link { opacity: 0; margin-left: 0.5rem; text-decoration: none !important; color: var(--text-faint) !important; font-weight: normal; transition: opacity 0.2s; font-size: 0.9em; }
+            .content h1:hover .anchor-link, .content h2:hover .anchor-link, .content h3:hover .anchor-link { opacity: 1; }
+
+            .toc-sidebar { position: sticky; top: 24px; border-left: 1px solid var(--border); padding-left: 24px; }
+            .toc-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-faint); letter-spacing: 0.06em; margin-bottom: 14px; }
+            .toc-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 11px; max-height: calc(100vh - 12rem); overflow-y: auto; }
+            .toc-link { display: block; font-size: 13px; color: var(--text-muted); text-decoration: none; border-left: 2px solid transparent; padding-left: 10px; margin-left: -11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .toc-link:hover { color: var(--text); }
+            .toc-link.active { color: var(--accent); font-weight: 600; border-left-color: var(--accent); }
+            .toc-brand { display: flex; align-items: center; gap: 6px; margin-top: 28px; font-size: 12px; color: var(--text-faint); font-weight: 500; }
+            .toc-brand span { width: 15px; height: 15px; border-radius: 4px; background: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 9px; color: #fff; }
+
+            footer { text-align: center; padding-bottom: 2rem; font-size: 12px; color: var(--text-faint); }
+            @media print { .header-actions, .toc-sidebar, .search-box, .anchor-link, .hero a, footer { display: none; } .hero { background: #fff; padding: 0; } h1, .brand-name { color: #000; } .wrapper { display: block; padding: 0; } body { background: #fff; color: #000; } }
         </style>
     </head>
     <body>
-        <div class="wrapper">
-            <div class="card">
-                <header>
+        <div class="hero">
+            <div class="hero-inner">
+                <div class="hero-top">
                     <a href="/<?= htmlspecialchars($currentLang) ?>" class="brand-wrap">
                         <img src="<?= htmlspecialchars($logoUrl) ?>" alt="Logo">
                         <span class="brand-name"><?= htmlspecialchars($project['name']) ?></span>
@@ -389,33 +387,35 @@ function render_public_document(array $project, array $trans, string $content, a
                             <?= svg_icon('print', '', 14) ?> <?= htmlspecialchars($i18n['print']) ?>
                         </button>
                     </div>
-                </header>
+                </div>
 
-                <main>
-                    <h1><?= htmlspecialchars($trans['title']) ?></h1>
-                    
-                    <div class="meta-bar">
-                        <span class="meta-pill"><?= svg_icon('clock', '', 14) ?> <?= htmlspecialchars($lastUpdatedStr) ?></span>
-                        <span class="meta-pill"><?= svg_icon('eye', '', 14) ?> <?= htmlspecialchars($readTimeStr) ?></span>
-                        <?php if (!empty($trans['change_note'])): ?>
-                            <span class="meta-pill"><?= svg_icon('edit', '', 14) ?> <?= htmlspecialchars($trans['change_note']) ?></span>
-                        <?php endif; ?>
-                    </div>
+                <h1><?= htmlspecialchars($trans['title']) ?></h1>
+                <div class="meta-bar">
+                    <span class="meta-pill"><?= svg_icon('clock', '', 13) ?> <?= htmlspecialchars($lastUpdatedStr) ?></span>
+                    <span class="meta-pill"><?= svg_icon('eye', '', 13) ?> <?= htmlspecialchars($readTimeStr) ?></span>
+                    <?php if (!empty($trans['change_note'])): ?>
+                        <span class="meta-pill"><?= svg_icon('edit', '', 13) ?> <?= htmlspecialchars($trans['change_note']) ?></span>
+                    <?php endif; ?>
+                </div>
 
-                    <div class="search-box">
-                        <?= svg_icon('search', '', 16) ?>
-                        <input type="text" id="docSearchInput" placeholder="<?= htmlspecialchars($i18n['search_ph']) ?>" oninput="filterDocumentText(this.value)">
-                    </div>
-
-                    <div class="content" id="documentContent">
-                        <?= $content ?>
-                    </div>
-                </main>
+                <div class="search-box">
+                    <?= svg_icon('search', '', 16) ?>
+                    <input type="text" id="docSearchInput" placeholder="<?= htmlspecialchars($i18n['search_ph']) ?>" oninput="filterDocumentText(this.value)">
+                </div>
             </div>
+        </div>
+
+        <div class="wrapper">
+            <main>
+                <div class="content" id="documentContent">
+                    <?= $content ?>
+                </div>
+            </main>
 
             <aside class="toc-sidebar">
-                <div class="toc-title"><?= svg_icon('shield', '', 14) ?> <?= htmlspecialchars($i18n['toc']) ?></div>
-                <ul class="toc-list" id="tocList"></ul>
+                <div class="toc-title"><?= htmlspecialchars($i18n['toc']) ?></div>
+                <ul class="toc-list" id="tocList" style="list-style:none;padding:0;margin:0"></ul>
+                <div class="toc-brand"><span>§</span> Bereitgestellt mit Paragrafy</div>
             </aside>
         </div>
 
@@ -426,7 +426,7 @@ function render_public_document(array $project, array $trans, string $content, a
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 const content = document.getElementById('documentContent');
-                const headings = content.querySelectorAll('h2, h3');
+                const headings = content.querySelectorAll('h1, h2, h3');
                 const tocList = document.getElementById('tocList');
 
                 if (headings.length === 0) {
@@ -476,7 +476,7 @@ function render_public_document(array $project, array $trans, string $content, a
             });
 
             function filterDocumentText(term) {
-                const paragraphs = document.querySelectorAll('#documentContent p, #documentContent li, #documentContent h2, #documentContent h3');
+                const paragraphs = document.querySelectorAll('#documentContent p, #documentContent li, #documentContent h1, #documentContent h2, #documentContent h3');
                 const query = term.toLowerCase().trim();
                 paragraphs.forEach(p => {
                     if (query === '' || p.innerText.toLowerCase().includes(query)) {
@@ -515,26 +515,29 @@ function render_public_overview(array $project, PDO $db, string $lang): void {
         <title><?= htmlspecialchars($i18n['overview_title']) ?> - <?= htmlspecialchars($project['name']) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars($logoUrl) ?>">
+        <?= theme_head_tags() ?>
+        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
         <style>
-            :root { --brand: <?= $brand ?>; }
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 2rem 1rem; }
-            .box { max-width: 580px; margin: 3rem auto; background: #fff; padding: 2.5rem; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); }
-            .head-logo { display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem; }
-            .head-logo img { width: 36px; height: 36px; border-radius: 10px; }
-            h1 { font-size: 1.6rem; margin: 0; color: var(--brand); font-weight: 800; letter-spacing: -0.02em; }
-            ul { list-style: none; padding: 0; margin-top: 1.5rem; }
-            li { margin-bottom: 0.75rem; }
-            li a { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border: 1px solid #e2e8f0; border-radius: 10px; color: #1e293b; text-decoration: none; font-weight: 600; transition: all 0.2s; }
-            li a:hover { border-color: var(--brand); color: var(--brand); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+            body { display: flex; align-items: center; justify-content: center; padding: 70px 20px; }
+            .box { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 36px; max-width: 460px; width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,.04); }
+            .head-logo { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+            .head-logo img { width: 32px; height: 32px; border-radius: 8px; }
+            .head-logo span { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 19px; letter-spacing: -0.01em; }
+            ul { list-style: none; padding: 0; margin: 20px 0 0; display: flex; flex-direction: column; gap: 10px; }
+            li a { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; color: var(--text); text-decoration: none; font-weight: 600; font-size: 14px; }
+            li a:hover { border-color: var(--accent); }
+            li a span:last-child { color: var(--text-faint); }
+            .toc-brand { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 14px; font-size: 12px; color: var(--text-faint); font-weight: 500; }
+            .toc-brand span.badge { width: 15px; height: 15px; border-radius: 4px; background: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 9px; color: #fff; }
         </style>
     </head>
     <body>
         <div class="box">
             <div class="head-logo">
                 <img src="<?= htmlspecialchars($logoUrl) ?>" alt="Logo">
-                <h1><?= htmlspecialchars($project['name']) ?></h1>
+                <span><?= htmlspecialchars($project['name']) ?></span>
             </div>
-            <p style="color: #64748b; margin-top:0;"><?= htmlspecialchars($i18n['overview_sub']) ?></p>
+            <p style="font-size:14px;color:var(--text-muted);margin:0 0 20px;"><?= htmlspecialchars($i18n['overview_sub']) ?></p>
             <ul>
                 <?php foreach ($docs as $doc): ?>
                     <?php if ($doc['title']): ?>
@@ -547,6 +550,8 @@ function render_public_overview(array $project, PDO $db, string $lang): void {
                     <?php endif; ?>
                 <?php endforeach; ?>
             </ul>
+            <p style="font-size:11px;color:var(--text-faintest);line-height:1.5;text-align:center;margin:22px 0 0"><?= htmlspecialchars($i18n['overview_title']) ?></p>
+            <div class="toc-brand"><span class="badge">§</span> Bereitgestellt mit Paragrafy</div>
         </div>
     </body>
     </html>
@@ -557,11 +562,17 @@ function render_public_404(array $project, string $lang): void {
     $i18n = get_i18n_strings($lang);
     ?>
     <!DOCTYPE html>
-    <html><head><meta charset="utf-8"><title>404 - <?= htmlspecialchars($i18n['not_found_title']) ?></title></head>
-    <body style="font-family:sans-serif; text-align:center; padding: 5rem 1rem; background:#f8fafc; color:#1e293b;">
-        <h2><?= htmlspecialchars($i18n['not_found_title']) ?></h2>
-        <p><?= htmlspecialchars($i18n['not_found_desc']) ?></p>
-        <p><a href="/<?= htmlspecialchars($lang) ?>" style="color:#e11d48; font-weight:bold;">&larr; <?= htmlspecialchars($i18n['back_to_overview']) ?></a></p>
+    <html lang="<?= htmlspecialchars($lang) ?>">
+    <head>
+        <meta charset="utf-8"><title>404 - <?= htmlspecialchars($i18n['not_found_title']) ?></title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <?= theme_head_tags() ?>
+        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
+    </head>
+    <body style="text-align:center; padding: 5rem 1rem;">
+        <h2 style="font-size:20px;font-weight:800;"><?= htmlspecialchars($i18n['not_found_title']) ?></h2>
+        <p style="color:var(--text-muted)"><?= htmlspecialchars($i18n['not_found_desc']) ?></p>
+        <p><a href="/<?= htmlspecialchars($lang) ?>" style="font-weight:700;">&larr; <?= htmlspecialchars($i18n['back_to_overview']) ?></a></p>
     </body></html>
     <?php
 }

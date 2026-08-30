@@ -121,6 +121,19 @@ function ensure_schema_migrations(PDO $pdo): void {
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             );
         ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT DEFAULT '',
+                status TEXT DEFAULT 'invited',
+                invite_token TEXT DEFAULT '',
+                invited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                activated_at DATETIME DEFAULT NULL
+            );
+        ");
     } catch (Throwable $e) {
     }
 }
@@ -207,6 +220,17 @@ function init_database_schema(PDO $pdo): void {
             duration_ms INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT DEFAULT '',
+            status TEXT DEFAULT 'invited',
+            invite_token TEXT DEFAULT '',
+            invited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            activated_at DATETIME DEFAULT NULL
         );
     ");
 }
@@ -604,4 +628,204 @@ function translate_with_deepl(string $text, string $sourceLang, string $targetLa
 function get_current_host(): string {
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     return explode(':', $host)[0];
+}
+
+function lang_meta(string $code): array {
+    $map = [
+        'de' => ['flag' => '🇩🇪', 'label' => 'Deutsch'],
+        'en' => ['flag' => '🇬🇧', 'label' => 'English'],
+        'es' => ['flag' => '🇪🇸', 'label' => 'Español'],
+        'fr' => ['flag' => '🇫🇷', 'label' => 'Français'],
+        'it' => ['flag' => '🇮🇹', 'label' => 'Italiano'],
+        'nl' => ['flag' => '🇳🇱', 'label' => 'Nederlands'],
+    ];
+    return $map[$code] ?? ['flag' => '', 'label' => strtoupper($code)];
+}
+
+/**
+ * Shared visual theme (fonts, base tokens, admin shell) for the redesigned UI.
+ * $accent is the project's brand_color (hex) and drives primary buttons/links.
+ */
+function theme_head_tags(): string {
+    return '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        . '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">';
+}
+
+function theme_base_css(string $accent = '#e11d48'): string {
+    $accent = htmlspecialchars($accent, ENT_QUOTES);
+    return <<<CSS
+    <style>
+        :root {
+            --accent: {$accent};
+            --accent-bg: color-mix(in srgb, {$accent} 12%, white);
+            --bg: #FAF9F6; --card: #ffffff; --border: #E8E4DC; --border-strong: #D8D2C6; --border-soft: #F1EEE7;
+            --text: #201C24; --text-muted: #746E78; --text-faint: #9C96A0; --text-faintest: #B8B2AA;
+            --green: #16814f; --green-bg: #E8F6EE; --amber: #92601a; --amber-bg: #FBF0DC; --red: #b3223a;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
+        h1, h2, h3, .heading-font { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.01em; }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { opacity: 0.85; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+
+        .pg-topbar { height: 56px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 28px; flex-shrink: 0; }
+        .pg-crumb { font-size: 13.5px; color: var(--text-faint); }
+        .pg-crumb strong { color: var(--text); font-weight: 600; }
+
+        .pg-shell { display: flex; min-height: 100vh; }
+        .pg-sidebar { width: 236px; flex-shrink: 0; background: #fff; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 14px; box-sizing: border-box; position: sticky; top: 0; height: 100vh; }
+        .pg-logo-row { display: flex; align-items: center; gap: 9px; padding: 4px 8px 18px; }
+        .pg-logo-badge { width: 28px; height: 28px; border-radius: 7px; overflow: hidden; flex-shrink: 0; }
+        .pg-logo-badge img { width: 100%; height: 100%; display: block; }
+        .pg-logo-text { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 16.5px; letter-spacing: -0.01em; color: var(--text); }
+        .pg-proj-select { width: 100%; box-sizing: border-box; border: 1px solid var(--border); background: var(--bg); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 600; color: var(--text); font-family: 'IBM Plex Sans', sans-serif; cursor: pointer; margin-bottom: 16px; }
+        .pg-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 4px; }
+        .pg-nav a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--text-muted); }
+        .pg-nav a:hover { background: var(--bg); opacity: 1; }
+        .pg-nav a.active { background: var(--accent-bg); color: var(--accent); }
+        .pg-nav-dot { width: 13px; height: 13px; border-radius: 50%; border: 2px solid currentColor; box-sizing: border-box; flex-shrink: 0; opacity: .85; }
+        .pg-nav-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; width: 13px; height: 13px; flex-shrink: 0; }
+        .pg-nav-grid span { background: currentColor; border-radius: 2px; opacity: .85; }
+        .pg-sidebar-spacer { flex: 1; }
+        .pg-viewer-link { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 10px; }
+        .pg-user-row { display: flex; align-items: center; gap: 9px; padding: 6px 8px; }
+        .pg-user-avatar { width: 26px; height: 26px; border-radius: 50%; background: #2b2732; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+        .pg-user-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pg-logout { color: var(--text-faint); font-size: 12px; }
+
+        .pg-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .pg-content { padding: 32px 32px 80px; }
+        .pg-footer-note { padding: 14px 32px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-faintest); line-height: 1.5; }
+
+        .pg-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 18px; }
+        .pg-card-pad { padding: 22px; }
+        .pg-card h2 { font-size: 16px; font-weight: 700; margin: 0 0 5px; }
+        .pg-card .pg-card-sub { font-size: 12.5px; color: var(--text-muted); margin: 0; }
+
+        .pg-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+        @media (max-width: 980px) { .pg-kpi-grid { grid-template-columns: 1fr 1fr; } }
+        .pg-kpi { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+        .pg-kpi-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--text-faint); text-transform: uppercase; margin-bottom: 10px; }
+        .pg-kpi-val { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 26px; font-weight: 800; }
+        .pg-kpi-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        table.pg-table { width: 100%; border-collapse: collapse; }
+        .pg-table th { text-align: left; padding: 9px 22px; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; color: var(--text-faint); text-transform: uppercase; background: var(--bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        .pg-table td { padding: 13px 22px; border-bottom: 1px solid var(--border-soft); font-size: 13.5px; vertical-align: middle; }
+        .pg-table tr:hover td { background: var(--bg); }
+
+        .pg-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; }
+        .pg-pill-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+        .pg-pill-green { color: var(--green); background: var(--green-bg); }
+        .pg-pill-green .pg-pill-dot { background: #2fa06a; }
+        .pg-pill-amber { color: var(--amber); background: var(--amber-bg); }
+        .pg-pill-amber .pg-pill-dot { background: #d9a441; }
+        .pg-pill-red { color: var(--red); background: #FBE7EA; }
+        .pg-pill-red .pg-pill-dot { background: #d9536b; }
+        .pg-pill-muted { color: var(--text-faint); background: var(--border-soft); font-weight: 500; }
+        .pg-req-label { font-size: 12px; font-weight: 700; color: var(--accent); }
+        .pg-opt-label { font-size: 12px; font-weight: 500; color: var(--text-faint); }
+
+        .pg-icon-btn { border: 1px solid var(--border); background: #fff; border-radius: 7px; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); }
+        .pg-icon-btn:hover { border-color: var(--border-strong); color: var(--text); }
+        .pg-icon-btn.danger:hover { border-color: #d99; color: var(--red); }
+        .pg-copy-btn { border: none; background: transparent; padding: 2px; cursor: pointer; color: var(--text-faint); display: inline-flex; align-items: center; }
+        .pg-copy-btn:hover { color: var(--text-muted); }
+
+        input[type=text], input[type=password], input[type=email], input[type=number], input[type=datetime-local], textarea, select {
+            font-family: 'IBM Plex Sans', sans-serif; border: 1px solid var(--border-strong); border-radius: 8px; padding: 9px 12px; font-size: 13px; background: #fff; color: var(--text);
+        }
+        label.pg-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; margin-top: 14px; }
+        .pg-hint { font-size: 11.5px; color: var(--text-faint); margin-top: 6px; }
+
+        .pg-btn { border: none; border-radius: 8px; padding: 10px 18px; background: var(--accent); color: #fff; font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+        .pg-btn:hover { filter: brightness(0.92); }
+        .pg-btn-secondary { border: 1px solid var(--border-strong); background: #fff; border-radius: 8px; padding: 9px 15px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
+        .pg-btn-secondary:hover { border-color: var(--text-faint); }
+        .pg-btn-dark { border: none; background: #17141b; color: #fff; border-radius: 7px; padding: 6px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .pg-btn-dark:hover { background: #2b2732; }
+        .pg-btn-danger { border: none; background: #7f1d1d; color: #fecaca; border-radius: 8px; padding: 9px 15px; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .pg-btn-danger:hover { background: #991b1b; }
+
+        .pg-alert { border-radius: 10px; padding: 13px 16px; margin-bottom: 24px; display: flex; align-items: flex-start; gap: 10px; font-size: 13px; }
+        .pg-alert-amber { background: #FCF3E1; border: 1px solid #EAD2A0; color: #6b4a13; }
+        .pg-alert-red { background: #FBE9EB; border: 1px solid #E9B7BE; color: #7a2431; }
+        .pg-alert ul { margin: 6px 0 0 18px; padding: 0; }
+
+        .pg-modal-backdrop { position: fixed; inset: 0; background: rgba(20,16,22,.5); display: none; align-items: center; justify-content: center; z-index: 300; padding: 1rem; }
+        .pg-modal-backdrop.show { display: flex; }
+        .pg-modal { background: #fff; border-radius: 16px; padding: 32px; width: 480px; max-width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.25); box-sizing: border-box; }
+
+        .pg-toast { position: fixed; bottom: 2rem; right: 2rem; background: #17141b; color: #fff; padding: 0.85rem 1.5rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 99999; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .pg-toast.show { transform: translateY(0); opacity: 1; }
+    </style>
+    CSS;
+}
+
+function render_sidebar(string $active, array $project, array $projects): string {
+    $items = [
+        'dashboard' => ['/admin', 'Dashboard', 'grid'],
+        'settings' => ['/admin/settings?project_id=' . $project['id'], 'Einstellungen', 'dot'],
+        'users' => ['/admin/users', 'Benutzer', 'users'],
+    ];
+    $currentUserName = $_SESSION['paragrafy_user_name'] ?? 'Admin';
+    $initials = '';
+    foreach (preg_split('/\s+/', trim($currentUserName)) as $part) {
+        if ($part !== '') { $initials .= mb_strtoupper(mb_substr($part, 0, 1)); }
+        if (mb_strlen($initials) >= 2) break;
+    }
+    if ($initials === '') { $initials = 'A'; }
+    ob_start();
+    ?>
+    <aside class="pg-sidebar">
+        <div class="pg-logo-row">
+            <div class="pg-logo-badge"><img src="/paragrafy.svg" alt="Paragrafy"></div>
+            <span class="pg-logo-text">Paragrafy</span>
+        </div>
+
+        <select class="pg-proj-select" onchange="location.href='/admin?project_id=' + this.value">
+            <?php foreach ($projects as $p): ?>
+                <option value="<?= $p['id'] ?>" <?= (int)$p['id'] === (int)$project['id'] ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+
+        <nav class="pg-nav">
+            <?php foreach ($items as $key => [$href, $label, $icon]): ?>
+                <a href="<?= htmlspecialchars($href) ?>" class="<?= $key === $active ? 'active' : '' ?>">
+                    <?php if ($icon === 'grid'): ?>
+                        <span class="pg-nav-grid"><span></span><span></span><span></span><span></span></span>
+                    <?php elseif ($icon === 'users'): ?>
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.85"><circle cx="6" cy="5.2" r="2.2"/><path d="M1.6 13c.5-2.6 2.4-4 4.4-4s3.9 1.4 4.4 4"/><circle cx="11.3" cy="5.8" r="1.7"/><path d="M10.5 9.3c1.7.2 3 1.4 3.4 3.7"/></svg>
+                    <?php else: ?>
+                        <span class="pg-nav-dot"></span>
+                    <?php endif; ?>
+                    <?= $label ?>
+                </a>
+            <?php endforeach; ?>
+        </nav>
+
+        <div class="pg-sidebar-spacer"></div>
+
+        <a href="https://<?= htmlspecialchars($project['domain']) ?>" target="_blank" class="pg-viewer-link">Öffentliche Seite ansehen<span>↗</span></a>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="width:6px;height:6px;border-radius:50%;background:var(--text-faint);display:inline-block"></span>
+                <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Self-Hosted &middot; v<?= PARAGRAFY_VERSION ?></span>
+            </div>
+            <p style="font-size:12px;color:var(--text-faint);margin:0;line-height:1.5">Open Source &amp; unter deiner Kontrolle.</p>
+        </div>
+
+        <div class="pg-user-row">
+            <div class="pg-user-avatar"><?= htmlspecialchars($initials) ?></div>
+            <div style="flex:1;min-width:0">
+                <div class="pg-user-name"><?= htmlspecialchars($currentUserName) ?></div>
+            </div>
+            <a href="/admin?logout=1" class="pg-logout" title="Abmelden">⏻</a>
+        </div>
+    </aside>
+    <?php
+    return ob_get_clean();
 }

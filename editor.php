@@ -14,7 +14,7 @@ $docId = (int)($_GET['doc_id'] ?? 0);
 $targetLang = strtolower($_GET['lang'] ?? 'de');
 
 $stmt = $db->prepare("
-    SELECT d.*, dt.title as type_title, dt.slug as default_slug, p.id as project_id, p.name as project_name, p.domain, p.primary_lang, p.active_languages, p.deepl_api_key, p.webhook_url, p.webhook_secret
+    SELECT d.*, dt.title as type_title, dt.slug as default_slug, p.id as project_id, p.name as project_name, p.domain, p.primary_lang, p.active_languages, p.deepl_api_key, p.webhook_url, p.webhook_secret, p.brand_color
     FROM documents d
     JOIN doc_types dt ON d.doc_type_id = dt.id
     JOIN projects p ON d.project_id = p.id
@@ -181,6 +181,7 @@ $displaySlug = $hasScheduled && !empty($targetTrans['scheduled_slug']) ? $target
 $displayNote = $hasScheduled && !empty($targetTrans['scheduled_note']) ? $targetTrans['scheduled_note'] : $targetTrans['change_note'];
 
 $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']) && $targetTrans['source_hash'] !== $currentSourceHash);
+$showRef = count($activeLangs) > 1 && ($_GET['showRef'] ?? '0') === '1';
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -189,80 +190,108 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
     <title>Editor: <?= htmlspecialchars($doc['type_title']) ?> (<?= strtoupper($targetLang) ?>)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
+    <?= theme_head_tags() ?>
+    <?= theme_base_css($doc['brand_color'] ?? '#e11d48') ?>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; margin: 0; }
-        .nav { background: #090d16; color: #fff; padding: 0.85rem 1.75rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; }
-        .nav a { color: #94a3b8; text-decoration: none; font-size: 0.9rem; font-weight: 600; }
-        .editor-container { max-width: 1440px; margin: 1.5rem auto; padding: 0 1.5rem; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-        .pane { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.75rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); display: flex; flex-direction: column; }
-        .pane-source { background: #fcfcfd; }
-        .pane-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; gap: 0.5rem; flex-wrap: wrap; }
-        h3 { margin: 0; font-size: 1.15rem; color: #0f172a; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; }
-        label { display: block; font-size: 0.8125rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem; margin-top: 0.75rem; }
-        input[type=text], input[type=datetime-local], select { width: 100%; box-sizing: border-box; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; }
-        
-        .wysiwyg-toolbar { display: flex; flex-wrap: wrap; gap: 0.35rem; background: #f1f5f9; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 8px 8px 0 0; border-bottom: none; }
-        .tool-btn { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.8125rem; font-weight: 600; cursor: pointer; color: #334155; display: inline-flex; align-items: center; gap: 0.25rem; }
-        .tool-btn:hover { background: #e2e8f0; color: #0f172a; }
-        .tool-btn.active { background: #0f172a; color: #ffffff; border-color: #0f172a; }
-        
-        .editor-box { min-height: 440px; max-height: 540px; overflow-y: auto; padding: 1.25rem; border: 1px solid #cbd5e1; border-radius: 0 0 8px 8px; background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.7; font-size: 0.95rem; outline: none; }
-        .editor-box:focus { border-color: #e11d48; }
-        .code-textarea { width: 100%; height: 440px; box-sizing: border-box; padding: 1.25rem; border: 1px solid #cbd5e1; border-radius: 0 0 8px 8px; font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 0.875rem; line-height: 1.5; display: none; }
-        
-        .source-box { min-height: 440px; max-height: 540px; overflow-y: auto; padding: 1.25rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 0.95rem; line-height: 1.7; color: #334155; }
-        .diff-box { min-height: 440px; max-height: 540px; overflow-y: auto; padding: 1.25rem; border: 1px solid #cbd5e1; border-radius: 8px; background: #fafafa; font-size: 0.95rem; line-height: 1.7; display: none; }
-        
-        .stat-footer { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #64748b; margin-top: 0.4rem; padding: 0 0.25rem; }
+        .editor-container { max-width: 1440px; margin: 24px auto; padding: 0 28px 60px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        .pane { background: var(--bg); padding: 22px 26px; display: flex; flex-direction: column; }
+        .pane-source { background: var(--bg); }
+        .pane:last-child { background: #fff; }
+        .pane-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap; }
+        h3 { margin: 0; font-size: 11.5px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: 8px; }
+        label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; margin-top: 12px; }
+        input[readonly] { background: var(--border-soft); color: var(--text-muted); }
 
-        .tokens { background: #f1f5f9; padding: 0.6rem 0.85rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.8125rem; }
-        .token-btn { background: #e2e8f0; border: 1px solid #cbd5e1; padding: 0.25rem 0.5rem; border-radius: 6px; cursor: pointer; margin-right: 0.35rem; font-size: 0.75rem; font-family: monospace; }
-        .token-btn:hover { background: #cbd5e1; }
-        
-        .btn-save { background: #e11d48; color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 0.4rem; box-shadow: 0 4px 12px rgba(225,29,72,0.25); transition: all 0.2s; }
-        .btn-save:hover { background: #be123c; transform: translateY(-1px); }
-        .btn-deepl { background: #0f172a; color: #38bdf8; border: 1px solid #334155; padding: 0.45rem 0.9rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s; }
-        .btn-deepl:hover { background: #1e293b; color: #7dd3fc; }
-        .btn-diff { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 0.4rem 0.75rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; }
-        
-        .warning-strip { background: #fed7aa; color: #9a3412; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem; border: 1px solid #f97316; display: flex; align-items: center; gap: 0.5rem; }
-        .scheduled-strip { background: #e0e7ff; color: #3730a3; border: 1px solid #818cf8; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; }
+        .wysiwyg-toolbar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+        .tool-btn { background: #fff; border: 1px solid var(--border-strong); border-radius: 6px; width: 28px; height: 28px; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
+        .tool-btn.wide { width: auto; padding: 0 8px; gap: 4px; }
+        .tool-btn:hover { background: var(--bg); }
+        .tool-btn.active { background: #17141b; color: #fff; border-color: #17141b; }
 
-        ins.diff-ins { background: #dcfce7; color: #166534; text-decoration: none; padding: 0.1rem 0.2rem; border-radius: 3px; }
-        del.diff-del { background: #fee2e2; color: #991b1b; text-decoration: line-through; padding: 0.1rem 0.2rem; border-radius: 3px; }
+        .editor-box { min-height: 260px; max-height: 480px; overflow-y: auto; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: #fff; line-height: 1.7; font-size: 13px; outline: none; margin-bottom: 12px; }
+        .editor-box:focus { border-color: var(--accent); }
+        .code-textarea { width: 100%; height: 260px; box-sizing: border-box; padding: 16px; border: 1px solid var(--border); border-radius: 8px; font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 12.5px; line-height: 1.5; display: none; margin-bottom: 12px; }
 
-        .ref-select { padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; font-size: 0.8125rem; font-weight: bold; }
-        .schedule-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.75rem 1rem; margin-top: 1rem; display: none; }
+        .source-box { min-height: 380px; max-height: 480px; overflow-y: auto; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 13px; line-height: 1.7; color: #3A353E; }
+        .diff-box { min-height: 380px; max-height: 480px; overflow-y: auto; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 13px; line-height: 1.7; display: none; }
+
+        .stat-footer { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-faint); margin-top: 6px; padding: 0 2px; }
+
+        .tokens { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+        .token-btn { background: var(--border-soft); border: none; color: var(--text-muted); padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-family: ui-monospace, monospace; }
+        .token-btn:hover { background: var(--border); color: var(--text); }
+
+        .btn-save { border: none; border-radius: 8px; padding: 10px 18px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-save:hover { filter: brightness(0.92); }
+        .btn-deepl { background: #17141b; color: #fff; border: none; border-radius: 7px; padding: 6px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-deepl:hover { background: #2b2732; }
+        .btn-diff { background: var(--border-soft); color: var(--text-muted); border: none; padding: 6px 12px; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+
+        .warning-strip { background: #FCF3E1; color: #6b4a13; padding: 10px 28px; font-size: 12.5px; border-bottom: 1px solid #EAD2A0; display: flex; align-items: center; gap: 8px; }
+        .scheduled-strip { background: oklch(95% 0.03 250); color: oklch(35% 0.08 250); border-bottom: 1px solid oklch(85% 0.06 250); padding: 10px 28px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
+
+        ins.diff-ins { background: var(--green-bg); color: var(--green); text-decoration: none; padding: 0.1rem 0.2rem; border-radius: 3px; }
+        del.diff-del { background: #FBE7EA; color: var(--red); text-decoration: line-through; padding: 0.1rem 0.2rem; border-radius: 3px; }
+
+        .ref-select { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-strong); background: #fff; font-size: 12px; font-weight: 700; }
+        .schedule-box { background: oklch(95% 0.03 250); border: 1px solid oklch(85% 0.06 250); border-radius: 8px; padding: 12px; margin-top: 14px; display: none; }
+        .schedule-box label { color: oklch(35% 0.08 250) !important; }
+
+        .lang-tabs-row { display: flex; align-items: center; gap: 10px; padding: 16px 28px 0; flex-wrap: wrap; }
+        .lang-tab { border: none; border-radius: 8px 8px 0 0; padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; border-bottom: 2px solid transparent; background: transparent; color: var(--text-faint); }
+        .lang-tab.active { background: #fff; color: var(--text); border-bottom-color: var(--accent); }
+        .lang-tab-add { border: 1px dashed var(--border-strong); background: transparent; border-radius: 8px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--text-faint); text-decoration: none; }
+        .compare-toggle { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-muted); font-weight: 500; cursor: pointer; white-space: nowrap; }
     </style>
 </head>
 <body>
-    <div class="nav">
-        <div><strong style="color:#fb7185;">Paragrafy Editor:</strong> <?= htmlspecialchars($doc['type_title']) ?> &bull; Projekt: <?= htmlspecialchars($doc['project_name']) ?></div>
-        <div><a href="/admin?project_id=<?= $doc['project_id'] ?>">&larr; Zurück zur Matrix</a></div>
+    <div class="pg-topbar">
+        <div class="pg-crumb"><?= htmlspecialchars($doc['project_name']) ?> <span style="margin:0 4px">/</span> <strong>Editor: <?= htmlspecialchars($doc['type_title']) ?></strong></div>
+        <a href="/admin?project_id=<?= $doc['project_id'] ?>" style="margin-left:auto;font-size:13px;font-weight:600">&larr; Zurück zur Matrix</a>
     </div>
 
-    <div class="editor-container">
+    <?php if ($hasScheduled || $isOutdated): ?>
+    <div style="max-width:1440px;margin:24px auto 0;padding:0 28px">
         <?php if ($hasScheduled): ?>
-            <div class="scheduled-strip">
+            <div class="scheduled-strip" style="border-radius:8px">
                 <?= svg_icon('calendar', '', 16) ?>
                 <span><strong>Zeitgesteuert geplant:</strong> Diese Version geht automatisch am <strong><?= date('d.m.Y \u\m H:i', strtotime($targetTrans['scheduled_at'])) ?> Uhr</strong> live. Bis dahin bleibt der aktuelle Stand öffentlich.</span>
             </div>
         <?php endif; ?>
 
         <?php if ($isOutdated): ?>
-            <div class="warning-strip">
+            <div class="warning-strip" style="border-radius:8px">
                 <?= svg_icon('warning', '', 16) ?>
                 <span><strong>Hinweis:</strong> Der Quelltext wurde seit der letzten Übersetzung geändert. Bitte gleiche den Zieltext an oder nutze DeepL.</span>
             </div>
         <?php endif; ?>
+    </div>
+    <?php endif; ?>
 
-        <div class="grid">
+    <div class="lang-tabs-row" style="max-width:1440px;margin:<?= ($hasScheduled || $isOutdated) ? '14px' : '24px' ?> auto 0;box-sizing:border-box">
+        <?php foreach ($activeLangs as $al): ?>
+            <?php $alMeta = lang_meta($al); ?>
+            <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $al ?>&showRef=<?= $showRef ? '1' : '0' ?>" class="lang-tab <?= $al === $targetLang ? 'active' : '' ?>"><?= $alMeta['flag'] ? $alMeta['flag'] . ' ' : '' ?><?= htmlspecialchars($alMeta['label']) ?></a>
+        <?php endforeach; ?>
+        <a href="/admin/settings?project_id=<?= $doc['project_id'] ?>" class="lang-tab-add">+ Sprache hinzufügen</a>
+        <?php if (count($activeLangs) > 1): ?>
+            <label class="compare-toggle">
+                <input type="checkbox" <?= $showRef ? 'checked' : '' ?> onchange="location.href='/admin/edit?doc_id=<?= $docId ?>&lang=<?= $targetLang ?>&ref_lang=<?= $sourceLang ?>&showRef=' + (this.checked ? '1' : '0')">
+                Andere Sprache zum Vergleich anzeigen
+            </label>
+        <?php endif; ?>
+    </div>
+
+    <div class="editor-container" style="margin-top:0;padding-top:22px">
+        <div class="grid" style="grid-template-columns: <?= $showRef ? '1fr 1fr' : '1fr' ?>; max-width: <?= $showRef ? 'none' : '900px' ?>; margin-left: <?= $showRef ? '0' : 'auto' ?>; margin-right: <?= $showRef ? '0' : 'auto' ?>;">
+            <?php if ($showRef): ?>
             <div class="pane pane-source">
                 <div class="pane-header">
                     <h3>
                         <span>Referenz:</span>
-                        <select class="ref-select" onchange="location.href='/admin/edit?doc_id=<?= $docId ?>&lang=<?= $targetLang ?>&ref_lang=' + this.value">
+                        <select class="ref-select" onchange="location.href='/admin/edit?doc_id=<?= $docId ?>&lang=<?= $targetLang ?>&showRef=1&ref_lang=' + this.value">
                             <?php foreach ($activeLangs as $al): ?>
                                 <?php if ($al !== $targetLang): ?>
                                     <option value="<?= $al ?>" <?= $al === $sourceLang ? 'selected' : '' ?>>
@@ -274,24 +303,26 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                     </h3>
                     <button type="button" class="btn-diff" id="diffBtn" onclick="toggleDiffViewer()"><?= svg_icon('eye', '', 14) ?> Diff-Vergleich</button>
                 </div>
-                
+
                 <label>Referenz-Titel (<?= strtoupper(htmlspecialchars($sourceLang)) ?>):</label>
-                <input type="text" id="sourceTitle" value="<?= htmlspecialchars($sourceTrans['title']) ?>" readonly disabled>
+                <input type="text" value="<?= htmlspecialchars($sourceTrans['title']) ?>" readonly disabled style="width:100%">
 
                 <label>Referenz-Inhalt:</label>
                 <div class="source-box" id="sourceContentBox"><?= $sourceTrans['content'] ?></div>
                 <div class="diff-box" id="diffViewerBox"></div>
-                
+
                 <div class="stat-footer">
                     <span id="sourceWordCount">0 Wörter</span>
                     <label style="display:inline-flex; align-items:center; gap:0.3rem; margin:0; cursor:pointer;">
                         <input type="checkbox" id="syncScrollCheck" checked style="width:14px; height:14px;"> Synchron-Scroll
                     </label>
                 </div>
-
-                <textarea id="sourceRaw" style="display:none;"><?= htmlspecialchars($sourceTrans['content']) ?></textarea>
-                <textarea id="previousSourceRaw" style="display:none;"><?= htmlspecialchars($sourceTrans['previous_content'] ?: $sourceTrans['content']) ?></textarea>
             </div>
+            <?php endif; ?>
+
+            <input type="hidden" id="sourceTitle" value="<?= htmlspecialchars($sourceTrans['title']) ?>">
+            <textarea id="sourceRaw" style="display:none;"><?= htmlspecialchars($sourceTrans['content']) ?></textarea>
+            <textarea id="previousSourceRaw" style="display:none;"><?= htmlspecialchars($sourceTrans['previous_content'] ?: $sourceTrans['content']) ?></textarea>
 
             <div class="pane">
                 <form id="editForm" method="post" action="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $targetLang ?>&ref_lang=<?= $sourceLang ?>" onsubmit="prepareSubmit()">
@@ -300,10 +331,10 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                     <textarea name="content" id="finalContentInput" style="display:none;"><?= htmlspecialchars($displayContent) ?></textarea>
 
                     <div class="pane-header">
-                        <h3>Zieltext: <?= strtoupper(htmlspecialchars($targetLang)) ?></h3>
+                        <h3>Wird bearbeitet &middot; <?= strtoupper(htmlspecialchars($targetLang)) ?></h3>
                         <?php if ($targetLang !== $sourceLang): ?>
                             <button type="button" class="btn-deepl" id="deeplBtn" onclick="translateWithDeepL()">
-                                <?= svg_icon('lightning', '', 14) ?> Mit DeepL übersetzen (<?= strtoupper($sourceLang) ?> &rarr; <?= strtoupper($targetLang) ?>)
+                                Mit DeepL übersetzen (<?= strtoupper($sourceLang) ?> &rarr; <?= strtoupper($targetLang) ?>)
                             </button>
                         <?php endif; ?>
                     </div>
@@ -318,10 +349,10 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                     </div>
 
                     <label>Titel des Dokuments:</label>
-                    <input type="text" id="targetTitle" name="title" value="<?= htmlspecialchars($displayTitle) ?>" required>
+                    <input type="text" id="targetTitle" name="title" value="<?= htmlspecialchars($displayTitle) ?>" required style="width:100%">
 
                     <label>URL-Slug (/<?= htmlspecialchars($targetLang) ?>/slug):</label>
-                    <input type="text" name="slug" value="<?= htmlspecialchars($displaySlug) ?>" required>
+                    <input type="text" name="slug" value="<?= htmlspecialchars($displaySlug) ?>" required style="width:100%">
 
                     <label>Inhalt (WYSIWYG-Visual Editor):</label>
                     
@@ -332,12 +363,12 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                         <button type="button" class="tool-btn" onclick="execFormat('h2')" title="Überschrift 2">H2</button>
                         <button type="button" class="tool-btn" onclick="execFormat('h3')" title="Überschrift 3">H3</button>
                         <button type="button" class="tool-btn" onclick="execFormat('p')" title="Absatz">P</button>
-                        <button type="button" class="tool-btn" onclick="execCmd('insertUnorderedList')" title="Aufzählung">&bull; Liste</button>
-                        <button type="button" class="tool-btn" onclick="execCmd('insertOrderedList')" title="Nummerierung">1. Liste</button>
-                        <button type="button" class="tool-btn" onclick="createLink()" title="Link einfügen"><?= svg_icon('link', '', 14) ?> Link</button>
-                        <button type="button" class="tool-btn" onclick="execCmd('removeFormat')" title="Formatierung entfernen">&#9003; Clear</button>
+                        <button type="button" class="tool-btn wide" onclick="execCmd('insertUnorderedList')" title="Aufzählung">&bull; Liste</button>
+                        <button type="button" class="tool-btn wide" onclick="execCmd('insertOrderedList')" title="Nummerierung">1. Liste</button>
+                        <button type="button" class="tool-btn wide" onclick="createLink()" title="Link einfügen"><?= svg_icon('link', '', 14) ?> Link</button>
+                        <button type="button" class="tool-btn wide" onclick="execCmd('removeFormat')" title="Formatierung entfernen">&#9003; Clear</button>
                         <div style="flex:1;"></div>
-                        <button type="button" class="tool-btn" id="toggleCodeBtn" onclick="toggleCodeView()" title="HTML Quellcode bearbeiten">&lt;/&gt; HTML Code</button>
+                        <button type="button" class="tool-btn wide" id="toggleCodeBtn" onclick="toggleCodeView()" title="HTML Quellcode bearbeiten">&lt;/&gt; HTML Code</button>
                     </div>
 
                     <div id="visualEditor" class="editor-box" contenteditable="true" oninput="updateWordCounts()"><?= $displayContent ?></div>
@@ -348,14 +379,14 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                         <span>Shortcut: <strong>Cmd+S</strong> / <strong>Strg+S</strong></span>
                     </div>
 
-                    <label>Änderungsnotiz (für Changelog & Webhooks):</label>
-                    <input type="text" name="change_note" value="<?= htmlspecialchars($displayNote) ?>" placeholder="z. B. Aktualisierung der Zahlungsbedingungen zum 31.08.">
+                    <label>Änderungsnotiz (für Changelog &amp; Webhooks):</label>
+                    <input type="text" name="change_note" value="<?= htmlspecialchars($displayNote) ?>" placeholder="z. B. Aktualisierung der Zahlungsbedingungen zum 31.08." style="width:100%">
 
                     <!-- Zeitgesteuerte Veröffentlichung Einstellungen -->
                     <div id="scheduleBox" class="schedule-box" style="<?= $hasScheduled ? 'display:block;' : '' ?>">
-                        <label style="margin-top:0; color:#3730a3;"><?= svg_icon('calendar', '', 14) ?> Live-Schaltungszeitpunkt festlegen:</label>
-                        <input type="datetime-local" id="scheduledInput" name="scheduled_at" value="<?= $hasScheduled ? date('Y-m-d\TH:i', strtotime($targetTrans['scheduled_at'])) : '' ?>">
-                        <div class="hint" style="color:#6366f1;">Sendet einen Webhook mit Vorankündigung und geht zum Stichtag automatisch live.</div>
+                        <label style="margin-top:0;">Live-Schaltungszeitpunkt festlegen:</label>
+                        <input type="datetime-local" id="scheduledInput" name="scheduled_at" value="<?= $hasScheduled ? date('Y-m-d\TH:i', strtotime($targetTrans['scheduled_at'])) : '' ?>" style="width:100%">
+                        <div class="pg-hint">Sendet einen Webhook mit Vorankündigung und geht zum Stichtag automatisch live.</div>
                     </div>
 
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; flex-wrap:wrap; gap:1rem;">
@@ -370,6 +401,8 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
             </div>
         </div>
     </div>
+
+    <div class="pg-footer-note">Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.</div>
 
     <script>
         let isCodeMode = false;
@@ -475,9 +508,12 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
         }
 
         function updateWordCounts() {
-            const srcText = document.getElementById('sourceContentBox').innerText.trim();
-            const srcWords = srcText ? srcText.split(/\\s+/).length : 0;
-            document.getElementById('sourceWordCount').innerText = `${srcWords} Wörter`;
+            const srcBox = document.getElementById('sourceContentBox');
+            if (srcBox) {
+                const srcText = srcBox.innerText.trim();
+                const srcWords = srcText ? srcText.split(/\\s+/).length : 0;
+                document.getElementById('sourceWordCount').innerText = `${srcWords} Wörter`;
+            }
 
             const targetText = isCodeMode ? document.getElementById('rawCodeEditor').value : document.getElementById('visualEditor').innerText;
             const targetWords = targetText.trim() ? targetText.trim().split(/\\s+/).length : 0;
@@ -488,6 +524,7 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
         function setupSynchronousScroll() {
             const srcBox = document.getElementById('sourceContentBox');
             const visualBox = document.getElementById('visualEditor');
+            if (!srcBox || !visualBox) return;
             let isSyncing = false;
 
             const sync = (source, target) => {

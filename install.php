@@ -254,7 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="grid">
                     <div>
                         <label>Projektname:</label>
-                        <input type="text" name="project_name" value="Yumder" placeholder="z. B. Yumder" required>
+                        <input type="text" name="project_name" placeholder="z. B. Meine App" required>
                     </div>
                     <div>
                         <label>Subdomain / Domain:</label>
