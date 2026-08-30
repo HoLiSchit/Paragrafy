@@ -415,7 +415,7 @@ function render_accept_invite_view(?array $user, ?string $error): void {
         <?= theme_base_css() ?>
         <style>
             body { display: flex; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; gap: 20px; }
-            .login-card { background: #fff; padding: 2.25rem; border-radius: 16px; width: 360px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); border: 1px solid var(--border); }
+            .login-card { background: var(--card); padding: 2.25rem; border-radius: 16px; width: 360px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); border: 1px solid var(--border); }
             .logo-header { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem; }
             .logo-header img { width: 34px; height: 34px; border-radius: 8px; }
             .logo-header h2 { margin: 0; font-size: 1.3rem; font-weight: 800; }
@@ -485,7 +485,7 @@ function render_login_view(?string $error): void {
         <?= theme_base_css() ?>
         <style>
             body { display: flex; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; gap: 20px; }
-            .login-card { background: #fff; padding: 2.25rem; border-radius: 16px; width: 340px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); border: 1px solid var(--border); }
+            .login-card { background: var(--card); padding: 2.25rem; border-radius: 16px; width: 340px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); border: 1px solid var(--border); }
             .logo-header { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem; }
             .logo-header img { width: 34px; height: 34px; border-radius: 8px; }
             .logo-header h2 { margin: 0; font-size: 1.3rem; font-weight: 800; }
@@ -594,7 +594,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                             <div style="font-size:13px;color:var(--text-muted);display:flex;gap:14px;flex-wrap:wrap">
                                 <span>Domain: <strong style="color:var(--text);font-weight:600"><?= htmlspecialchars($project['domain']) ?></strong></span>
                                 <span style="color:var(--border-strong)">&middot;</span>
-                                <span>API: <span class="api-pill">/api/:lang/:slug</span></span>
+                                <span>Technische Schnittstelle: <span class="api-pill">/api/:lang/:slug</span></span>
                             </div>
                         </div>
                         <button type="button" class="pg-btn" onclick="openNewProjectModal()">+ Neues Projekt</button>
@@ -603,7 +603,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                     <!-- Health KPI Cards -->
                     <div class="pg-kpi-grid">
                         <div class="pg-kpi">
-                            <div class="pg-kpi-label">Compliance-Score<?= help_icon('Anteil der als Pflichtseite markierten Rechtstexte, die in der Primärsprache veröffentlicht sind. Optionale Seiten und andere Sprachen zählen nicht mit.') ?></div>
+                            <div class="pg-kpi-label">Vollständigkeit<?= help_icon('Anteil der als Pflichtseite markierten Rechtstexte, die in der Primärsprache veröffentlicht sind. Optionale Seiten und andere Sprachen zählen nicht mit.') ?></div>
                             <div class="pg-kpi-val" style="color: <?= $complianceScore === 100 ? 'var(--green)' : 'var(--accent)' ?>;"><?= $complianceScore ?>%</div>
                             <div class="pg-kpi-sub"><?= $publishedRequired ?> von <?= $totalRequired ?> Pflichtseiten live</div>
                         </div>
@@ -613,14 +613,14 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                             <div class="pg-kpi-sub"><?= strtoupper(implode(', ', $activeLangs)) ?></div>
                         </div>
                         <div class="pg-kpi">
-                            <div class="pg-kpi-label">Sync-Status</div>
+                            <div class="pg-kpi-label">Übersetzungsabgleich<?= help_icon('Prüft automatisch, ob sich der Originaltext seit der letzten Übersetzung geändert hat, und markiert betroffene Sprachen als veraltet.') ?></div>
                             <div class="pg-kpi-val" style="color:var(--green);display:flex;align-items:center;gap:6px;font-size:20px;">
                                 <span style="width:8px;height:8px;border-radius:50%;background:#2fa06a;display:inline-block"></span>Aktiv
                             </div>
-                            <div class="pg-kpi-sub">Quelltext-Hash Engine aktiv</div>
+                            <div class="pg-kpi-sub">Läuft automatisch im Hintergrund</div>
                         </div>
                         <div class="pg-kpi">
-                            <div class="pg-kpi-label">Audit-Status</div>
+                            <div class="pg-kpi-label">Prüfstatus</div>
                             <div class="pg-kpi-val" style="font-size:20px;color: <?= empty($auditWarnings) ? 'var(--green)' : '#b4650f' ?>;">
                                 <?= empty($auditWarnings) ? 'Aktuell' : count($auditWarnings) . ' Fällig' ?>
                             </div>
@@ -630,7 +630,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
 
                     <?php if (!empty($auditWarnings)): ?>
                         <div class="pg-alert pg-alert-red">
-                            <div><strong>Audit-Prüfung fällig (älter als <?= $auditIntervalMonths ?> Monate):</strong>
+                            <div><strong>Prüfung fällig (älter als <?= $auditIntervalMonths ?> Monate):</strong>
                                 <ul>
                                     <?php foreach (array_slice($auditWarnings, 0, 3) as $aw): ?>
                                         <li><?= htmlspecialchars($aw) ?></li>
@@ -655,7 +655,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                     <!-- Matrix -->
                     <div class="pg-card">
                         <div style="padding:20px 22px 14px">
-                            <h2>Pflichtseiten &amp; Status-Matrix</h2>
+                            <h2>Rechtstexte im Überblick</h2>
                             <p class="pg-card-sub">Klicke auf einen Status, um die Seite in dieser Sprache zu bearbeiten. Über die Symbole rechts bearbeitest oder entfernst du den gesamten Rechtstext.</p>
                         </div>
                         <table class="pg-table">
@@ -756,17 +756,6 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                         </table>
                     </div>
 
-                    <!-- Backup & Export Box -->
-                    <div class="pg-card pg-card-pad">
-                        <h2>Backups &amp; Exporte</h2>
-                        <p class="pg-card-sub" style="margin-bottom:14px">Sichere deine SQLite-Datenbank oder lade alle Rechtstexte als Markdown-Archiv herunter.</p>
-                        <div style="display:flex;gap:10px;flex-wrap:wrap">
-                            <a href="/admin?action=download_backup" class="pg-btn-secondary"><?= svg_icon('disk', '', 14) ?> Datenbank herunterladen</a>
-                            <a href="/admin?action=export_markdown" class="pg-btn-secondary"><?= svg_icon('folder', '', 14) ?> Markdown-Export</a>
-                            <button type="button" class="pg-btn-secondary" onclick="triggerAuditReport()"><?= svg_icon('mail', '', 14) ?> Audit-Report per E-Mail</button>
-                        </div>
-                    </div>
-
                     <!-- Neuer Rechtstext hinzufügen -->
                     <div class="pg-card pg-card-pad" style="margin-bottom:0">
                         <h2>Neuen Rechtstext hinzufügen</h2>
@@ -775,7 +764,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="action" value="create_doc_type">
                             <div class="grid-add">
                                 <input type="text" name="doc_title" placeholder="Titel (z. B. AGB für Geschäftskunden / B2B)" required>
-                                <input type="text" name="doc_slug" placeholder="URL-Slug (z. B. agb-b2b)" required>
+                                <input type="text" name="doc_slug" placeholder="Seitenadresse (z. B. agb-b2b)" required>
                                 <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-muted);white-space:nowrap;cursor:pointer;">
                                     <input type="checkbox" name="is_required" value="1"> Pflichtseite
                                 </label>
@@ -906,19 +895,6 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                 }
             }
 
-            async function triggerAuditReport() {
-                try {
-                    const res = await fetch('/api/cron/audit');
-                    const data = await res.json();
-                    if (data.success) {
-                        showToast(data.message || 'Audit-Report per E-Mail gesendet!');
-                    } else {
-                        alert('Fehler: ' + (data.error || 'Konnte Report nicht senden.'));
-                    }
-                } catch(e) {
-                    alert('Fehler: ' + e.message);
-                }
-            }
         </script>
     </body>
     </html>
@@ -957,6 +933,11 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
             .status-200 { background: var(--green-bg); color: var(--green); }
             .status-err { background: #FBE7EA; color: var(--red); }
             .payload-preview { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+            .pg-theme-toggle { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+            .pg-theme-toggle button { border: none; background: var(--card); color: var(--text-muted); padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; }
+            .pg-theme-toggle button + button { border-left: 1px solid var(--border-strong); }
+            .pg-theme-toggle button.active { background: var(--accent-bg); color: var(--accent); }
         </style>
     </head>
     <body>
@@ -969,6 +950,16 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                 </div>
 
                 <div class="pg-content" style="max-width:840px">
+                    <div class="pg-card pg-card-pad">
+                        <h2>Darstellung</h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px">Nur für dich in diesem Browser gespeichert — wirkt sich nicht auf andere Personen aus.</p>
+                        <div class="pg-theme-toggle" id="themeToggle">
+                            <button type="button" data-theme-choice="light">Hell</button>
+                            <button type="button" data-theme-choice="dark">Dunkel</button>
+                            <button type="button" data-theme-choice="auto">Auto</button>
+                        </div>
+                    </div>
+
                     <div class="pg-card pg-card-pad">
                         <h2 style="margin-bottom:18px">Projekt &amp; API-Konfiguration</h2>
                         <form method="post">
@@ -1011,7 +1002,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             </div>
 
                             <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border-soft)">
-                                <label class="pg-label" style="margin-top:0">Audit-Intervall (Monate)</label>
+                                <label class="pg-label" style="margin-top:0">Prüfintervall (Monate)</label>
                                 <input type="number" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>" min="1" max="36" required style="width:100px">
                                 <div class="pg-hint">Warnt im Dashboard nach X Monaten vor ungeprüften Texten.</div>
                             </div>
@@ -1085,7 +1076,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     </div>
 
                     <div class="pg-card pg-card-pad">
-                        <h2>E-Mail-Versand &amp; Audit-Benachrichtigung</h2>
+                        <h2>E-Mail-Versand &amp; Prüf-Erinnerungen</h2>
                         <p class="pg-card-sub" style="margin-bottom:16px">Damit verschickt Paragrafy Prüf-Erinnerungen und Testmails. Zugangsdaten bekommst du von deinem E-Mail-Anbieter (SMTP).</p>
                         <form method="post">
                             <input type="hidden" name="action" value="save_project">
@@ -1143,7 +1134,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                     <input type="email" name="smtp_from" value="<?= htmlspecialchars($project['smtp_from'] ?? '') ?>" placeholder="legal@deinefirma.de" style="width:100%">
                                 </div>
                                 <div>
-                                    <label class="pg-label">Empfänger für Audit-Reports</label>
+                                    <label class="pg-label">Empfänger für Prüfberichte</label>
                                     <input type="email" name="audit_email_recipient" value="<?= htmlspecialchars($project['audit_email_recipient'] ?? '') ?>" placeholder="deine-mail@domain.de" style="width:100%">
                                 </div>
                             </div>
@@ -1278,6 +1269,17 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                         <?php endif; ?>
                     </div>
 
+                    <!-- Sicherung & Export -->
+                    <div class="pg-card pg-card-pad">
+                        <h2>Sicherung &amp; Export</h2>
+                        <p class="pg-card-sub" style="margin-bottom:14px">Lade eine Sicherungskopie aller Daten herunter oder exportiere deine Rechtstexte als Textdateien.</p>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap">
+                            <a href="/admin?action=download_backup" class="pg-btn-secondary"><?= svg_icon('disk', '', 14) ?> Sicherungskopie herunterladen</a>
+                            <a href="/admin?action=export_markdown" class="pg-btn-secondary"><?= svg_icon('folder', '', 14) ?> Als Textdateien exportieren</a>
+                            <button type="button" class="pg-btn-secondary" onclick="triggerAuditReport()"><?= svg_icon('mail', '', 14) ?> Prüfbericht per E-Mail</button>
+                        </div>
+                    </div>
+
                     <!-- Webhook Protokoll & Delivery Logs -->
                     <div class="pg-card pg-card-pad" style="margin-bottom:0">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -1340,6 +1342,46 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
         </div>
 
         <script>
+            (function() {
+                const THEME_KEY = 'paragrafy_theme';
+                const toggle = document.getElementById('themeToggle');
+                const current = localStorage.getItem(THEME_KEY) || 'auto';
+
+                function applyActive(choice) {
+                    toggle.querySelectorAll('button').forEach(function(btn) {
+                        btn.classList.toggle('active', btn.dataset.themeChoice === choice);
+                    });
+                }
+                applyActive(current);
+
+                toggle.querySelectorAll('button').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        const choice = btn.dataset.themeChoice;
+                        try { localStorage.setItem(THEME_KEY, choice); } catch (e) {}
+                        if (choice === 'auto') {
+                            document.documentElement.removeAttribute('data-theme');
+                        } else {
+                            document.documentElement.setAttribute('data-theme', choice);
+                        }
+                        applyActive(choice);
+                    });
+                });
+            })();
+
+            async function triggerAuditReport() {
+                try {
+                    const res = await fetch('/api/cron/audit');
+                    const data = await res.json();
+                    if (data.success) {
+                        alert(data.message || 'Prüfbericht per E-Mail gesendet!');
+                    } else {
+                        alert('Fehler: ' + (data.error || 'Konnte Bericht nicht senden.'));
+                    }
+                } catch (e) {
+                    alert('Fehler: ' + e.message);
+                }
+            }
+
             async function triggerTestWebhook() {
                 const formData = new FormData();
                 formData.append('action', 'test_webhook');

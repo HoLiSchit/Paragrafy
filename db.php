@@ -732,7 +732,8 @@ function record_translation_version(PDO $db, int $documentId, string $lang, stri
  */
 function theme_head_tags(): string {
     return '<link rel="preconnect" href="https://fonts.googleapis.com">'
-        . '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">';
+        . '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">'
+        . '<script>(function(){try{var t=localStorage.getItem("paragrafy_theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();</script>';
 }
 
 function theme_base_css(string $accent = '#e11d48'): string {
@@ -745,6 +746,23 @@ function theme_base_css(string $accent = '#e11d48'): string {
             --bg: #FAF9F6; --card: #ffffff; --border: #E8E4DC; --border-strong: #D8D2C6; --border-soft: #F1EEE7;
             --text: #201C24; --text-muted: #746E78; --text-faint: #9C96A0; --text-faintest: #B8B2AA;
             --green: #16814f; --green-bg: #E8F6EE; --amber: #92601a; --amber-bg: #FBF0DC; --red: #b3223a;
+            color-scheme: light;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --accent-bg: color-mix(in srgb, {$accent} 22%, black);
+                --bg: #18151d; --card: #221f27; --border: #34303b; --border-strong: #45404d; --border-soft: #2b2830;
+                --text: #F0EDE9; --text-muted: #ACA6B2; --text-faint: #837d8a; --text-faintest: #5c5763;
+                --green: #3ecf8e; --green-bg: #1c3229; --amber: #e0a950; --amber-bg: #3a2e1a; --red: #ea7b8d;
+                color-scheme: dark;
+            }
+        }
+        :root[data-theme="dark"] {
+            --accent-bg: color-mix(in srgb, {$accent} 22%, black);
+            --bg: #18151d; --card: #221f27; --border: #34303b; --border-strong: #45404d; --border-soft: #2b2830;
+            --text: #F0EDE9; --text-muted: #ACA6B2; --text-faint: #837d8a; --text-faintest: #5c5763;
+            --green: #3ecf8e; --green-bg: #1c3229; --amber: #e0a950; --amber-bg: #3a2e1a; --red: #ea7b8d;
+            color-scheme: dark;
         }
         * { box-sizing: border-box; }
         body { font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
@@ -754,12 +772,12 @@ function theme_base_css(string $accent = '#e11d48'): string {
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
 
-        .pg-topbar { height: 56px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 28px; flex-shrink: 0; }
+        .pg-topbar { height: 56px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 28px; flex-shrink: 0; }
         .pg-crumb { font-size: 13.5px; color: var(--text-faint); }
         .pg-crumb strong { color: var(--text); font-weight: 600; }
 
         .pg-shell { display: flex; min-height: 100vh; }
-        .pg-sidebar { width: 236px; flex-shrink: 0; background: #fff; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 14px; box-sizing: border-box; position: sticky; top: 0; height: 100vh; }
+        .pg-sidebar { width: 236px; flex-shrink: 0; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 14px; box-sizing: border-box; position: sticky; top: 0; height: 100vh; }
         .pg-logo-row { display: flex; align-items: center; gap: 9px; padding: 4px 8px 18px; }
         .pg-logo-badge { width: 28px; height: 28px; border-radius: 7px; overflow: hidden; flex-shrink: 0; }
         .pg-logo-badge img { width: 100%; height: 100%; display: block; }
@@ -815,14 +833,14 @@ function theme_base_css(string $accent = '#e11d48'): string {
         .pg-req-label { font-size: 12px; font-weight: 700; color: var(--accent); }
         .pg-opt-label { font-size: 12px; font-weight: 500; color: var(--text-faint); }
 
-        .pg-icon-btn { border: 1px solid var(--border); background: #fff; border-radius: 7px; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); }
+        .pg-icon-btn { border: 1px solid var(--border); background: var(--card); border-radius: 7px; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); }
         .pg-icon-btn:hover { border-color: var(--border-strong); color: var(--text); }
         .pg-icon-btn.danger:hover { border-color: #d99; color: var(--red); }
         .pg-copy-btn { border: none; background: transparent; padding: 2px; cursor: pointer; color: var(--text-faint); display: inline-flex; align-items: center; }
         .pg-copy-btn:hover { color: var(--text-muted); }
 
         input[type=text], input[type=password], input[type=email], input[type=number], input[type=datetime-local], textarea, select {
-            font-family: 'IBM Plex Sans', sans-serif; border: 1px solid var(--border-strong); border-radius: 8px; padding: 9px 12px; font-size: 13px; background: #fff; color: var(--text);
+            font-family: 'IBM Plex Sans', sans-serif; border: 1px solid var(--border-strong); border-radius: 8px; padding: 9px 12px; font-size: 13px; background: var(--card); color: var(--text);
         }
         label.pg-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; margin-top: 14px; }
         .pg-hint { font-size: 11.5px; color: var(--text-faint); margin-top: 6px; }
@@ -831,7 +849,7 @@ function theme_base_css(string $accent = '#e11d48'): string {
 
         .pg-btn { border: none; border-radius: 8px; padding: 10px 18px; background: var(--accent); color: #fff; font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
         .pg-btn:hover { filter: brightness(0.92); }
-        .pg-btn-secondary { border: 1px solid var(--border-strong); background: #fff; border-radius: 8px; padding: 9px 15px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
+        .pg-btn-secondary { border: 1px solid var(--border-strong); background: var(--card); border-radius: 8px; padding: 9px 15px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
         .pg-btn-secondary:hover { border-color: var(--text-faint); }
         .pg-btn-dark { border: none; background: #17141b; color: #fff; border-radius: 7px; padding: 6px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
         .pg-btn-dark:hover { background: #2b2732; }
@@ -845,7 +863,7 @@ function theme_base_css(string $accent = '#e11d48'): string {
 
         .pg-modal-backdrop { position: fixed; inset: 0; background: rgba(20,16,22,.5); display: none; align-items: center; justify-content: center; z-index: 300; padding: 1rem; }
         .pg-modal-backdrop.show { display: flex; }
-        .pg-modal { background: #fff; border-radius: 16px; padding: 32px; width: 480px; max-width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.25); box-sizing: border-box; }
+        .pg-modal { background: var(--card); border-radius: 16px; padding: 32px; width: 480px; max-width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.25); box-sizing: border-box; }
 
         .pg-toast { position: fixed; bottom: 2rem; right: 2rem; background: #17141b; color: #fff; padding: 0.85rem 1.5rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 99999; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .pg-toast.show { transform: translateY(0); opacity: 1; }
@@ -901,14 +919,6 @@ function render_sidebar(string $active, array $project, array $projects): string
 
         <div class="pg-sidebar-spacer"></div>
 
-        <div class="pg-user-row">
-            <div class="pg-user-avatar"><?= htmlspecialchars($initials) ?></div>
-            <div style="flex:1;min-width:0">
-                <div class="pg-user-name"><?= htmlspecialchars($currentUserName) ?></div>
-            </div>
-            <a href="/admin?logout=1" class="pg-logout" title="Abmelden">⏻</a>
-        </div>
-
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:10px">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
                 <span style="width:6px;height:6px;border-radius:50%;background:var(--text-faint);display:inline-block"></span>
@@ -925,6 +935,14 @@ function render_sidebar(string $active, array $project, array $projects): string
                 Einstellungen
             </span>
         </a>
+
+        <div class="pg-user-row">
+            <div class="pg-user-avatar"><?= htmlspecialchars($initials) ?></div>
+            <div style="flex:1;min-width:0">
+                <div class="pg-user-name"><?= htmlspecialchars($currentUserName) ?></div>
+            </div>
+            <a href="/admin?logout=1" class="pg-logout" title="Abmelden">⏻</a>
+        </div>
     </aside>
     <?php
     return ob_get_clean();

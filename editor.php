@@ -247,24 +247,24 @@ $versions = $stmtVersions->fetchAll();
         @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
         .pane { background: var(--bg); padding: 22px 26px; display: flex; flex-direction: column; }
         .pane-source { background: var(--bg); }
-        .pane:last-child { background: #fff; }
+        .pane:last-child { background: var(--card); }
         .pane-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap; }
         h3 { margin: 0; font-size: 11.5px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: 8px; }
         label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; margin-top: 12px; }
         input[readonly] { background: var(--border-soft); color: var(--text-muted); }
 
         .wysiwyg-toolbar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
-        .tool-btn { background: #fff; border: 1px solid var(--border-strong); border-radius: 6px; width: 28px; height: 28px; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
+        .tool-btn { background: var(--card); border: 1px solid var(--border-strong); border-radius: 6px; width: 28px; height: 28px; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
         .tool-btn.wide { width: auto; padding: 0 8px; gap: 4px; }
         .tool-btn:hover { background: var(--bg); }
         .tool-btn.active { background: #17141b; color: #fff; border-color: #17141b; }
 
-        .editor-box { min-height: 260px; max-height: 480px; overflow-y: auto; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: #fff; line-height: 1.7; font-size: 13px; outline: none; margin-bottom: 12px; }
+        .editor-box { min-height: 260px; max-height: 480px; overflow-y: auto; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); line-height: 1.7; font-size: 13px; outline: none; margin-bottom: 12px; }
         .editor-box:focus { border-color: var(--accent); }
         .code-textarea { width: 100%; height: 260px; box-sizing: border-box; padding: 16px; border: 1px solid var(--border); border-radius: 8px; font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 12.5px; line-height: 1.5; display: none; margin-bottom: 12px; }
 
-        .source-box { min-height: 380px; max-height: 480px; overflow-y: auto; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 13px; line-height: 1.7; color: #3A353E; }
-        .diff-box { min-height: 380px; max-height: 480px; overflow-y: auto; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 13px; line-height: 1.7; display: none; }
+        .source-box { min-height: 380px; max-height: 480px; overflow-y: auto; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 13px; line-height: 1.7; color: var(--text); }
+        .diff-box { min-height: 380px; max-height: 480px; overflow-y: auto; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 13px; line-height: 1.7; display: none; }
 
         .stat-footer { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-faint); margin-top: 6px; padding: 0 2px; }
 
@@ -284,13 +284,13 @@ $versions = $stmtVersions->fetchAll();
         ins.diff-ins { background: var(--green-bg); color: var(--green); text-decoration: none; padding: 0.1rem 0.2rem; border-radius: 3px; }
         del.diff-del { background: #FBE7EA; color: var(--red); text-decoration: line-through; padding: 0.1rem 0.2rem; border-radius: 3px; }
 
-        .ref-select { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-strong); background: #fff; font-size: 12px; font-weight: 700; }
+        .ref-select { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--card); font-size: 12px; font-weight: 700; }
         .schedule-box { background: oklch(95% 0.03 250); border: 1px solid oklch(85% 0.06 250); border-radius: 8px; padding: 12px; margin-top: 14px; display: none; }
         .schedule-box label { color: oklch(35% 0.08 250) !important; }
 
         .lang-tabs-row { display: flex; align-items: center; gap: 10px; padding: 16px 28px 0; flex-wrap: wrap; }
         .lang-tab { border: none; border-radius: 8px 8px 0 0; padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; border-bottom: 2px solid transparent; background: transparent; color: var(--text-faint); }
-        .lang-tab.active { background: #fff; color: var(--text); border-bottom-color: var(--accent); }
+        .lang-tab.active { background: var(--card); color: var(--text); border-bottom-color: var(--accent); }
         .lang-tab-add { border: 1px dashed var(--border-strong); background: transparent; border-radius: 8px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--text-faint); text-decoration: none; }
         .compare-toggle { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-muted); font-weight: 500; cursor: pointer; white-space: nowrap; }
     </style>
@@ -298,7 +298,7 @@ $versions = $stmtVersions->fetchAll();
 <body>
     <div class="pg-topbar">
         <div class="pg-crumb"><?= htmlspecialchars($doc['project_name']) ?> <span style="margin:0 4px">/</span> <strong>Editor: <?= htmlspecialchars($doc['type_title']) ?></strong></div>
-        <a href="/admin?project_id=<?= $doc['project_id'] ?>" style="margin-left:auto;font-size:13px;font-weight:600">&larr; Zurück zur Matrix</a>
+        <a href="/admin?project_id=<?= $doc['project_id'] ?>" style="margin-left:auto;font-size:13px;font-weight:600">&larr; Zurück zum Dashboard</a>
     </div>
 
     <?php if (($_GET['msg'] ?? '') === 'restored'): ?>
@@ -359,7 +359,7 @@ $versions = $stmtVersions->fetchAll();
                             <?php endforeach; ?>
                         </select>
                     </h3>
-                    <button type="button" class="btn-diff" id="diffBtn" onclick="toggleDiffViewer()"><?= svg_icon('eye', '', 14) ?> Diff-Vergleich</button>
+                    <button type="button" class="btn-diff" id="diffBtn" onclick="toggleDiffViewer()"><?= svg_icon('eye', '', 14) ?> Unterschiede anzeigen</button>
                 </div>
 
                 <label>Referenz-Titel (<?= strtoupper(htmlspecialchars($sourceLang)) ?>):</label>
@@ -372,7 +372,7 @@ $versions = $stmtVersions->fetchAll();
                 <div class="stat-footer">
                     <span id="sourceWordCount">0 Wörter</span>
                     <label style="display:inline-flex; align-items:center; gap:0.3rem; margin:0; cursor:pointer;">
-                        <input type="checkbox" id="syncScrollCheck" checked style="width:14px; height:14px;"> Synchron-Scroll
+                        <input type="checkbox" id="syncScrollCheck" checked style="width:14px; height:14px;"> Gemeinsam scrollen
                     </label>
                 </div>
             </div>
@@ -412,10 +412,10 @@ $versions = $stmtVersions->fetchAll();
                     <label>Titel des Dokuments:</label>
                     <input type="text" id="targetTitle" name="title" value="<?= htmlspecialchars($displayTitle) ?>" required style="width:100%">
 
-                    <label>URL-Slug (/<?= htmlspecialchars($targetLang) ?>/slug):<?= help_icon('Bestimmt die öffentliche Adresse dieses Rechtstexts, z. B. /' . htmlspecialchars($targetLang) . '/agb-b2c. Änderungen brechen bestehende Links zu dieser Seite.') ?></label>
+                    <label>Seitenadresse (/<?= htmlspecialchars($targetLang) ?>/adresse):<?= help_icon('Bestimmt die öffentliche Adresse dieses Rechtstexts, z. B. /' . htmlspecialchars($targetLang) . '/agb-b2c. Änderungen brechen bestehende Links zu dieser Seite.') ?></label>
                     <input type="text" name="slug" value="<?= htmlspecialchars($displaySlug) ?>" required style="width:100%">
 
-                    <label>Inhalt (WYSIWYG-Visual Editor):</label>
+                    <label>Inhalt (Visueller Editor):</label>
                     
                     <div class="wysiwyg-toolbar">
                         <button type="button" class="tool-btn" onclick="execCmd('bold')" title="Fett"><strong>B</strong></button>
@@ -429,7 +429,7 @@ $versions = $stmtVersions->fetchAll();
                         <button type="button" class="tool-btn wide" onclick="createLink()" title="Link einfügen"><?= svg_icon('link', '', 14) ?> Link</button>
                         <button type="button" class="tool-btn wide" onclick="execCmd('removeFormat')" title="Formatierung entfernen">&#9003; Clear</button>
                         <div style="flex:1;"></div>
-                        <button type="button" class="tool-btn wide" id="toggleCodeBtn" onclick="toggleCodeView()" title="HTML Quellcode bearbeiten">&lt;/&gt; HTML Code</button>
+                        <button type="button" class="tool-btn wide" id="toggleCodeBtn" onclick="toggleCodeView()" title="HTML-Quellcode bearbeiten">&lt;/&gt; HTML-Code</button>
                     </div>
 
                     <div id="visualEditor" class="editor-box" contenteditable="true" oninput="updateWordCounts()"><?= $displayContent ?></div>
@@ -485,7 +485,7 @@ $versions = $stmtVersions->fetchAll();
                                 <?php if (!empty($v['change_note'])): ?><div style="font-size:12px;color:var(--text-faint);margin-top:2px"><?= htmlspecialchars($v['change_note']) ?></div><?php endif; ?>
                             </div>
                             <div style="display:flex;gap:6px;flex-shrink:0">
-                                <button type="button" class="pg-btn-secondary" style="padding:5px 10px;font-size:11.5px" onclick="toggleVersionDiff(<?= $v['id'] ?>)">Diff</button>
+                                <button type="button" class="pg-btn-secondary" style="padding:5px 10px;font-size:11.5px" onclick="toggleVersionDiff(<?= $v['id'] ?>)">Unterschiede</button>
                                 <form method="post" onsubmit="return confirm('Diese Version wiederherstellen? Der aktuelle Stand wird dabei als neue Version gesichert.');" style="margin:0">
                                     <input type="hidden" name="action" value="restore_version">
                                     <input type="hidden" name="version_id" value="<?= $v['id'] ?>">
@@ -585,13 +585,13 @@ $versions = $stmtVersions->fetchAll();
                 visual.style.display = 'none';
                 code.style.display = 'block';
                 btn.classList.add('active');
-                btn.innerText = 'Visual Editor';
+                btn.innerText = 'Visueller Editor';
             } else {
                 visual.innerHTML = code.value;
                 code.style.display = 'none';
                 visual.style.display = 'block';
                 btn.classList.remove('active');
-                btn.innerText = '</> HTML Code';
+                btn.innerText = '</> HTML-Code';
             }
             updateWordCounts();
         }
