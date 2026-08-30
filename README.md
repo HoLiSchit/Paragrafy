@@ -28,6 +28,18 @@ Paragrafy ist ein leichtgewichtiges, selbstgehostetes Content-Management-System 
   Integriertes, leichtgewichtiges Consent-Skript (`/consent.js`) ohne externe Abhängigkeiten.
 - **Notion/Stripe-Style Public Viewer**:
   Mitscrollendes Inhaltsverzeichnis (Sticky TOC mit Scroll-Spy), Lesezeit-Berechnung, Direktlink-Anker (`#`) und Live-Textfilter in allen Zielsprachen.
+- **Backups & Exporte**:
+  Lade die komplette SQLite-Datenbank oder alle veröffentlichten Rechtstexte als Markdown-Archiv (ZIP, nach Sprache/Slug sortiert) direkt aus dem Dashboard herunter.
+- **Beliebig viele eigene Rechtstext-Typen**:
+  Über die Pflichtseiten hinaus lassen sich projektübergreifend zusätzliche Dokumente anlegen (z. B. AGB B2B, Sponsoring-Vereinbarung, Lizenzbedingungen) und optional als Pflichtseite markieren.
+- **Multi-User-Verwaltung mit E-Mail-Einladung**:
+  Lade beliebig viele Personen per E-Mail ein; sie legen über einen Aktivierungslink ihr eigenes Passwort fest. Jede eingeladene Person hat vollen Zugriff auf das gesamte Admin-Panel — es gibt keine Rollen oder Rechte einzustellen.
+- **Änderungsprotokoll (Audit-Trail)**:
+  Ein eigener Tab "Protokoll" zeigt, wer wann was geändert hat — Projekteinstellungen, Rechtstext-Typen, Veröffentlichungen und Benutzerverwaltung.
+- **Versionshistorie mit Diff & Wiederherstellen**:
+  Jede Veröffentlichung eines Rechtstexts legt eine neue Version an. Der Editor zeigt den vollständigen Versionsverlauf pro Sprache inklusive Diff-Ansicht gegen den aktuellen Stand und einer nicht-destruktiven "Wiederherstellen"-Funktion.
+- **Sprachen-Tabs im Editor**:
+  Aktive Sprachen erscheinen als Tabs; eine optionale Vergleichsansicht blendet die Referenzsprache bei Bedarf side-by-side ein.
 
 ---
 
@@ -37,9 +49,11 @@ Paragrafy ist ein leichtgewichtiges, selbstgehostetes Content-Management-System 
 /var/www/paragrafy/
 ├── index.php             # Öffentlicher Router, Viewer, JSON-API & Cron-Handler
 ├── admin.php             # Admin-Dashboard, Compliance-Matrix, Webhook-Logs & Einstellungen
-├── editor.php            # Side-by-Side WYSIWYG- & Übersetzungs-Editor mit Scheduled Publishing
+├── editor.php            # Sprachen-Tabs-Editor mit Scheduled Publishing & Versionshistorie
 ├── install.php           # Interaktiver Setup-Wizard für die Erstinstallation
-├── db.php                # SQLite-Datenbankanbindung, Migrationen, Webhooks & SMTP-Client
+├── db.php                # SQLite-Datenbankanbindung, Migrationen, Webhooks, SMTP-Client & Theme
+├── Dockerfile            # Container-Image-Definition
+├── docker-compose.yaml   # Docker-Compose-Setup für den Betrieb via Container
 ├── WEBHOOKS.md           # Detaillierte Webhook-Dokumentation, Spezifikation & Payloads
 ├── paragrafy.svg         # Vektor-Logo
 ├── .htaccess             # Apache Routing & Schutz sensibler Dateien
@@ -87,7 +101,7 @@ Paragrafy.cloud lässt sich am schnellsten und saubersten über Docker und Docke
 
 ### Schnellanleitung
 
-1. Repository klonen oder die Konfigurationsdateien auf dem Server hinterlegen (`Dockerfile` und `docker-compose.yml`).
+1. Repository klonen oder die Konfigurationsdateien auf dem Server hinterlegen (`Dockerfile` und `docker-compose.yaml`).
 2. Container im Hintergrund starten:
    ```bash
    docker compose up -d --build

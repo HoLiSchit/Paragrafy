@@ -10,7 +10,7 @@ RUN a2enmod rewrite
 
 WORKDIR /var/www/html
 
-RUN git clone https://github.com/HoLiSchit/Paragrafy.git /var/www/html
+RUN git clone https://github.com/mineco-de/Paragrafy.git /var/www/html
 
 RUN chown -R www-data:www-data /var/www/html \
     && find /var/www/html -type d -exec chmod 755 {} + \

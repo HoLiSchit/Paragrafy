@@ -237,16 +237,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $auditRecipient = trim($_POST['audit_email_recipient'] ?? '');
 
         $cookieBanner = !empty($_POST['cookie_banner_enabled']) ? 1 : 0;
+        $cookieBannerText = trim($_POST['cookie_banner_text'] ?? '');
         if (!str_starts_with($brandColor, '#')) {
             $brandColor = '#' . $brandColor;
         }
 
         $stmt = $db->prepare("
-            UPDATE projects SET 
+            UPDATE projects SET
                 name=?, domain=?, brand_color=?, primary_lang=?, active_languages=?,
                 deepl_api_key=?, logo_url=?, webhook_url=?, webhook_secret=?, audit_interval_months=?,
                 smtp_host=?, smtp_port=?, smtp_user=?, smtp_pass=?, smtp_secure=?, smtp_from=?, audit_email_recipient=?,
-                cookie_banner_enabled=?,
+                cookie_banner_enabled=?, cookie_banner_text=?,
                 company_name=?, address=?, email=?, phone=?, representative=?, register_info=?
             WHERE id=?
         ");
@@ -254,7 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['name'], $_POST['domain'], $brandColor, $_POST['primary_lang'], $activeLangs,
             $deeplKey, $logoUrl, $webhookUrl, $webhookSecret, $auditMonths,
             $smtpHost, $smtpPort, $smtpUser, $smtpPass, $smtpSecure, $smtpFrom, $auditRecipient,
-            $cookieBanner,
+            $cookieBanner, $cookieBannerText,
             $_POST['company_name'], $_POST['address'], $_POST['email'], $_POST['phone'], $_POST['representative'], $_POST['register_info'],
             $projectId
         ]);
@@ -1021,6 +1022,9 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                 </label>
                             </div>
 
+                            <label class="pg-label">Cookie-Banner-Text <span style="color:var(--text-faint);font-weight:400">(optional, sonst Standardtext)</span></label>
+                            <textarea name="cookie_banner_text" rows="2" style="width:100%" placeholder="Diese Website verwendet Cookies, um grundlegende Funktionen bereitzustellen und die Nutzung zu verbessern."><?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?></textarea>
+
                             <input type="hidden" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>">
                             <input type="hidden" name="smtp_port" value="<?= htmlspecialchars((string)($project['smtp_port'] ?? 587)) ?>">
                             <input type="hidden" name="smtp_user" value="<?= htmlspecialchars($project['smtp_user'] ?? '') ?>">
@@ -1057,6 +1061,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="logo_url" value="<?= htmlspecialchars($project['logo_url'] ?? '') ?>">
                             <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
                             <?php if (!empty($project['cookie_banner_enabled'])): ?><input type="hidden" name="cookie_banner_enabled" value="1"><?php endif; ?>
+                            <input type="hidden" name="cookie_banner_text" value="<?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?>">
                             <input type="hidden" name="webhook_url" value="<?= htmlspecialchars($project['webhook_url'] ?? '') ?>">
                             <input type="hidden" name="webhook_secret" value="<?= htmlspecialchars($project['webhook_secret'] ?? '') ?>">
                             <input type="hidden" name="deepl_api_key" value="<?= htmlspecialchars($project['deepl_api_key'] ?? '') ?>">
@@ -1129,6 +1134,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="logo_url" value="<?= htmlspecialchars($project['logo_url'] ?? '') ?>">
                             <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
                             <?php if (!empty($project['cookie_banner_enabled'])): ?><input type="hidden" name="cookie_banner_enabled" value="1"><?php endif; ?>
+                            <input type="hidden" name="cookie_banner_text" value="<?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?>">
                             <input type="hidden" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>">
                             <input type="hidden" name="smtp_port" value="<?= htmlspecialchars((string)($project['smtp_port'] ?? 587)) ?>">
                             <input type="hidden" name="smtp_user" value="<?= htmlspecialchars($project['smtp_user'] ?? '') ?>">
@@ -1181,6 +1187,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="logo_url" value="<?= htmlspecialchars($project['logo_url'] ?? '') ?>">
                             <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
                             <?php if (!empty($project['cookie_banner_enabled'])): ?><input type="hidden" name="cookie_banner_enabled" value="1"><?php endif; ?>
+                            <input type="hidden" name="cookie_banner_text" value="<?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?>">
                             <input type="hidden" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>">
                             <input type="hidden" name="smtp_port" value="<?= htmlspecialchars((string)($project['smtp_port'] ?? 587)) ?>">
                             <input type="hidden" name="smtp_user" value="<?= htmlspecialchars($project['smtp_user'] ?? '') ?>">

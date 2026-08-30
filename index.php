@@ -23,18 +23,6 @@ if ($uri === '/paragrafy.svg') {
     exit;
 }
 
-if ($uri === '/embed.js') {
-    header('Content-Type: application/javascript; charset=utf-8');
-    render_embed_js();
-    exit;
-}
-
-if ($uri === '/consent.js') {
-    header('Content-Type: application/javascript; charset=utf-8');
-    render_consent_js();
-    exit;
-}
-
 if (str_starts_with($uri, '/admin')) {
     require_once __DIR__ . '/admin.php';
     exit;
@@ -46,6 +34,18 @@ $db = get_db();
 $stmt = $db->prepare("SELECT * FROM projects WHERE domain = ? OR domain = 'localhost' ORDER BY (domain = ?) DESC LIMIT 1");
 $stmt->execute([$host, $host]);
 $project = $stmt->fetch();
+
+if ($uri === '/embed.js') {
+    header('Content-Type: application/javascript; charset=utf-8');
+    render_embed_js();
+    exit;
+}
+
+if ($uri === '/consent.js') {
+    header('Content-Type: application/javascript; charset=utf-8');
+    render_consent_js($project ?: null);
+    exit;
+}
 
 if (!$project) {
     http_response_code(404);
@@ -574,5 +574,181 @@ function render_public_404(array $project, string $lang): void {
         <p style="color:var(--text-muted)"><?= htmlspecialchars($i18n['not_found_desc']) ?></p>
         <p><a href="/<?= htmlspecialchars($lang) ?>" style="font-weight:700;">&larr; <?= htmlspecialchars($i18n['back_to_overview']) ?></a></p>
     </body></html>
+    <?php
+}
+
+/**
+ * In-App Embed-Drawer: bind buttons with data-paragrafy-slug / data-paragrafy-lang
+ * and open a modal sheet loading the document via the public JSON API.
+ */
+function render_embed_js(): void {
+    ?>
+(function () {
+    var scriptEl = document.currentScript;
+    if (!scriptEl) {
+        var scripts = document.getElementsByTagName('script');
+        scriptEl = scripts[scripts.length - 1];
+    }
+    var origin;
+    try { origin = new URL(scriptEl.src, window.location.href).origin; } catch (e) { origin = window.location.origin; }
+
+    function injectStyles() {
+        if (document.getElementById('paragrafy-embed-style')) return;
+        var style = document.createElement('style');
+        style.id = 'paragrafy-embed-style';
+        style.textContent =
+            '.paragrafy-embed-backdrop{position:fixed;inset:0;background:rgba(20,16,22,.5);z-index:999999;display:flex;align-items:flex-end;justify-content:center;padding:0}' +
+            '@media (min-width:720px){.paragrafy-embed-backdrop{align-items:center;padding:20px}}' +
+            '.paragrafy-embed-sheet{background:#fff;width:100%;max-width:640px;max-height:85vh;border-radius:16px 16px 0 0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 -10px 40px rgba(0,0,0,.2);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}' +
+            '@media (min-width:720px){.paragrafy-embed-sheet{border-radius:16px}}' +
+            '.paragrafy-embed-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #E8E4DC;flex-shrink:0}' +
+            '.paragrafy-embed-header h2{margin:0;font-size:16px;font-weight:700;color:#201C24}' +
+            '.paragrafy-embed-close{border:none;background:transparent;font-size:22px;line-height:1;cursor:pointer;color:#746E78;padding:4px;flex-shrink:0}' +
+            '.paragrafy-embed-body{padding:20px;overflow-y:auto;font-size:14px;line-height:1.7;color:#201C24}' +
+            '.paragrafy-embed-body h2{font-size:18px;margin-top:20px}' +
+            '.paragrafy-embed-body h3{font-size:15px;margin-top:16px}' +
+            '.paragrafy-embed-body p{margin:0.75em 0}' +
+            '.paragrafy-embed-loading,.paragrafy-embed-error{padding:40px 20px;text-align:center;color:#746E78;font-size:14px}';
+        document.head.appendChild(style);
+    }
+
+    function openDrawer(lang, slug) {
+        injectStyles();
+        var backdrop = document.createElement('div');
+        backdrop.className = 'paragrafy-embed-backdrop';
+        backdrop.innerHTML =
+            '<div class="paragrafy-embed-sheet" role="dialog" aria-modal="true">' +
+                '<div class="paragrafy-embed-header"><h2>Wird geladen&hellip;</h2>' +
+                '<button type="button" class="paragrafy-embed-close" aria-label="Schlie&szlig;en">&times;</button></div>' +
+                '<div class="paragrafy-embed-body"><div class="paragrafy-embed-loading">L&auml;dt&hellip;</div></div>' +
+            '</div>';
+        document.body.appendChild(backdrop);
+
+        function close() {
+            backdrop.remove();
+            document.removeEventListener('keydown', onKey);
+        }
+        function onKey(e) { if (e.key === 'Escape') close(); }
+        document.addEventListener('keydown', onKey);
+        backdrop.addEventListener('click', function (e) { if (e.target === backdrop) close(); });
+        backdrop.querySelector('.paragrafy-embed-close').addEventListener('click', close);
+
+        fetch(origin + '/api/' + encodeURIComponent(lang) + '/' + encodeURIComponent(slug))
+            .then(function (res) {
+                if (!res.ok) throw new Error('not_found');
+                return res.json();
+            })
+            .then(function (data) {
+                backdrop.querySelector('.paragrafy-embed-header h2').textContent = data.title || '';
+                backdrop.querySelector('.paragrafy-embed-body').innerHTML = data.html || '';
+            })
+            .catch(function () {
+                backdrop.querySelector('.paragrafy-embed-header h2').textContent = 'Fehler';
+                backdrop.querySelector('.paragrafy-embed-body').innerHTML =
+                    '<div class="paragrafy-embed-error">Dokument konnte nicht geladen werden.</div>';
+            });
+    }
+
+    function bind(el) {
+        if (el.__paragrafyBound) return;
+        el.__paragrafyBound = true;
+        el.addEventListener('click', function (e) {
+            e.preventDefault();
+            var slug = el.getAttribute('data-paragrafy-slug');
+            var lang = el.getAttribute('data-paragrafy-lang') || 'de';
+            if (slug) openDrawer(lang, slug);
+        });
+    }
+
+    function scan() {
+        var els = document.querySelectorAll('[data-paragrafy-slug]');
+        for (var i = 0; i < els.length; i++) bind(els[i]);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', scan);
+    } else {
+        scan();
+    }
+
+    if (window.MutationObserver) {
+        new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
+    }
+})();
+    <?php
+}
+
+/**
+ * DSGVO Cookie-Consent-Banner. $project may be null (unknown domain) — falls
+ * back to generic text/colors in that case.
+ */
+function render_consent_js(?array $project): void {
+    $brand = $project['brand_color'] ?? '#e11d48';
+    $primaryLang = $project['primary_lang'] ?? 'de';
+    $bannerText = trim($project['cookie_banner_text'] ?? '') ?: 'Diese Website verwendet Cookies, um grundlegende Funktionen bereitzustellen und die Nutzung zu verbessern.';
+    $privacyUrl = '/' . $primaryLang . '/datenschutz';
+
+    $brandJs = json_encode($brand, JSON_UNESCAPED_UNICODE);
+    $textJs = json_encode($bannerText, JSON_UNESCAPED_UNICODE);
+    $privacyUrlJs = json_encode($privacyUrl, JSON_UNESCAPED_UNICODE);
+    ?>
+(function () {
+    var CONSENT_KEY = 'paragrafy_consent';
+    try { if (localStorage.getItem(CONSENT_KEY)) return; } catch (e) {}
+
+    var brand = <?= $brandJs ?>;
+    var text = <?= $textJs ?>;
+    var privacyUrl = <?= $privacyUrlJs ?>;
+
+    var style = document.createElement('style');
+    style.textContent =
+        '.paragrafy-consent-bar{position:fixed;left:16px;right:16px;bottom:16px;max-width:560px;margin:0 auto;background:#201C24;color:#fff;border-radius:12px;padding:16px 18px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;line-height:1.5;z-index:999998;box-shadow:0 10px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:12px}' +
+        '.paragrafy-consent-bar a{color:#fff;text-decoration:underline}' +
+        '.paragrafy-consent-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}' +
+        '.paragrafy-consent-actions button{border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}' +
+        '.paragrafy-consent-decline{background:transparent !important;color:#fff;border:1px solid rgba(255,255,255,.3) !important}' +
+        '.paragrafy-consent-accept{background:' + brand + ';color:#fff}';
+    document.head.appendChild(style);
+
+    var bar = document.createElement('div');
+    bar.className = 'paragrafy-consent-bar';
+    bar.setAttribute('role', 'dialog');
+    bar.setAttribute('aria-label', 'Cookie-Hinweis');
+
+    var textEl = document.createElement('div');
+    textEl.textContent = text + ' ';
+    var link = document.createElement('a');
+    link.href = privacyUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = 'Mehr erfahren';
+    textEl.appendChild(link);
+
+    var actions = document.createElement('div');
+    actions.className = 'paragrafy-consent-actions';
+    var declineBtn = document.createElement('button');
+    declineBtn.type = 'button';
+    declineBtn.className = 'paragrafy-consent-decline';
+    declineBtn.textContent = 'Nur notwendige';
+    var acceptBtn = document.createElement('button');
+    acceptBtn.type = 'button';
+    acceptBtn.className = 'paragrafy-consent-accept';
+    acceptBtn.textContent = 'Akzeptieren';
+
+    actions.appendChild(declineBtn);
+    actions.appendChild(acceptBtn);
+    bar.appendChild(textEl);
+    bar.appendChild(actions);
+    document.body.appendChild(bar);
+
+    function setConsent(value) {
+        try { localStorage.setItem(CONSENT_KEY, value); } catch (e) {}
+        bar.remove();
+        document.dispatchEvent(new CustomEvent('paragrafy:consent', { detail: { consent: value } }));
+    }
+
+    acceptBtn.addEventListener('click', function () { setConsent('accepted'); });
+    declineBtn.addEventListener('click', function () { setConsent('declined'); });
+})();
     <?php
 }
