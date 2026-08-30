@@ -78,6 +78,20 @@ sudo find /var/www/paragrafy -type f -exec chmod 644 {} +
 </VirtualHost>
 ```
 
+## 🚀 Docker Setup & Deployment
+
+Paragrafy.cloud lässt sich am schnellsten und saubersten über Docker und Docker Compose betreiben. Alle persistierenden Daten (wie SQLite-Datenbanken und Instanzen) werden im Ordner `./data` gespeichert.
+
+### Voraussetzungen
+* Docker & Docker Compose auf dem Server installiert.
+
+### Schnellanleitung
+
+1. Repository klonen oder die Konfigurationsdateien auf dem Server hinterlegen (`Dockerfile` und `docker-compose.yml`).
+2. Container im Hintergrund starten:
+   ```bash
+   docker compose up -d --build
+
 ### 3. Erstinstallation
 
 Rufe deine Subdomain im Browser auf (z. B. `https://legal.deinedomain.de`). Der **Paragrafy Setup-Wizard** startet automatisch.
