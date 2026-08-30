@@ -384,6 +384,10 @@ function svg_icon(string $name, string $extraClass = '', int $size = 16): string
     return '<svg viewBox="0 0 24 24" width="' . $size . '" height="' . $size . '" fill="none" class="' . $extraClass . '" style="vertical-align:middle; display:inline-block;">' . $path . '</svg>';
 }
 
+function help_icon(string $text): string {
+    return '<span class="pg-help" tabindex="0" title="' . htmlspecialchars($text, ENT_QUOTES) . '">?</span>';
+}
+
 function replace_placeholders(string $content, array $project): string {
     $map = [
         '{{company_name}}' => htmlspecialchars($project['company_name'] ?? ''),
@@ -822,6 +826,8 @@ function theme_base_css(string $accent = '#e11d48'): string {
         }
         label.pg-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; margin-top: 14px; }
         .pg-hint { font-size: 11.5px; color: var(--text-faint); margin-top: 6px; }
+        .pg-help { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: var(--border-soft); color: var(--text-faint); font-size: 10px; font-weight: 700; font-style: normal; cursor: help; margin-left: 5px; flex-shrink: 0; vertical-align: middle; }
+        .pg-help:hover { background: var(--border); color: var(--text-muted); }
 
         .pg-btn { border: none; border-radius: 8px; padding: 10px 18px; background: var(--accent); color: #fff; font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
         .pg-btn:hover { filter: brightness(0.92); }

@@ -412,7 +412,7 @@ $versions = $stmtVersions->fetchAll();
                     <label>Titel des Dokuments:</label>
                     <input type="text" id="targetTitle" name="title" value="<?= htmlspecialchars($displayTitle) ?>" required style="width:100%">
 
-                    <label>URL-Slug (/<?= htmlspecialchars($targetLang) ?>/slug):</label>
+                    <label>URL-Slug (/<?= htmlspecialchars($targetLang) ?>/slug):<?= help_icon('Bestimmt die öffentliche Adresse dieses Rechtstexts, z. B. /' . htmlspecialchars($targetLang) . '/agb-b2c. Änderungen brechen bestehende Links zu dieser Seite.') ?></label>
                     <input type="text" name="slug" value="<?= htmlspecialchars($displaySlug) ?>" required style="width:100%">
 
                     <label>Inhalt (WYSIWYG-Visual Editor):</label>
@@ -440,7 +440,7 @@ $versions = $stmtVersions->fetchAll();
                         <span>Shortcut: <strong>Cmd+S</strong> / <strong>Strg+S</strong></span>
                     </div>
 
-                    <label>Änderungsnotiz (für Changelog &amp; Webhooks):</label>
+                    <label>Änderungsnotiz (für Changelog &amp; Webhooks):<?= help_icon('Wird im Versionsverlauf angezeigt und als change_note im Webhook-Payload mitgeschickt — keine Auswirkung auf die öffentliche Seite.') ?></label>
                     <input type="text" name="change_note" value="<?= htmlspecialchars($displayNote) ?>" placeholder="z. B. Aktualisierung der Zahlungsbedingungen zum 31.08." style="width:100%">
 
                     <!-- Zeitgesteuerte Veröffentlichung Einstellungen -->

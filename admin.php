@@ -603,7 +603,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                     <!-- Health KPI Cards -->
                     <div class="pg-kpi-grid">
                         <div class="pg-kpi">
-                            <div class="pg-kpi-label">Compliance-Score</div>
+                            <div class="pg-kpi-label">Compliance-Score<?= help_icon('Anteil der als Pflichtseite markierten Rechtstexte, die in der Primärsprache veröffentlicht sind. Optionale Seiten und andere Sprachen zählen nicht mit.') ?></div>
                             <div class="pg-kpi-val" style="color: <?= $complianceScore === 100 ? 'var(--green)' : 'var(--accent)' ?>;"><?= $complianceScore ?>%</div>
                             <div class="pg-kpi-sub"><?= $publishedRequired ?> von <?= $totalRequired ?> Pflichtseiten live</div>
                         </div>
@@ -1022,7 +1022,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                 </label>
                             </div>
 
-                            <label class="pg-label">Cookie-Banner-Text <span style="color:var(--text-faint);font-weight:400">(optional, sonst Standardtext)</span></label>
+                            <label class="pg-label">Cookie-Banner-Text <span style="color:var(--text-faint);font-weight:400">(optional, sonst Standardtext)</span><?= help_icon('Dieser Text erscheint im Banner, das /consent.js auf deiner Website einblendet. Bindest du das Skript nicht ein, hat dieser Text keine Wirkung.') ?></label>
                             <textarea name="cookie_banner_text" rows="2" style="width:100%" placeholder="Diese Website verwendet Cookies, um grundlegende Funktionen bereitzustellen und die Nutzung zu verbessern."><?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?></textarea>
 
                             <input type="hidden" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>">
@@ -1149,10 +1149,10 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="phone" value="<?= htmlspecialchars($project['phone'] ?? '') ?>">
                             <input type="hidden" name="register_info" value="<?= htmlspecialchars($project['register_info'] ?? '') ?>">
 
-                            <label class="pg-label" style="margin-top:0">Webhook-URL (POST bei Textänderungen)</label>
+                            <label class="pg-label" style="margin-top:0">Webhook-URL (POST bei Textänderungen)<?= help_icon('Wird per POST mit JSON-Payload aufgerufen, sobald ein Rechtstext veröffentlicht oder eine geplante Änderung eingerichtet wird. Vollständige Payload-Struktur siehe WEBHOOKS.md.') ?></label>
                             <input type="text" name="webhook_url" value="<?= htmlspecialchars($project['webhook_url'] ?? '') ?>" placeholder="https://app.deinefirma.de/api/legal-webhook" style="width:100%;margin-bottom:14px">
 
-                            <label class="pg-label" style="margin-top:0">Webhook-Secret <span style="color:var(--text-faint);font-weight:400">(optional, für Signaturprüfung)</span></label>
+                            <label class="pg-label" style="margin-top:0">Webhook-Secret <span style="color:var(--text-faint);font-weight:400">(optional, für Signaturprüfung)</span><?= help_icon('Wird als HMAC-SHA256-Signatur im Header X-Paragrafy-Signature mitgeschickt, damit dein Server die Echtheit der Anfrage prüfen kann.') ?></label>
                             <input type="text" name="webhook_secret" value="<?= htmlspecialchars($project['webhook_secret'] ?? '') ?>" placeholder="z. B. ein geheimer Schlüssel" style="width:100%;margin-bottom:14px">
 
                             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
