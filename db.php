@@ -1,10 +1,10 @@
 <?php
 /**
- * Paragrafy v1.5.3 - Database, Helper & SMTP Core
+ * Paragrafy v1.6.0 - Database, Helper, Scheduled Publishing & SMTP Core
  */
 declare(strict_types=1);
 
-define('PARAGRAFY_VERSION', '1.5.3');
+define('PARAGRAFY_VERSION', '1.6.0');
 define('PARAGRAFY_DIR', __DIR__);
 define('DB_FILE', PARAGRAFY_DIR . '/paragrafy_data.sqlite');
 define('CONFIG_FILE', PARAGRAFY_DIR . '/config.php');
@@ -22,7 +22,7 @@ function load_env_file(): array {
                     if (str_contains($line, '=')) {
                         [$k, $v] = explode('=', $line, 2);
                         $k = trim($k);
-                        $v = trim($v, " \t\n\r\0\x0B\"\'");
+                        $v = trim($v, " \t\n\r\0\x0B\"'");
                         $env[$k] = $v;
                     }
                 }
@@ -89,14 +89,20 @@ function ensure_schema_migrations(PDO $pdo): void {
         if ($stmtTrans && $stmtTrans->fetch()) {
             $colsTrans = $pdo->query("PRAGMA table_info(translations)")->fetchAll();
             $transColNames = array_column($colsTrans, 'name');
-            if (!in_array('change_note', $transColNames)) {
-                $pdo->exec("ALTER TABLE translations ADD COLUMN change_note TEXT DEFAULT ''");
-            }
-            if (!in_array('source_hash', $transColNames)) {
-                $pdo->exec("ALTER TABLE translations ADD COLUMN source_hash TEXT DEFAULT ''");
-            }
-            if (!in_array('previous_content', $transColNames)) {
-                $pdo->exec("ALTER TABLE translations ADD COLUMN previous_content TEXT DEFAULT ''");
+            $transNewCols = [
+                'change_note' => "TEXT DEFAULT ''",
+                'source_hash' => "TEXT DEFAULT ''",
+                'previous_content' => "TEXT DEFAULT ''",
+                'scheduled_at' => "DATETIME DEFAULT NULL",
+                'scheduled_title' => "TEXT DEFAULT ''",
+                'scheduled_slug' => "TEXT DEFAULT ''",
+                'scheduled_content' => "TEXT DEFAULT ''",
+                'scheduled_note' => "TEXT DEFAULT ''"
+            ];
+            foreach ($transNewCols as $tc => $ttype) {
+                if (!in_array($tc, $transColNames)) {
+                    $pdo->exec("ALTER TABLE translations ADD COLUMN " . $tc . " " . $ttype);
+                }
             }
         }
     } catch (Throwable $e) {
@@ -163,6 +169,11 @@ function init_database_schema(PDO $pdo): void {
             status TEXT DEFAULT 'draft',
             change_note TEXT DEFAULT '',
             source_hash TEXT DEFAULT '',
+            scheduled_at DATETIME DEFAULT NULL,
+            scheduled_title TEXT DEFAULT '',
+            scheduled_slug TEXT DEFAULT '',
+            scheduled_content TEXT DEFAULT '',
+            scheduled_note TEXT DEFAULT '',
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
             UNIQUE(document_id, lang)
@@ -170,11 +181,71 @@ function init_database_schema(PDO $pdo): void {
     ");
 }
 
+function check_and_publish_scheduled(PDO $pdo, ?array $project = null): array {
+    $publishedCount = 0;
+    try {
+        $nowStr = date('Y-m-d H:i:s');
+        $sql = "
+            SELECT t.id, t.document_id, t.lang, t.scheduled_title, t.scheduled_slug, t.scheduled_content, t.scheduled_note, t.scheduled_at,
+                   d.project_id, p.name as project_name, p.domain, p.webhook_url, p.webhook_secret
+            FROM translations t
+            JOIN documents d ON t.document_id = d.id
+            JOIN projects p ON d.project_id = p.id
+            WHERE t.scheduled_at IS NOT NULL AND t.scheduled_at <= ?
+        ";
+        $params = [$nowStr];
+        if ($project !== null) {
+            $sql .= " AND p.id = ?";
+            $params[] = $project['id'];
+        }
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $due = $stmt->fetchAll();
+
+        foreach ($due as $row) {
+            $upd = $pdo->prepare("
+                UPDATE translations SET
+                    title = CASE WHEN scheduled_title != '' THEN scheduled_title ELSE title END,
+                    slug = CASE WHEN scheduled_slug != '' THEN scheduled_slug ELSE slug END,
+                    previous_content = content,
+                    content = CASE WHEN scheduled_content != '' THEN scheduled_content ELSE content END,
+                    change_note = scheduled_note,
+                    status = 'published',
+                    scheduled_at = NULL,
+                    scheduled_title = '',
+                    scheduled_slug = '',
+                    scheduled_content = '',
+                    scheduled_note = '',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $upd->execute([$row['id']]);
+            $publishedCount++;
+
+            dispatch_webhook($row, [
+                'event_type' => 'legal_text.updated',
+                'document_id' => $row['document_id'],
+                'slug' => $row['scheduled_slug'] ?: $row['slug'],
+                'lang' => $row['lang'],
+                'title' => $row['scheduled_title'] ?: $row['title'],
+                'status' => 'published',
+                'change_note' => $row['scheduled_note'],
+                'was_scheduled' => true,
+                'published_at' => date('c')
+            ]);
+        }
+    } catch (Throwable $e) {
+    }
+    return ['published_count' => $publishedCount];
+}
+
 function svg_icon(string $name, string $extraClass = '', int $size = 16): string {
     $icons = [
         'check' => '<path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>',
         'warning' => '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
         'clock' => '<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+        'calendar' => '<rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
         'lightning' => '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
         'eye' => '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>',
         'disk' => '<path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -328,13 +399,14 @@ function dispatch_webhook(array $project, array $eventData): void {
         return;
     }
 
+    $eventName = $eventData['event_type'] ?? 'legal_text.updated';
     $payload = json_encode([
-        'event' => 'legal_text.updated',
+        'event' => $eventName,
         'timestamp' => date('c'),
         'project' => [
-            'id' => $project['id'],
-            'name' => $project['name'],
-            'domain' => $project['domain']
+            'id' => $project['id'] ?? ($project['project_id'] ?? 1),
+            'name' => $project['name'] ?? ($project['project_name'] ?? 'Paragrafy'),
+            'domain' => $project['domain'] ?? ''
         ],
         'data' => $eventData
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -344,8 +416,8 @@ function dispatch_webhook(array $project, array $eventData): void {
 
     $headers = [
         'Content-Type: application/json',
-        'User-Agent: Paragrafy-Webhook/1.5.3',
-        'X-Paragrafy-Event: legal_text.updated'
+        'User-Agent: Paragrafy-Webhook/1.6.0',
+        'X-Paragrafy-Event: ' . $eventName
     ];
     if ($signature !== '') {
         $headers[] = 'X-Paragrafy-Signature: ' . $signature;

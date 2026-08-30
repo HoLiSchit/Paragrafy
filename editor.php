@@ -1,6 +1,6 @@
 <?php
 /**
- * Paragrafy v1.5.2 - Bidirectional Side-by-Side WYSIWYG & Translation Editor
+ * Paragrafy v1.6.0 - Side-by-Side WYSIWYG & Translation Editor with Scheduled Publishing
  */
 declare(strict_types=1);
 
@@ -28,15 +28,15 @@ if (!$doc) {
     exit;
 }
 
-// Alle verfügbaren Übersetzungen für dieses Dokument laden
-$stmtAll = $db->prepare("SELECT lang, title, content, updated_at FROM translations WHERE document_id = ?");
+// Alle vorhandenen Übersetzungen für dieses Dokument laden
+$stmtAll = $db->prepare("SELECT lang, title, content, updated_at, scheduled_at FROM translations WHERE document_id = ?");
 $stmtAll->execute([$docId]);
 $allTranslations = [];
 foreach ($stmtAll->fetchAll() as $row) {
     $allTranslations[$row['lang']] = $row;
 }
 
-// Standard-Referenzsprache bestimmen (falls target == primary, nimm en oder die erste andere Sprache)
+// Standard-Referenzsprache bestimmen
 $activeLangs = array_filter(array_map('trim', explode(',', $doc['active_languages'] ?? 'de,en')));
 $defaultRefLang = $doc['primary_lang'] ?: 'de';
 if ($targetLang === $defaultRefLang) {
@@ -81,7 +81,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'deepl_translate') {
     exit;
 }
 
-// Speichern
+// Speichern (Sofort live, Zeitgesteuert oder Entwurf)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     if ($action === 'save_translation') {
@@ -90,32 +90,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $content = $_POST['content'] ?? '';
         $status = $_POST['status'] ?? 'published';
         $changeNote = trim($_POST['change_note'] ?? '');
-
+        $scheduledAt = !empty($_POST['scheduled_at']) ? str_replace('T', ' ', trim($_POST['scheduled_at'])) . ':00' : null;
+        
         $sourceHashToSave = $currentSourceHash;
 
-        $stmtOld = $db->prepare("SELECT content FROM translations WHERE document_id = ? AND lang = ?");
+        $stmtOld = $db->prepare("SELECT content, title, slug FROM translations WHERE document_id = ? AND lang = ?");
         $stmtOld->execute([$docId, $targetLang]);
         $oldRow = $stmtOld->fetch();
-        $prevContent = $oldRow ? $oldRow['content'] : $content;
 
-        $stmt = $db->prepare("
-            INSERT INTO translations (document_id, lang, title, slug, content, previous_content, status, change_note, source_hash, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(document_id, lang) DO UPDATE SET
-            title=excluded.title, slug=excluded.slug, previous_content=translations.content, content=excluded.content, status=excluded.status, change_note=excluded.change_note, source_hash=excluded.source_hash, updated_at=CURRENT_TIMESTAMP
-        ");
-        $stmt->execute([$docId, $targetLang, $title, $slug, $content, $prevContent, $status, $changeNote, $sourceHashToSave]);
+        if ($status === 'scheduled' && !empty($scheduledAt)) {
+            // Geplante Veröffentlichung: Aktuelle Live-Inhalte bleiben unberührt, geplante Daten werden gesichert
+            if ($oldRow) {
+                $stmt = $db->prepare("
+                    UPDATE translations SET
+                        scheduled_at = ?,
+                        scheduled_title = ?,
+                        scheduled_slug = ?,
+                        scheduled_content = ?,
+                        scheduled_note = ?
+                    WHERE document_id = ? AND lang = ?
+                ");
+                $stmt->execute([$scheduledAt, $title, $slug, $content, $changeNote, $docId, $targetLang]);
+            } else {
+                $stmt = $db->prepare("
+                    INSERT INTO translations (document_id, lang, title, slug, content, previous_content, status, change_note, source_hash, scheduled_at, scheduled_title, scheduled_slug, scheduled_content, scheduled_note, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ");
+                $stmt->execute([$docId, $targetLang, $title, $slug, $content, $content, $changeNote, $sourceHashToSave, $scheduledAt, $title, $slug, $content, $changeNote]);
+            }
 
-        if ($status === 'published') {
+            // Webhook für Vorankündigung triggern
             dispatch_webhook($doc, [
+                'event_type' => 'legal_text.scheduled',
                 'document_id' => $docId,
                 'slug' => $slug,
                 'lang' => $targetLang,
                 'title' => $title,
-                'status' => $status,
-                'change_note' => $changeNote,
-                'updated_at' => date('c')
+                'scheduled_at' => date('c', strtotime($scheduledAt)),
+                'change_note' => $changeNote
             ]);
+        } else {
+            // Sofortige Veröffentlichung oder Entwurf
+            $prevContent = $oldRow ? $oldRow['content'] : $content;
+            $stmt = $db->prepare("
+                INSERT INTO translations (document_id, lang, title, slug, content, previous_content, status, change_note, source_hash, scheduled_at, scheduled_title, scheduled_slug, scheduled_content, scheduled_note, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, '', '', '', '', CURRENT_TIMESTAMP)
+                ON CONFLICT(document_id, lang) DO UPDATE SET
+                title=excluded.title, slug=excluded.slug, previous_content=translations.content, content=excluded.content, status=excluded.status, change_note=excluded.change_note, source_hash=excluded.source_hash, scheduled_at=NULL, scheduled_title='', scheduled_slug='', scheduled_content='', scheduled_note='', updated_at=CURRENT_TIMESTAMP
+            ");
+            $stmt->execute([$docId, $targetLang, $title, $slug, $content, $prevContent, $status, $changeNote, $sourceHashToSave]);
+
+            if ($status === 'published') {
+                dispatch_webhook($doc, [
+                    'event_type' => 'legal_text.updated',
+                    'document_id' => $docId,
+                    'slug' => $slug,
+                    'lang' => $targetLang,
+                    'title' => $title,
+                    'status' => $status,
+                    'change_note' => $changeNote,
+                    'updated_at' => date('c')
+                ]);
+            }
         }
 
         header("Location: /admin?project_id=" . ((int)$_POST['project_id']) . "&msg=saved");
@@ -132,8 +168,19 @@ $targetTrans = $stmt->fetch() ?: [
     'content' => '',
     'previous_content' => '',
     'change_note' => '',
-    'status' => 'published'
+    'status' => 'published',
+    'scheduled_at' => null,
+    'scheduled_title' => '',
+    'scheduled_slug' => '',
+    'scheduled_content' => '',
+    'scheduled_note' => ''
 ];
+
+$hasScheduled = !empty($targetTrans['scheduled_at']);
+$displayContent = $hasScheduled && !empty($targetTrans['scheduled_content']) ? $targetTrans['scheduled_content'] : $targetTrans['content'];
+$displayTitle = $hasScheduled && !empty($targetTrans['scheduled_title']) ? $targetTrans['scheduled_title'] : $targetTrans['title'];
+$displaySlug = $hasScheduled && !empty($targetTrans['scheduled_slug']) ? $targetTrans['scheduled_slug'] : $targetTrans['slug'];
+$displayNote = $hasScheduled && !empty($targetTrans['scheduled_note']) ? $targetTrans['scheduled_note'] : $targetTrans['change_note'];
 
 $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']) && $targetTrans['source_hash'] !== $currentSourceHash);
 ?>
@@ -155,37 +202,40 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
         .pane-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; gap: 0.5rem; flex-wrap: wrap; }
         h3 { margin: 0; font-size: 1.15rem; color: #0f172a; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; }
         label { display: block; font-size: 0.8125rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem; margin-top: 0.75rem; }
-        input[type=text], select { width: 100%; box-sizing: border-box; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; }
-
+        input[type=text], input[type=datetime-local], select { width: 100%; box-sizing: border-box; padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; }
+        
         .wysiwyg-toolbar { display: flex; flex-wrap: wrap; gap: 0.35rem; background: #f1f5f9; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 8px 8px 0 0; border-bottom: none; }
         .tool-btn { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.8125rem; font-weight: 600; cursor: pointer; color: #334155; display: inline-flex; align-items: center; gap: 0.25rem; }
         .tool-btn:hover { background: #e2e8f0; color: #0f172a; }
         .tool-btn.active { background: #0f172a; color: #ffffff; border-color: #0f172a; }
-
+        
         .editor-box { min-height: 440px; max-height: 540px; overflow-y: auto; padding: 1.25rem; border: 1px solid #cbd5e1; border-radius: 0 0 8px 8px; background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.7; font-size: 0.95rem; outline: none; }
         .editor-box:focus { border-color: #e11d48; }
         .code-textarea { width: 100%; height: 440px; box-sizing: border-box; padding: 1.25rem; border: 1px solid #cbd5e1; border-radius: 0 0 8px 8px; font-family: ui-monospace, Menlo, Monaco, monospace; font-size: 0.875rem; line-height: 1.5; display: none; }
-
+        
         .source-box { min-height: 440px; max-height: 540px; overflow-y: auto; padding: 1.25rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 0.95rem; line-height: 1.7; color: #334155; }
         .diff-box { min-height: 440px; max-height: 540px; overflow-y: auto; padding: 1.25rem; border: 1px solid #cbd5e1; border-radius: 8px; background: #fafafa; font-size: 0.95rem; line-height: 1.7; display: none; }
-
+        
         .stat-footer { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #64748b; margin-top: 0.4rem; padding: 0 0.25rem; }
 
         .tokens { background: #f1f5f9; padding: 0.6rem 0.85rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.8125rem; }
         .token-btn { background: #e2e8f0; border: 1px solid #cbd5e1; padding: 0.25rem 0.5rem; border-radius: 6px; cursor: pointer; margin-right: 0.35rem; font-size: 0.75rem; font-family: monospace; }
         .token-btn:hover { background: #cbd5e1; }
-
+        
         .btn-save { background: #e11d48; color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 0.4rem; box-shadow: 0 4px 12px rgba(225,29,72,0.25); transition: all 0.2s; }
         .btn-save:hover { background: #be123c; transform: translateY(-1px); }
         .btn-deepl { background: #0f172a; color: #38bdf8; border: 1px solid #334155; padding: 0.45rem 0.9rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s; }
         .btn-deepl:hover { background: #1e293b; color: #7dd3fc; }
         .btn-diff { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 0.4rem 0.75rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; }
-
+        
         .warning-strip { background: #fed7aa; color: #9a3412; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem; border: 1px solid #f97316; display: flex; align-items: center; gap: 0.5rem; }
+        .scheduled-strip { background: #e0e7ff; color: #3730a3; border: 1px solid #818cf8; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; }
+
         ins.diff-ins { background: #dcfce7; color: #166534; text-decoration: none; padding: 0.1rem 0.2rem; border-radius: 3px; }
         del.diff-del { background: #fee2e2; color: #991b1b; text-decoration: line-through; padding: 0.1rem 0.2rem; border-radius: 3px; }
 
         .ref-select { padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; font-size: 0.8125rem; font-weight: bold; }
+        .schedule-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.75rem 1rem; margin-top: 1rem; display: none; }
     </style>
 </head>
 <body>
@@ -195,6 +245,13 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
     </div>
 
     <div class="editor-container">
+        <?php if ($hasScheduled): ?>
+            <div class="scheduled-strip">
+                <?= svg_icon('calendar', '', 16) ?>
+                <span><strong>Zeitgesteuert geplant:</strong> Diese Version geht automatisch am <strong><?= date('d.m.Y', strtotime($targetTrans['scheduled_at'])) . ' um ' . date('H:i', strtotime($targetTrans['scheduled_at'])) ?> Uhr</strong> live. Bis dahin bleibt der aktuelle Stand öffentlich.</span>
+            </div>
+        <?php endif; ?>
+
         <?php if ($isOutdated): ?>
             <div class="warning-strip">
                 <?= svg_icon('warning', '', 16) ?>
@@ -220,14 +277,14 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                     </h3>
                     <button type="button" class="btn-diff" id="diffBtn" onclick="toggleDiffViewer()"><?= svg_icon('eye', '', 14) ?> Diff-Vergleich</button>
                 </div>
-
+                
                 <label>Referenz-Titel (<?= strtoupper(htmlspecialchars($sourceLang)) ?>):</label>
                 <input type="text" id="sourceTitle" value="<?= htmlspecialchars($sourceTrans['title']) ?>" readonly disabled>
 
                 <label>Referenz-Inhalt:</label>
                 <div class="source-box" id="sourceContentBox"><?= $sourceTrans['content'] ?></div>
                 <div class="diff-box" id="diffViewerBox"></div>
-
+                
                 <div class="stat-footer">
                     <span id="sourceWordCount">0 Wörter</span>
                     <label style="display:inline-flex; align-items:center; gap:0.3rem; margin:0; cursor:pointer;">
@@ -244,7 +301,7 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                 <form id="editForm" method="post" action="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $targetLang ?>&ref_lang=<?= $sourceLang ?>" onsubmit="prepareSubmit()">
                     <input type="hidden" name="action" value="save_translation">
                     <input type="hidden" name="project_id" value="<?= $doc['project_id'] ?>">
-                    <textarea name="content" id="finalContentInput" style="display:none;"><?= htmlspecialchars($targetTrans['content']) ?></textarea>
+                    <textarea name="content" id="finalContentInput" style="display:none;"><?= htmlspecialchars($displayContent) ?></textarea>
 
                     <div class="pane-header">
                         <h3>Zieltext: <?= strtoupper(htmlspecialchars($targetLang)) ?></h3>
@@ -254,7 +311,7 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                             </button>
                         <?php endif; ?>
                     </div>
-
+                    
                     <div class="tokens">
                         <strong>Platzhalter einfügen:</strong><br>
                         <button type="button" class="token-btn" onclick="insertToken('{{company_name}}')">{{company_name}}</button>
@@ -265,13 +322,13 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                     </div>
 
                     <label>Titel des Dokuments:</label>
-                    <input type="text" id="targetTitle" name="title" value="<?= htmlspecialchars($targetTrans['title']) ?>" required>
+                    <input type="text" id="targetTitle" name="title" value="<?= htmlspecialchars($displayTitle) ?>" required>
 
                     <label>URL-Slug (/<?= htmlspecialchars($targetLang) ?>/slug):</label>
-                    <input type="text" name="slug" value="<?= htmlspecialchars($targetTrans['slug']) ?>" required>
+                    <input type="text" name="slug" value="<?= htmlspecialchars($displaySlug) ?>" required>
 
                     <label>Inhalt (WYSIWYG-Visual Editor):</label>
-
+                    
                     <div class="wysiwyg-toolbar">
                         <button type="button" class="tool-btn" onclick="execCmd('bold')" title="Fett"><strong>B</strong></button>
                         <button type="button" class="tool-btn" onclick="execCmd('italic')" title="Kursiv"><em>I</em></button>
@@ -287,23 +344,31 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
                         <button type="button" class="tool-btn" id="toggleCodeBtn" onclick="toggleCodeView()" title="HTML Quellcode bearbeiten">&lt;/&gt; HTML Code</button>
                     </div>
 
-                    <div id="visualEditor" class="editor-box" contenteditable="true" oninput="updateWordCounts()"><?= $targetTrans['content'] ?></div>
-                    <textarea id="rawCodeEditor" class="code-textarea" oninput="updateWordCounts()"><?= htmlspecialchars($targetTrans['content']) ?></textarea>
+                    <div id="visualEditor" class="editor-box" contenteditable="true" oninput="updateWordCounts()"><?= $displayContent ?></div>
+                    <textarea id="rawCodeEditor" class="code-textarea" oninput="updateWordCounts()"><?= htmlspecialchars($displayContent) ?></textarea>
 
                     <div class="stat-footer">
                         <span id="targetWordCount">0 Wörter &bull; 0 Zeichen</span>
                         <span>Shortcut: <strong>Cmd+S</strong> / <strong>Strg+S</strong></span>
                     </div>
 
-                    <label>Änderungsnotiz (optional für Changelog):</label>
-                    <input type="text" name="change_note" value="<?= htmlspecialchars($targetTrans['change_note'] ?? '') ?>" placeholder="z. B. Zahlungsanbieter & DPO ergänzt">
+                    <label>Änderungsnotiz (für Changelog & Webhooks):</label>
+                    <input type="text" name="change_note" value="<?= htmlspecialchars($displayNote) ?>" placeholder="z. B. Aktualisierung der Zahlungsbedingungen zum 31.08.">
 
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem;">
-                        <select name="status" style="width:auto;">
-                            <option value="published" <?= $targetTrans['status'] === 'published' ? 'selected' : '' ?>>Veröffentlicht (öffentlich & API aktiv)</option>
-                            <option value="draft" <?= $targetTrans['status'] === 'draft' ? 'selected' : '' ?>>Entwurf (ausgeblendet)</option>
+                    <!-- Zeitgesteuerte Veröffentlichung Einstellungen -->
+                    <div id="scheduleBox" class="schedule-box" style="<?= $hasScheduled ? 'display:block;' : '' ?>">
+                        <label style="margin-top:0; color:#3730a3;"><?= svg_icon('calendar', '', 14) ?> Live-Schaltungszeitpunkt festlegen:</label>
+                        <input type="datetime-local" id="scheduledInput" name="scheduled_at" value="<?= $hasScheduled ? date('Y-m-d\TH:i', strtotime($targetTrans['scheduled_at'])) : '' ?>">
+                        <div class="hint" style="color:#6366f1;">Sendet einen Webhook mit Vorankündigung und geht zum Stichtag automatisch live.</div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; flex-wrap:wrap; gap:1rem;">
+                        <select id="statusSelect" name="status" style="width:auto;" onchange="handleStatusChange(this.value)">
+                            <option value="published" <?= (!$hasScheduled && $targetTrans['status'] === 'published') ? 'selected' : '' ?>>Sofort veröffentlichen (Live)</option>
+                            <option value="scheduled" <?= $hasScheduled ? 'selected' : '' ?>>Zeitgesteuert planen (Live ab Datum)</option>
+                            <option value="draft" <?= (!$hasScheduled && $targetTrans['status'] === 'draft') ? 'selected' : '' ?>>Entwurf (ausgeblendet)</option>
                         </select>
-                        <button type="submit" class="btn-save"><?= svg_icon('disk', '', 16) ?> Speichern & Freigeben</button>
+                        <button type="submit" class="btn-save"><?= svg_icon('disk', '', 16) ?> Speichern & Bestätigen</button>
                     </div>
                 </form>
             </div>
@@ -320,6 +385,22 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
             updateWordCounts();
             setupSynchronousScroll();
         });
+
+        function handleStatusChange(val) {
+            const box = document.getElementById('scheduleBox');
+            const schedInput = document.getElementById('scheduledInput');
+            if (val === 'scheduled') {
+                box.style.display = 'block';
+                if (!schedInput.value) {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 1);
+                    d.setHours(0, 0, 0, 0);
+                    schedInput.value = d.toISOString().slice(0, 16);
+                }
+            } else {
+                box.style.display = 'none';
+            }
+        }
 
         document.addEventListener('keydown', function(e) {
             if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -399,11 +480,11 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
 
         function updateWordCounts() {
             const srcText = document.getElementById('sourceContentBox').innerText.trim();
-            const srcWords = srcText ? srcText.split(/\s+/).length : 0;
+            const srcWords = srcText ? srcText.split(/\\s+/).length : 0;
             document.getElementById('sourceWordCount').innerText = `${srcWords} Wörter`;
 
             const targetText = isCodeMode ? document.getElementById('rawCodeEditor').value : document.getElementById('visualEditor').innerText;
-            const targetWords = targetText.trim() ? targetText.trim().split(/\s+/).length : 0;
+            const targetWords = targetText.trim() ? targetText.trim().split(/\\s+/).length : 0;
             const targetChars = targetText.length;
             document.getElementById('targetWordCount').innerText = `${targetWords} Wörter • ${targetChars} Zeichen`;
         }
@@ -452,8 +533,8 @@ $isOutdated = ($targetLang !== $sourceLang && !empty($targetTrans['source_hash']
             if (oldStr === newStr) {
                 return '<div style="color:#64748b; font-style:italic; padding:1rem 0;">Keine inhaltlichen Änderungen gegenüber der Vorversion.</div>' + newStr;
             }
-            const oldWords = oldStr.split(/(\s+|<[^>]+>)/).filter(Boolean);
-            const newWords = newStr.split(/(\s+|<[^>]+>)/).filter(Boolean);
+            const oldWords = oldStr.split(/(\\s+|<[^>]+>)/).filter(Boolean);
+            const newWords = newStr.split(/(\\s+|<[^>]+>)/).filter(Boolean);
             let out = '';
             let i = 0, j = 0;
             while (i < oldWords.length || j < newWords.length) {
