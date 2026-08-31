@@ -1219,17 +1219,22 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
                         <?php
                         $cronRows = [
-                            ['Geplante Veröffentlichungen', '/api/cron/publish', 'jede Minute'],
-                            ['Webhook-Warteschlange', '/api/cron/webhooks', 'alle 5 Minuten'],
-                            ['Rollierendes Backup', '/api/cron/backup', 'täglich'],
-                            ['Prüfbericht per E-Mail', '/api/cron/audit', 'täglich'],
+                            ['Geplante Veröffentlichungen', '/api/cron/publish', 'jede Minute', '* * * * *'],
+                            ['Webhook-Warteschlange', '/api/cron/webhooks', 'alle 5 Minuten', '*/5 * * * *'],
+                            ['Rollierendes Backup', '/api/cron/backup', 'täglich um 3 Uhr', '0 3 * * *'],
+                            ['Prüfbericht per E-Mail', '/api/cron/audit', 'täglich um 8 Uhr', '0 8 * * *'],
                         ];
                         ?>
+                        <p class="pg-card-sub" style="margin-bottom:12px">Jede Zeile ist eine fertige Crontab-Zeile mit empfohlenem Zeitplan — einfach kopieren und per <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">crontab -e</code> einfügen.</p>
                         <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
-                            <?php foreach ($cronRows as [$cronLabel, $cronPath, $cronFreq]): ?>
+                            <?php foreach ($cronRows as [$cronLabel, $cronPath, $cronFreq, $cronSchedule]): ?>
+                                <?php $cronLine = $cronSchedule . ' curl -fsS "' . $cronBase . $cronPath . '?secret=' . $cronSecret . '" > /dev/null'; ?>
                                 <div>
                                     <label class="pg-label" style="margin-top:0"><?= htmlspecialchars($cronLabel) ?> <span style="color:var(--text-faint);font-weight:400">(empfohlen: <?= htmlspecialchars($cronFreq) ?>)</span></label>
-                                    <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars($cronBase . $cronPath . '?secret=' . $cronSecret) ?>" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted)">
+                                    <div style="display:flex;gap:6px">
+                                        <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars($cronLine) ?>" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted)">
+                                        <button type="button" class="pg-icon-btn" title="Kopieren" onclick="copyToClipboard('<?= htmlspecialchars($cronLine, ENT_QUOTES) ?>')"><?= svg_icon('link', '', 14) ?></button>
+                                    </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
@@ -1681,7 +1686,47 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
             </div>
         </div>
 
+        <div id="toastNotification" class="pg-toast">
+            <?= svg_icon('check', '', 16) ?> <span id="toastMsg">In Zwischenablage kopiert!</span>
+        </div>
+
         <script>
+            function showToast(msg) {
+                const toast = document.getElementById('toastNotification');
+                document.getElementById('toastMsg').innerText = msg;
+                toast.classList.add('show');
+                setTimeout(() => { toast.classList.remove('show'); }, 2500);
+            }
+
+            function copyToClipboard(text, successMsg = 'In Zwischenablage kopiert!') {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showToast(successMsg);
+                    }).catch(() => {
+                        fallbackCopy(text, successMsg);
+                    });
+                } else {
+                    fallbackCopy(text, successMsg);
+                }
+            }
+
+            function fallbackCopy(text, successMsg) {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast(successMsg);
+                } catch (err) {
+                    alert('Kopieren fehlgeschlagen.');
+                }
+                document.body.removeChild(textArea);
+            }
+
             (function() {
                 const THEME_KEY = 'paragrafy_theme';
                 const toggle = document.getElementById('themeToggle');
