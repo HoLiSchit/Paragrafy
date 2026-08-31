@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $transStmt = $pdo->prepare("
                         INSERT INTO translations (document_id, lang, title, slug, content, previous_content, status, source_hash)
-                        VALUES (?, ?, ?, ?, ?, ?, 'published', ?)
+                        VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)
                     ");
                     $transStmt->execute([
                         $documentId,
@@ -172,7 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $defaultContent = "<h2>" . htmlspecialchars($cDoc['title']) . "</h2>\n<p>Hier den Inhalt für {{company_name}} einfügen.</p>";
                 $transStmt = $pdo->prepare("
                     INSERT INTO translations (document_id, lang, title, slug, content, previous_content, status, source_hash)
-                    VALUES (?, ?, ?, ?, ?, ?, 'published', ?)
+                    VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)
                 ");
                 $transStmt->execute([
                     $documentId,
