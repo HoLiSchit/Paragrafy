@@ -185,7 +185,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
             }
 
-            session_start();
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
             $_SESSION['paragrafy_admin'] = true;
             header('Location: /admin');
             exit;
