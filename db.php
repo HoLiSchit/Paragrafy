@@ -171,6 +171,22 @@ function ensure_schema_migrations(PDO $pdo): void {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
         ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS webhook_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                event_name TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                status TEXT DEFAULT 'pending',
+                attempts INTEGER DEFAULT 0,
+                next_attempt_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_error TEXT DEFAULT '',
+                last_status_code INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                sent_at DATETIME DEFAULT NULL
+            );
+        ");
     } catch (Throwable $e) {
     }
 }
@@ -298,6 +314,20 @@ function init_database_schema(PDO $pdo): void {
             identifier TEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS webhook_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            event_name TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            attempts INTEGER DEFAULT 0,
+            next_attempt_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_error TEXT DEFAULT '',
+            last_status_code INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            sent_at DATETIME DEFAULT NULL
+        );
     ");
 }
 
@@ -358,7 +388,7 @@ function check_and_publish_scheduled(PDO $pdo, ?array $project = null): array {
                 'Geplante Veröffentlichung'
             );
 
-            dispatch_webhook($row, [
+            enqueue_webhook($row, [
                 'event_type' => 'legal_text.updated',
                 'document_id' => (int)$row['document_id'],
                 'slug' => $finalSlug,
@@ -534,21 +564,21 @@ function send_smtp_mail(array $project, string $to, string $subject, string $bod
     return ['success' => false, 'error' => "E-Mail Senden fehlgeschlagen: $dataRes"];
 }
 
-function dispatch_webhook(array $project, array $eventData): array {
+/**
+ * Builds the final webhook envelope (event name + ready-to-send JSON payload)
+ * from a project and raw event data, applying the same field auto-completion
+ * (url/api_url/status/effective_date/was_scheduled) used by the spec.
+ */
+function build_webhook_payload(array $project, array $eventData): array {
     $url = trim($project['webhook_url'] ?? '');
     $projectId = (int)($project['id'] ?? ($project['project_id'] ?? 1));
     $projectName = $project['name'] ?? ($project['project_name'] ?? 'Paragrafy');
     $projectDomain = $project['domain'] ?? '';
     $eventName = $eventData['event_type'] ?? 'legal_text.updated';
 
-    if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
-        return ['success' => false, 'error' => 'Keine gültige Webhook-URL konfiguriert.'];
-    }
-
-    // Vollständiges Daten-Mapping gemäß Spezifikation
     $lang = $eventData['lang'] ?? ($project['primary_lang'] ?? 'de');
     $slug = $eventData['slug'] ?? '';
-    
+
     if (!isset($eventData['url']) && !empty($slug) && !empty($projectDomain)) {
         $eventData['url'] = 'https://' . $projectDomain . '/' . $lang . '/' . $slug;
     }
@@ -578,12 +608,22 @@ function dispatch_webhook(array $project, array $eventData): array {
         'data' => $eventData
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-    $secret = trim($project['webhook_secret'] ?? '');
-    $signature = $secret !== '' ? hash_hmac('sha256', (string)$payload, $secret) : '';
+    return [
+        'project_id' => $projectId,
+        'event_name' => $eventName,
+        'url' => $url,
+        'payload' => (string)$payload
+    ];
+}
+
+/** Performs the actual outbound HTTP POST for one webhook payload. */
+function send_webhook_http(string $url, string $payload, string $eventName, string $secret, int $timeoutSeconds = 6): array {
+    $secret = trim($secret);
+    $signature = $secret !== '' ? hash_hmac('sha256', $payload, $secret) : '';
 
     $headers = [
         'Content-Type: application/json',
-        'User-Agent: Paragrafy-Webhook/1.6.2',
+        'User-Agent: Paragrafy-Webhook/' . PARAGRAFY_VERSION,
         'X-Paragrafy-Event: ' . $eventName
     ];
     if ($signature !== '') {
@@ -602,8 +642,8 @@ function dispatch_webhook(array $project, array $eventData): array {
             CURLOPT_POSTFIELDS => $payload,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => 6,
-            CURLOPT_CONNECTTIMEOUT => 3
+            CURLOPT_TIMEOUT => $timeoutSeconds,
+            CURLOPT_CONNECTTIMEOUT => min(3, $timeoutSeconds)
         ]);
         $responseBody = (string)curl_exec($ch);
         $statusCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -614,6 +654,31 @@ function dispatch_webhook(array $project, array $eventData): array {
     }
 
     $durationMs = (int)round((microtime(true) - $startTime) * 1000);
+    $success = ($statusCode >= 200 && $statusCode < 300);
+
+    return [
+        'success' => $success,
+        'status_code' => $statusCode,
+        'duration_ms' => $durationMs,
+        'response' => substr($responseBody, 0, 500),
+        'error' => $errorMessage ?: ($success ? '' : "HTTP-Status $statusCode erhalten")
+    ];
+}
+
+/**
+ * Sends a webhook immediately and logs the result. Used only for the manual
+ * "Test-Webhook senden" button, which needs an instant result to show the
+ * admin. Real content-change events should use enqueue_webhook() instead so
+ * a slow/unreachable customer server can never block saving a legal text.
+ */
+function dispatch_webhook(array $project, array $eventData): array {
+    $built = build_webhook_payload($project, $eventData);
+
+    if (empty($built['url']) || !filter_var($built['url'], FILTER_VALIDATE_URL)) {
+        return ['success' => false, 'error' => 'Keine gültige Webhook-URL konfiguriert.'];
+    }
+
+    $result = send_webhook_http($built['url'], $built['payload'], $built['event_name'], $project['webhook_secret'] ?? '', 6);
 
     try {
         $db = get_db();
@@ -622,26 +687,132 @@ function dispatch_webhook(array $project, array $eventData): array {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $ins->execute([
-            $projectId,
-            $eventName,
-            $url,
-            $statusCode,
-            $payload,
-            substr($responseBody, 0, 1000),
-            $errorMessage,
-            $durationMs
+            $built['project_id'],
+            $built['event_name'],
+            $built['url'],
+            $result['status_code'],
+            $built['payload'],
+            $result['response'],
+            $result['error'] ?: '',
+            $result['duration_ms']
         ]);
     } catch (Throwable $e) {
     }
 
-    $success = ($statusCode >= 200 && $statusCode < 300);
-    return [
-        'success' => $success,
-        'status_code' => $statusCode,
-        'duration_ms' => $durationMs,
-        'response' => substr($responseBody, 0, 500),
-        'error' => $errorMessage ?: ($success ? '' : "HTTP-Status $statusCode erhalten")
-    ];
+    return $result;
+}
+
+/**
+ * Queues a webhook instead of sending it inline -- this is what every real
+ * content-change trigger (publish, schedule, restore, auto-publish) should
+ * call. A background worker (process_webhook_queue(), run via cron) does
+ * the actual, potentially-slow HTTP delivery later.
+ */
+function enqueue_webhook(array $project, array $eventData): void {
+    try {
+        $built = build_webhook_payload($project, $eventData);
+        if (empty($built['url']) || !filter_var($built['url'], FILTER_VALIDATE_URL)) {
+            return;
+        }
+        $db = get_db();
+        $stmt = $db->prepare("INSERT INTO webhook_queue (project_id, event_name, payload, status, attempts, next_attempt_at) VALUES (?, ?, ?, 'pending', 0, CURRENT_TIMESTAMP)");
+        $stmt->execute([$built['project_id'], $built['event_name'], $built['payload']]);
+    } catch (Throwable $e) {
+    }
+}
+
+const WEBHOOK_MAX_ATTEMPTS = 5;
+const WEBHOOK_TIMEOUT_SECONDS = 5;
+
+/** Backoff schedule per attempt number: 1min, 5min, 15min, 60min, then 3h. */
+function webhook_backoff_seconds(int $attempt): int {
+    $steps = [60, 300, 900, 3600, 10800];
+    return $steps[$attempt - 1] ?? end($steps);
+}
+
+/**
+ * Works through pending webhook_queue rows that are due, sending each with a
+ * short timeout so one unreachable customer server can't stall the batch.
+ * Meant to be triggered every few minutes via an external cron hitting
+ * /api/cron/webhooks (same pattern as the audit-mail and backup crons).
+ */
+function process_webhook_queue(int $limit = 20): array {
+    $db = get_db();
+    $processed = 0;
+    $sent = 0;
+    $failed = 0;
+    $retried = 0;
+
+    try {
+        $stmt = $db->prepare("SELECT * FROM webhook_queue WHERE status = 'pending' AND next_attempt_at <= datetime('now') ORDER BY created_at ASC LIMIT " . (int)$limit);
+        $stmt->execute();
+        $rows = $stmt->fetchAll();
+
+        foreach ($rows as $row) {
+            $processed++;
+
+            $projStmt = $db->prepare("SELECT * FROM projects WHERE id = ?");
+            $projStmt->execute([$row['project_id']]);
+            $project = $projStmt->fetch();
+
+            $url = trim($project['webhook_url'] ?? '');
+            if (!$project || empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+                $upd = $db->prepare("UPDATE webhook_queue SET status = 'failed', last_error = ? WHERE id = ?");
+                $upd->execute(['Keine gültige Webhook-URL mehr konfiguriert.', $row['id']]);
+                $failed++;
+                continue;
+            }
+
+            $result = send_webhook_http($url, $row['payload'], $row['event_name'], $project['webhook_secret'] ?? '', WEBHOOK_TIMEOUT_SECONDS);
+
+            try {
+                $logStmt = $db->prepare("
+                    INSERT INTO webhook_logs (project_id, event_name, url, status_code, request_payload, response_body, error_message, duration_ms)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $logStmt->execute([
+                    $row['project_id'], $row['event_name'], $url, $result['status_code'],
+                    $row['payload'], $result['response'], $result['error'] ?: '', $result['duration_ms']
+                ]);
+            } catch (Throwable $e) {
+            }
+
+            $attempts = (int)$row['attempts'] + 1;
+
+            if ($result['success']) {
+                $upd = $db->prepare("UPDATE webhook_queue SET status = 'sent', attempts = ?, last_status_code = ?, last_error = '', sent_at = CURRENT_TIMESTAMP WHERE id = ?");
+                $upd->execute([$attempts, $result['status_code'], $row['id']]);
+                $sent++;
+            } elseif ($attempts >= WEBHOOK_MAX_ATTEMPTS) {
+                $upd = $db->prepare("UPDATE webhook_queue SET status = 'failed', attempts = ?, last_status_code = ?, last_error = ? WHERE id = ?");
+                $upd->execute([$attempts, $result['status_code'], $result['error'], $row['id']]);
+                $failed++;
+            } else {
+                $waitSeconds = webhook_backoff_seconds($attempts);
+                $upd = $db->prepare("UPDATE webhook_queue SET attempts = ?, last_status_code = ?, last_error = ?, next_attempt_at = datetime('now', ?) WHERE id = ?");
+                $upd->execute([$attempts, $result['status_code'], $result['error'], '+' . $waitSeconds . ' seconds', $row['id']]);
+                $retried++;
+            }
+        }
+    } catch (Throwable $e) {
+    }
+
+    return ['processed' => $processed, 'sent' => $sent, 'failed' => $failed, 'retried' => $retried];
+}
+
+/** Pending/failed queue counts for the current project, shown in Settings. */
+function webhook_queue_summary(PDO $db, int $projectId): array {
+    try {
+        $stmt = $db->prepare("SELECT status, COUNT(*) as c FROM webhook_queue WHERE project_id = ? GROUP BY status");
+        $stmt->execute([$projectId]);
+        $counts = ['pending' => 0, 'sent' => 0, 'failed' => 0];
+        foreach ($stmt->fetchAll() as $row) {
+            $counts[$row['status']] = (int)$row['c'];
+        }
+        return $counts;
+    } catch (Throwable $e) {
+        return ['pending' => 0, 'sent' => 0, 'failed' => 0];
+    }
 }
 
 function translate_with_deepl(string $text, string $sourceLang, string $targetLang, string $apiKey): array {

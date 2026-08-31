@@ -2,6 +2,8 @@
 
 Dieses Dokument beschreibt die Webhook-Schnittstelle von Paragrafy (v1.6.2) zur automatisierten Synchronisation von Rechtstexten (AGB, Datenschutzerklärung, Impressum etc.) mit angebundenen Web- und Mobile-Anwendungen.
 
+**Zustellung ist asynchron:** Veröffentlichungen legen den Webhook in einer Warteschlange ab statt ihn sofort zu senden, damit ein langsamer oder nicht erreichbarer Empfänger niemals das Speichern eines Rechtstexts blockiert. Ein externer Cron-Job muss `/api/cron/webhooks` regelmäßig aufrufen (empfohlen: alle 5 Minuten), damit die Warteschlange abgearbeitet wird — ohne diesen Cron werden Webhooks nur zugestellt, wenn im Admin-Bereich manuell auf „Jetzt abarbeiten" geklickt wird. Fehlgeschlagene Zustellungen werden bis zu 5-mal mit steigendem Abstand (1 / 5 / 15 / 60 / 180 Minuten) wiederholt, mit einem Timeout von 5 Sekunden pro Versuch.
+
 ---
 
 ## 1. HTTP-Header & Authentifizierung

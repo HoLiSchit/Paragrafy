@@ -30,6 +30,20 @@ if ($uri === '/api/cron/backup') {
     exit;
 }
 
+// Webhook-Warteschlange abarbeiten -- per externem Cron alle paar Minuten aufzurufen
+if ($uri === '/api/cron/webhooks') {
+    header('Content-Type: application/json');
+    echo json_encode(process_webhook_queue());
+    exit;
+}
+
+// Geplante Veröffentlichungen live schalten -- projektübergreifend, für explizite Cron-Aufrufe
+if ($uri === '/api/cron/publish') {
+    header('Content-Type: application/json');
+    echo json_encode(check_and_publish_scheduled(get_db()));
+    exit;
+}
+
 if (str_starts_with($uri, '/admin')) {
     require_once __DIR__ . '/admin.php';
     exit;
@@ -59,6 +73,10 @@ if (!$project) {
     echo "<h1>404 - Kein Projekt hinterlegt</h1><p>Für die Domain <code>" . htmlspecialchars($host) . "</code> ist kein Legal-Projekt eingerichtet. Bitte im <a href='/admin'>Admin-Panel</a> anlegen.</p>";
     exit;
 }
+
+// Zero-Config-Fallback: bei jedem Seitenaufruf prüfen, ob für dieses Projekt etwas fällig ist.
+// Ersetzt keinen Cron (der greift auch ohne Traffic), fängt aber Instanzen ohne eingerichteten Cron auf.
+check_and_publish_scheduled($db, $project);
 
 $parts = array_values(array_filter(explode('/', $uri)));
 $primaryLang = $project['primary_lang'] ?: 'de';

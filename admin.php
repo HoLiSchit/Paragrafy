@@ -125,6 +125,13 @@ if (isset($_POST['action']) && $_POST['action'] === 'run_backup_now') {
     exit;
 }
 
+// 1d. Webhook-Warteschlange manuell abarbeiten
+if (isset($_POST['action']) && $_POST['action'] === 'run_webhook_queue_now') {
+    process_webhook_queue();
+    header("Location: /admin/settings?project_id=$projectId&msg=queue_processed");
+    exit;
+}
+
 // 2. Markdown Export herunterladen
 if (isset($_GET['action']) && $_GET['action'] === 'export_markdown') {
     $stmt = $db->prepare("
@@ -1136,6 +1143,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
     $logs = $stmtLogs->fetchAll();
     $backups = list_backups();
     $backupMsg = $_GET['msg'] ?? '';
+    $queueSummary = webhook_queue_summary($db, $project['id']);
     ?>
     <!DOCTYPE html>
     <html lang="de">
@@ -1542,6 +1550,27 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- Webhook-Warteschlange -->
+                    <div class="pg-card pg-card-pad">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+                            <h2 style="margin:0">Webhook-Warteschlange<?= help_icon('Veröffentlichungen werden nicht mehr direkt beim Speichern verschickt, sondern in einer Warteschlange abgelegt. Ein externer Cron-Job muss regelmäßig (z. B. alle 5 Minuten) /api/cron/webhooks aufrufen, damit sie zugestellt werden. Fehlgeschlagene Zustellungen werden bis zu 5-mal mit steigendem Abstand wiederholt.') ?></h2>
+                            <form method="post" style="margin:0">
+                                <input type="hidden" name="action" value="run_webhook_queue_now">
+                                <button type="submit" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px">Jetzt abarbeiten</button>
+                            </form>
+                        </div>
+                        <?php if (($_GET['msg'] ?? '') === 'queue_processed'): ?>
+                            <p style="font-size:12px;color:var(--green);margin:4px 0 10px">Warteschlange verarbeitet.</p>
+                        <?php endif; ?>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap">
+                            <span class="pg-pill pg-pill-amber"><span class="pg-pill-dot"></span><?= $queueSummary['pending'] ?> wartend</span>
+                            <span class="pg-pill pg-pill-green"><span class="pg-pill-dot"></span><?= $queueSummary['sent'] ?> zugestellt</span>
+                            <?php if ($queueSummary['failed'] > 0): ?>
+                                <span class="pg-pill pg-pill-red"><span class="pg-pill-dot"></span><?= $queueSummary['failed'] ?> endgültig fehlgeschlagen</span>
                             <?php endif; ?>
                         </div>
                     </div>

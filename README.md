@@ -12,8 +12,12 @@ Paragrafy ist ein leichtgewichtiges, selbstgehostetes Content-Management-System 
   Das Admin-Dashboard visualisiert auf einen Blick, welche Pflichttexte in welchen Sprachen (`DE`, `EN`, `ES`, `FR` etc.) vorhanden, als Entwurf gespeichert oder noch unvollständig sind. Mit Instant-Toggles und 1-Klick-Kopierbuttons für alle Sprach-URLs.
 - **Zeitgesteuerte Veröffentlichung (Scheduled Publishing)**:
   Änderungen an AGB oder Datenschutzerklärungen können im Voraus mit einem Stichtag (z. B. `31.08. 00:00`) geplant werden. Die bestehende Fassung bleibt bis zum Stichtag live und wird zum Zielzeitpunkt automatisch abgelöst.
-- **Vollwertige Webhooks mit Delivery-Logs**:
-  Benachrichtigt verbundene Web-Apps per `POST`-Webhook bei Live-Schaltungen (`legal_text.updated`) und Vorankündigungen (`legal_text.scheduled`) mit vollständigen Feldern (`effective_date`, `url`, `api_url`, `status`, `was_scheduled`). Ein integriertes Protokoll im Admin-Bereich zeigt HTTP-Statuscodes, Server-Antworten und Latenzen an. *(Siehe [WEBHOOKS.md](WEBHOOKS.md) für die Spezifikation).*
+- **Vollwertige Webhooks mit Warteschlange, Retry & Delivery-Logs**:
+  Benachrichtigt verbundene Web-Apps per `POST`-Webhook bei Live-Schaltungen (`legal_text.updated`) und Vorankündigungen (`legal_text.scheduled`, inkl. `preview_url`) mit vollständigen Feldern (`effective_date`, `url`, `api_url`, `status`, `was_scheduled`). Zustellung läuft asynchron über eine Warteschlange (per Cron `/api/cron/webhooks` abzuarbeiten) mit automatischem Retry (bis zu 5 Versuche, steigender Abstand) — ein langsamer Empfänger blockiert nie das Speichern. Ein integriertes Protokoll im Admin-Bereich zeigt HTTP-Statuscodes, Server-Antworten und Latenzen an. *(Siehe [WEBHOOKS.md](WEBHOOKS.md) für die Spezifikation).*
+- **Öffentliche Vorschau geplanter Änderungen**:
+  Unter `/{lang}/{slug}/preview` (und als JSON-API) ist eine geplante, noch nicht live geschaltete Fassung schon vor dem Stichtag einsehbar — z. B. um Nutzer:innen vorab über anstehende AGB-Änderungen zu informieren.
+- **Automatische rollierende Backups (7 Tage)**:
+  Ein Cron-Endpunkt (`/api/cron/backup`) sichert die Datenbank täglich und löscht ältere Stände automatisch. Die letzten Backups lassen sich einzeln in den Einstellungen herunterladen.
 - **Vollwertiger WYSIWYG & Code-Editor**:
   Visuelle Formatierungsleiste (H2, H3, Fett, Kursiv, Listen, Links) mit 1-Klick-Umschaltung zum reinen HTML-Quellcode.
 - **Bidirektionale DeepL-Übersetzung**:
@@ -113,6 +117,28 @@ Paragrafy.cloud lässt sich am schnellsten und saubersten über Docker und Docke
 ### 3. Erstinstallation
 
 Rufe deine Subdomain im Browser auf (z. B. `https://legal.deinedomain.de`). Der **Paragrafy Setup-Wizard** startet automatisch.
+
+### 4. Cron-Jobs einrichten (empfohlen)
+
+Vier Endpunkte sollten von außen regelmäßig aufgerufen werden, damit geplante Veröffentlichungen live gehen, Backups entstehen und Webhooks zugestellt werden:
+
+```cron
+# Geplante Veröffentlichungen live schalten (jede Minute, projektübergreifend)
+* * * * * curl -fsS https://legal.deinedomain.de/api/cron/publish > /dev/null
+
+# Webhook-Warteschlange abarbeiten (alle 5 Minuten)
+*/5 * * * * curl -fsS https://legal.deinedomain.de/api/cron/webhooks > /dev/null
+
+# Tägliches rollierendes Backup (7 Tage)
+0 3 * * * curl -fsS https://legal.deinedomain.de/api/cron/backup > /dev/null
+
+# Prüfbericht per E-Mail, falls Rechtstexte überfällig sind (täglich)
+0 8 * * * curl -fsS https://legal.deinedomain.de/api/cron/audit > /dev/null
+```
+
+Alternativ eignet sich auch ein externer Uptime-Monitor (z. B. Uptime Kuma, healthchecks.io) als "Cron", der diese URLs im gewünschten Intervall abruft.
+
+Ohne eingerichteten Cron ist Paragrafy dennoch nutzbar: Geplante Veröffentlichungen werden zusätzlich automatisch geprüft, sobald jemand die jeweilige Projekt-Domain besucht (Zero-Config-Fallback) — bei sehr wenig Traffic kann das aber verzögert live gehen. Backups und Webhooks lassen sich in den Einstellungen jederzeit manuell anstoßen.
 
 ---
 

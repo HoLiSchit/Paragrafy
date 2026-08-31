@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $currentSlugForPreview = $oldRow['slug'] ?? $slug;
-            dispatch_webhook($doc, [
+            enqueue_webhook($doc, [
                 'event_type' => 'legal_text.scheduled',
                 'document_id' => $docId,
                 'slug' => $slug,
@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             record_translation_version($db, $docId, $targetLang, $title, $slug, $content, $changeNote, $status);
 
             if ($status === 'published') {
-                dispatch_webhook($doc, [
+                enqueue_webhook($doc, [
                     'event_type' => 'legal_text.updated',
                     'document_id' => $docId,
                     'slug' => $slug,
@@ -185,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$docId, $targetLang, $version['title'], $version['slug'], $version['content'], $prevContent, $noteRestored, $currentSourceHash]);
             record_translation_version($db, $docId, $targetLang, $version['title'], $version['slug'], $version['content'], $noteRestored, 'published');
 
-            dispatch_webhook($doc, [
+            enqueue_webhook($doc, [
                 'event_type' => 'legal_text.updated',
                 'document_id' => $docId,
                 'slug' => $version['slug'],
