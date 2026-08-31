@@ -1233,7 +1233,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                     <label class="pg-label" style="margin-top:0"><?= htmlspecialchars($cronLabel) ?> <span style="color:var(--text-faint);font-weight:400">(empfohlen: <?= htmlspecialchars($cronFreq) ?>)</span></label>
                                     <div style="display:flex;gap:6px">
                                         <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars($cronLine) ?>" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted)">
-                                        <button type="button" class="pg-icon-btn" title="Kopieren" onclick="copyToClipboard('<?= htmlspecialchars($cronLine, ENT_QUOTES) ?>')"><?= svg_icon('link', '', 14) ?></button>
+                                        <button type="button" class="pg-icon-btn" title="Kopieren" onclick="copyToClipboard('<?= htmlspecialchars($cronLine, ENT_QUOTES) ?>')"><?= svg_icon('copy', '', 14) ?></button>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
