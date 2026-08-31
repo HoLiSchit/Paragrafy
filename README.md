@@ -114,7 +114,7 @@ Paragrafy lässt sich am schnellsten und saubersten über Docker und Docker Comp
 
 ### Schnellanleitung
 
-1. Repository klonen oder die Konfigurationsdateien auf dem Server hinterlegen (`Dockerfile`, `docker-compose.yaml`, `docker-entrypoint.sh`).
+1. Repository **komplett klonen** (nicht nur die Docker-Dateien!): `git clone https://github.com/mineco-de/Paragrafy.git && cd Paragrafy`. Das Image wird aus diesem lokalen Checkout gebaut (`COPY . /var/www/html/` in der Dockerfile) — es holt den Code nicht mehr selbst von GitHub, damit `docker compose up -d --build` zuverlässig deinen aktuellen Stand verwendet und nicht an einem alten Docker-Layer-Cache-Stand hängen bleibt.
 2. Container im Hintergrund starten:
    ```bash
    docker compose up -d --build
@@ -185,7 +185,8 @@ Nur folgende Werte kommen tatsächlich aus Dateien statt aus der Datenbank:
 Ein Update ist unkompliziert, da Schema-Änderungen automatisch beim ersten Request nach dem Update laufen:
 
 1. **Vor dem Update:** Sicherung erstellen (Einstellungen → Sicherung & Export, oder `/backups` bei Docker sichern).
-2. Neue Dateien über die alten kopieren bzw. `git pull` (Apache) oder neues Image bauen (`docker compose up -d --build`, Docker) — `config.php`, `paragrafy_data.sqlite`, `/backups` und `.env.local` dabei **nicht** überschreiben/löschen (bei Docker automatisch durch das `data`-Volume sichergestellt).
+2. **Apache:** Neue Dateien über die alten kopieren bzw. `git pull` — `config.php`, `paragrafy_data.sqlite` und `/backups` dabei **nicht** überschreiben/löschen.
+   **Docker:** Zuerst im lokalen Checkout `git pull`, dann `docker compose up -d --build` — das Image wird aus dem lokalen Code gebaut, ein reines `--build` ohne vorheriges `git pull` verwendet weiterhin den alten Stand. `config.php`, `paragrafy_data.sqlite`, `/backups` und `.env.local` bleiben durch das `data`-Volume automatisch erhalten.
 3. Beim nächsten Aufruf einer beliebigen Seite legt `ensure_schema_migrations()` fehlende Tabellen und Spalten automatisch an (z. B. `users`, `audit_log`, `translation_versions`, `webhook_queue`, neue Spalten in `projects`) — kein manuelles Migrationsskript nötig.
 4. Bestehende Installationen ohne `cron_secret` in `config.php` bekommen beim ersten Aufruf eines `/api/cron/...`-Endpunkts automatisch eines generiert (sichtbar unter Einstellungen → Automatisierung).
 
