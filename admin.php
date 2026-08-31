@@ -4,7 +4,9 @@
  */
 declare(strict_types=1);
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/db.php';
 
 if (!is_installed()) {
@@ -129,6 +131,14 @@ if (isset($_POST['action']) && $_POST['action'] === 'run_backup_now') {
 if (isset($_POST['action']) && $_POST['action'] === 'run_webhook_queue_now') {
     process_webhook_queue();
     header("Location: /admin/settings?project_id=$projectId&msg=queue_processed");
+    exit;
+}
+
+// 1e. Cron-Secret neu generieren (macht bestehende Cron-URLs ungültig)
+if (isset($_POST['action']) && $_POST['action'] === 'regenerate_cron_secret') {
+    regenerate_cron_secret();
+    log_audit(null, '', 'Cron-Secret neu generiert');
+    header("Location: /admin/settings?project_id=$projectId&msg=cron_secret_regenerated");
     exit;
 }
 
@@ -1143,6 +1153,10 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
     $logs = $stmtLogs->fetchAll();
     $backups = list_backups();
     $backupMsg = $_GET['msg'] ?? '';
+    $cronSecret = ensure_cron_secret();
+    $cronScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $cronHost = $_SERVER['HTTP_HOST'] ?? $project['domain'];
+    $cronBase = $cronScheme . '://' . $cronHost;
     $queueSummary = webhook_queue_summary($db, $project['id']);
     ?>
     <!DOCTYPE html>
@@ -1193,6 +1207,37 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <button type="button" data-theme-choice="dark">Dunkel</button>
                             <button type="button" data-theme-choice="auto">Auto</button>
                         </div>
+                    </div>
+
+                    <div class="pg-card pg-card-pad">
+                        <h2>Automatisierung (Cron)</h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px">Diese Adressen extern per Cron-Job (oder Uptime-Monitor) aufrufen, damit geplante Veröffentlichungen live gehen, Webhooks zugestellt und Backups angelegt werden. Alle vier sind mit einem geheimen Schlüssel geschützt — ohne korrektes <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">?secret=</code> antworten sie mit 403.</p>
+
+                        <?php if (($_GET['msg'] ?? '') === 'cron_secret_regenerated'): ?>
+                            <p style="font-size:12px;color:var(--green);margin:0 0 12px">Neues Secret erzeugt — bitte die Cron-Jobs mit den Adressen unten aktualisieren.</p>
+                        <?php endif; ?>
+
+                        <?php
+                        $cronRows = [
+                            ['Geplante Veröffentlichungen', '/api/cron/publish', 'jede Minute'],
+                            ['Webhook-Warteschlange', '/api/cron/webhooks', 'alle 5 Minuten'],
+                            ['Rollierendes Backup', '/api/cron/backup', 'täglich'],
+                            ['Prüfbericht per E-Mail', '/api/cron/audit', 'täglich'],
+                        ];
+                        ?>
+                        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+                            <?php foreach ($cronRows as [$cronLabel, $cronPath, $cronFreq]): ?>
+                                <div>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars($cronLabel) ?> <span style="color:var(--text-faint);font-weight:400">(empfohlen: <?= htmlspecialchars($cronFreq) ?>)</span></label>
+                                    <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars($cronBase . $cronPath . '?secret=' . $cronSecret) ?>" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted)">
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <form method="post" onsubmit="return confirm('Neues Secret erzeugen? Die alten URLs funktionieren danach nicht mehr — bestehende Cron-Jobs müssen aktualisiert werden.');">
+                            <input type="hidden" name="action" value="regenerate_cron_secret">
+                            <button type="submit" class="pg-btn-secondary">Secret neu generieren</button>
+                        </form>
                     </div>
 
                     <div class="pg-card pg-card-pad">

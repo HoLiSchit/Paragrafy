@@ -8,7 +8,8 @@ services:
     ports:
       - "5555:80"
     volumes:
-      # Sichert den SQLite-Datenordner permanent auf dem Host-Server
+      # Persistiert SQLite-Datenbank, config.php, Backups und .env.local auf dem Host.
+      # Ohne dieses Volume gehen Datenbank & Zugangsdaten bei jedem Rebuild verloren!
       - ./data:/var/www/html/data
     environment:
-      - SAAS_MODE=true
+      - PARAGRAFY_DATA_DIR=/var/www/html/data

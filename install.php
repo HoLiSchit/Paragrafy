@@ -92,8 +92,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo = get_db();
             init_database_schema($pdo);
 
-            $configContent = "<?php\nreturn [\n    'admin_password_hash' => " . var_export(password_hash($adminPass, PASSWORD_DEFAULT), true) . ",\n    'installed_at' => " . var_export(date('c'), true) . ",\n];\n";
-            file_put_contents(CONFIG_FILE, $configContent);
+            write_config([
+                'admin_password_hash' => password_hash($adminPass, PASSWORD_DEFAULT),
+                'installed_at' => date('c'),
+                'cron_secret' => bin2hex(random_bytes(32)),
+            ]);
 
             $docTypeIds = [];
             foreach ($standardTemplates as $slugKey => $tpl) {

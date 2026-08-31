@@ -6,14 +6,22 @@ declare(strict_types=1);
 
 define('PARAGRAFY_VERSION', '1.6.2');
 define('PARAGRAFY_DIR', __DIR__);
-define('DB_FILE', PARAGRAFY_DIR . '/paragrafy_data.sqlite');
-define('CONFIG_FILE', PARAGRAFY_DIR . '/config.php');
-define('BACKUP_DIR', PARAGRAFY_DIR . '/backups');
+// Where persistent data (DB, config, backups, .env) lives. Defaults to the
+// code directory (bare-metal installs); set PARAGRAFY_DATA_DIR to point this
+// at a mounted volume in Docker so rebuilds don't wipe your data.
+define('PARAGRAFY_DATA_DIR', rtrim((string)(getenv('PARAGRAFY_DATA_DIR') ?: PARAGRAFY_DIR), '/'));
+define('DB_FILE', PARAGRAFY_DATA_DIR . '/paragrafy_data.sqlite');
+define('CONFIG_FILE', PARAGRAFY_DATA_DIR . '/config.php');
+define('BACKUP_DIR', PARAGRAFY_DATA_DIR . '/backups');
 define('BACKUP_RETENTION_DAYS', 7);
+
+if (!is_dir(PARAGRAFY_DATA_DIR)) {
+    @mkdir(PARAGRAFY_DATA_DIR, 0755, true);
+}
 
 function load_env_file(): array {
     $env = [];
-    $candidates = [PARAGRAFY_DIR . '/.env.local', PARAGRAFY_DIR . '/.env'];
+    $candidates = [PARAGRAFY_DATA_DIR . '/.env.local', PARAGRAFY_DATA_DIR . '/.env'];
     foreach ($candidates as $file) {
         if (file_exists($file)) {
             $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -44,6 +52,55 @@ function get_config(): array {
         return [];
     }
     return require CONFIG_FILE;
+}
+
+function write_config(array $config): void {
+    if (!is_dir(PARAGRAFY_DATA_DIR)) {
+        mkdir(PARAGRAFY_DATA_DIR, 0755, true);
+    }
+    $content = "<?php\nreturn " . var_export($config, true) . ";\n";
+    file_put_contents(CONFIG_FILE, $content);
+}
+
+/** Returns the shared secret for the /api/cron/* endpoints, generating one on first use (self-healing for installs from before this existed). */
+function ensure_cron_secret(): string {
+    $config = get_config();
+    if (!empty($config['cron_secret'])) {
+        return $config['cron_secret'];
+    }
+    return regenerate_cron_secret();
+}
+
+function regenerate_cron_secret(): string {
+    $config = get_config();
+    $secret = bin2hex(random_bytes(32));
+    $config['cron_secret'] = $secret;
+    write_config($config);
+    return $secret;
+}
+
+function verify_cron_secret(): bool {
+    $expected = ensure_cron_secret();
+    $given = (string)($_GET['secret'] ?? '');
+    return $given !== '' && hash_equals($expected, $given);
+}
+
+/**
+ * Call at the top of a /api/cron/* handler; exits with 403 JSON unless either
+ * ?secret= matches or the request comes from an already-logged-in admin
+ * session (so in-app buttons like "Prüfbericht jetzt senden" keep working
+ * without exposing the secret in front-end JS).
+ */
+function require_cron_secret(): void {
+    if (!empty($_SESSION['paragrafy_admin'])) {
+        return;
+    }
+    if (!verify_cron_secret()) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Ungültiges oder fehlendes Secret. ?secret=<dein-cron-secret> anhängen (siehe Einstellungen).']);
+        exit;
+    }
 }
 
 function get_db(): PDO {

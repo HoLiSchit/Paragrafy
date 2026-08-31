@@ -62,13 +62,18 @@ Paragrafy ist ein leichtgewichtiges, selbstgehostetes Content-Management-System 
 ├── db.php                # SQLite-Datenbankanbindung, Migrationen, Webhooks, SMTP-Client & Theme
 ├── Dockerfile            # Container-Image-Definition
 ├── docker-compose.yaml   # Docker-Compose-Setup für den Betrieb via Container
+├── docker-entrypoint.sh  # Setzt beim Container-Start Dateirechte auf das Daten-Volume
 ├── WEBHOOKS.md           # Detaillierte Webhook-Dokumentation, Spezifikation & Payloads
 ├── paragrafy.svg         # Vektor-Logo
 ├── .htaccess             # Apache Routing & Schutz sensibler Dateien
 ├── .gitignore            # Git-Ausschlussregeln
-├── config.php            # Admin-Zugangsdaten (wird bei Setup generiert)
+├── config.php            # Admin-Passwort-Hash & Cron-Secret (wird bei Setup generiert)
+├── .env.local            # Optional: DEEPL_API_KEY als Fallback
+├── backups/              # Rollierende 7-Tage-Backups (automatisch angelegt)
 └── paragrafy_data.sqlite # SQLite-Datenbank (wird automatisch angelegt)
 ```
+
+Bei Docker liegen `config.php`, `.env.local`, `backups/` und `paragrafy_data.sqlite` stattdessen unter `PARAGRAFY_DATA_DIR` (`/var/www/html/data`, auf `./data` gemountet).
 
 ---
 
@@ -102,43 +107,89 @@ sudo find /var/www/paragrafy -type f -exec chmod 644 {} +
 
 ## 🚀 Docker Setup & Deployment
 
-Paragrafy.cloud lässt sich am schnellsten und saubersten über Docker und Docker Compose betreiben. Alle persistierenden Daten (wie SQLite-Datenbanken und Instanzen) werden im Ordner `./data` gespeichert.
+Paragrafy lässt sich am schnellsten und saubersten über Docker und Docker Compose betreiben.
 
 ### Voraussetzungen
 * Docker & Docker Compose auf dem Server installiert.
 
 ### Schnellanleitung
 
-1. Repository klonen oder die Konfigurationsdateien auf dem Server hinterlegen (`Dockerfile` und `docker-compose.yaml`).
+1. Repository klonen oder die Konfigurationsdateien auf dem Server hinterlegen (`Dockerfile`, `docker-compose.yaml`, `docker-entrypoint.sh`).
 2. Container im Hintergrund starten:
    ```bash
    docker compose up -d --build
+   ```
 
-### 3. Erstinstallation
+**Persistenz:** `docker-compose.yaml` mountet `./data` nach `/var/www/html/data` und setzt `PARAGRAFY_DATA_DIR=/var/www/html/data` — dort liegen `paragrafy_data.sqlite`, `config.php`, `/backups` und ein optionales `.env.local`. Ohne dieses Volume gehen Datenbank und Admin-Zugangsdaten bei jedem `--build` verloren. Der Container setzt beim Start automatisch die richtigen Dateirechte auf diesen Ordner (per `docker-entrypoint.sh`), auch wenn das Host-Verzeichnis vorher nicht existierte.
 
-Rufe deine Subdomain im Browser auf (z. B. `https://legal.deinedomain.de`). Der **Paragrafy Setup-Wizard** startet automatisch.
+Für einen Bare-Metal-/Apache-Betrieb (siehe unten) ist `PARAGRAFY_DATA_DIR` nicht nötig — dann liegen Datenbank und Config wie gewohnt direkt im Projektordner.
 
-### 4. Cron-Jobs einrichten (empfohlen)
+---
 
-Vier Endpunkte sollten von außen regelmäßig aufgerufen werden, damit geplante Veröffentlichungen live gehen, Backups entstehen und Webhooks zugestellt werden:
+## 🔑 Erstinstallation & Cron-Jobs
+
+Gilt unabhängig davon, ob Apache oder Docker verwendet wird.
+
+### Erstinstallation
+
+Rufe deine Subdomain im Browser auf (z. B. `https://legal.deinedomain.de`). Der **Paragrafy Setup-Wizard** startet automatisch und legt Datenbank, Admin-Passwort und ein zufälliges Cron-Secret an.
+
+### Cron-Jobs einrichten (empfohlen)
+
+Vier Endpunkte sollten von außen regelmäßig aufgerufen werden, damit geplante Veröffentlichungen live gehen, Backups entstehen und Webhooks zugestellt werden. Alle vier sind mit einem geheimen Schlüssel geschützt (Query-Parameter `?secret=...`), den du fertig zusammengesetzt in **Einstellungen → Automatisierung (Cron)** findest — dort lässt er sich bei Bedarf auch neu generieren.
 
 ```cron
 # Geplante Veröffentlichungen live schalten (jede Minute, projektübergreifend)
-* * * * * curl -fsS https://legal.deinedomain.de/api/cron/publish > /dev/null
+* * * * * curl -fsS "https://legal.deinedomain.de/api/cron/publish?secret=DEIN_CRON_SECRET" > /dev/null
 
 # Webhook-Warteschlange abarbeiten (alle 5 Minuten)
-*/5 * * * * curl -fsS https://legal.deinedomain.de/api/cron/webhooks > /dev/null
+*/5 * * * * curl -fsS "https://legal.deinedomain.de/api/cron/webhooks?secret=DEIN_CRON_SECRET" > /dev/null
 
 # Tägliches rollierendes Backup (7 Tage)
-0 3 * * * curl -fsS https://legal.deinedomain.de/api/cron/backup > /dev/null
+0 3 * * * curl -fsS "https://legal.deinedomain.de/api/cron/backup?secret=DEIN_CRON_SECRET" > /dev/null
 
 # Prüfbericht per E-Mail, falls Rechtstexte überfällig sind (täglich)
-0 8 * * * curl -fsS https://legal.deinedomain.de/api/cron/audit > /dev/null
+0 8 * * * curl -fsS "https://legal.deinedomain.de/api/cron/audit?secret=DEIN_CRON_SECRET" > /dev/null
 ```
 
 Alternativ eignet sich auch ein externer Uptime-Monitor (z. B. Uptime Kuma, healthchecks.io) als "Cron", der diese URLs im gewünschten Intervall abruft.
 
-Ohne eingerichteten Cron ist Paragrafy dennoch nutzbar: Geplante Veröffentlichungen werden zusätzlich automatisch geprüft, sobald jemand die jeweilige Projekt-Domain besucht (Zero-Config-Fallback) — bei sehr wenig Traffic kann das aber verzögert live gehen. Backups und Webhooks lassen sich in den Einstellungen jederzeit manuell anstoßen.
+Ohne eingerichteten Cron ist Paragrafy dennoch nutzbar: Geplante Veröffentlichungen werden zusätzlich automatisch geprüft, sobald jemand die jeweilige Projekt-Domain besucht (Zero-Config-Fallback) — bei sehr wenig Traffic kann das aber verzögert live gehen. Backup und Webhook-Warteschlange lassen sich in den Einstellungen jederzeit manuell anstoßen; ein aufgerufener Endpunkt ohne oder mit falschem `secret` antwortet mit HTTP 403.
+
+---
+
+## ⚙️ Konfiguration & Umgebungsvariablen
+
+Die meisten Einstellungen (SMTP-Zugangsdaten, Webhook-URL/-Secret, DeepL-API-Key, Firmendaten, Cookie-Banner-Text, Akzentfarbe etc.) sind **projektbezogen** und liegen in der SQLite-Datenbank — sie werden ausschließlich über die Einstellungen-Oberfläche im Admin-Bereich gepflegt, nicht über Umgebungsvariablen oder Config-Dateien.
+
+Nur folgende Werte kommen tatsächlich aus Dateien statt aus der Datenbank:
+
+| Datei / Variable | Zweck |
+| :--- | :--- |
+| `config.php` (auto-generiert) | Admin-Passwort-Hash (Legacy-Login) und das Cron-Secret. Wird beim Setup-Wizard angelegt, nicht manuell bearbeiten. |
+| `.env` / `.env.local` (optional) | `DEEPL_API_KEY=...` als projektübergreifender Fallback, falls im jeweiligen Projekt kein eigener DeepL-Key hinterlegt ist. Beide Dateien sind optional — ohne sie funktioniert alles außer diesem Fallback. |
+| `PARAGRAFY_DATA_DIR` (Umgebungsvariable) | Nur für Docker relevant: verlegt `config.php`, die SQLite-Datenbank, `/backups` und `.env.local` in ein persistentes Verzeichnis. Siehe Abschnitt „Docker Setup & Deployment" weiter oben. |
+
+---
+
+## 🔐 API-Zugriff & Authentifizierung
+
+- **Öffentliche JSON-API** (`/api/:lang/:slug`, siehe unten) ist bewusst **unauthentifiziert und rein lesend** — Rechtstexte sollen von jeder verbundenen Website ohne Zugangsdaten abrufbar sein. Es gibt keine Möglichkeit, Inhalte über diese API zu schreiben oder zu ändern.
+- **Bearbeiten von Rechtstexten** ist ausschließlich über die eingeloggte `/admin`-Session möglich (Passwort- bzw. Multi-User-Login) — es existiert keine separate API mit Bearer-Token oder API-Keys für schreibende Zugriffe.
+- **Cron-Endpunkte** (`/api/cron/...`) erfordern das oben beschriebene `?secret=`-Query-Parameter (oder eine aktive Admin-Session) und lösen Server-Aktionen aus (Backup, Webhook-Versand, Live-Schaltung, Audit-Mail) — sie geben aber keine Inhalte oder Zugangsdaten preis.
+
+---
+
+## ⬆️ Upgrade-Guide
+
+Ein Update ist unkompliziert, da Schema-Änderungen automatisch beim ersten Request nach dem Update laufen:
+
+1. **Vor dem Update:** Sicherung erstellen (Einstellungen → Sicherung & Export, oder `/backups` bei Docker sichern).
+2. Neue Dateien über die alten kopieren bzw. `git pull` (Apache) oder neues Image bauen (`docker compose up -d --build`, Docker) — `config.php`, `paragrafy_data.sqlite`, `/backups` und `.env.local` dabei **nicht** überschreiben/löschen (bei Docker automatisch durch das `data`-Volume sichergestellt).
+3. Beim nächsten Aufruf einer beliebigen Seite legt `ensure_schema_migrations()` fehlende Tabellen und Spalten automatisch an (z. B. `users`, `audit_log`, `translation_versions`, `webhook_queue`, neue Spalten in `projects`) — kein manuelles Migrationsskript nötig.
+4. Bestehende Installationen ohne `cron_secret` in `config.php` bekommen beim ersten Aufruf eines `/api/cron/...`-Endpunkts automatisch eines generiert (sichtbar unter Einstellungen → Automatisierung).
+
+Es gab bislang keine Breaking Changes, die manuelles Eingreifen über die automatische Migration hinaus erfordern.
 
 ---
 

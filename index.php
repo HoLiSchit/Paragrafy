@@ -5,6 +5,9 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 if (!is_installed()) {
     require_once __DIR__ . '/install.php';
@@ -25,6 +28,7 @@ if ($uri === '/paragrafy.svg') {
 
 // Rollierendes Backup (7 Tage) -- per externem Cron täglich aufzurufen, z. B. via crontab oder Uptime-Kuma-Healthcheck
 if ($uri === '/api/cron/backup') {
+    require_cron_secret();
     header('Content-Type: application/json');
     echo json_encode(run_scheduled_backup());
     exit;
@@ -32,6 +36,7 @@ if ($uri === '/api/cron/backup') {
 
 // Webhook-Warteschlange abarbeiten -- per externem Cron alle paar Minuten aufzurufen
 if ($uri === '/api/cron/webhooks') {
+    require_cron_secret();
     header('Content-Type: application/json');
     echo json_encode(process_webhook_queue());
     exit;
@@ -39,6 +44,7 @@ if ($uri === '/api/cron/webhooks') {
 
 // Geplante Veröffentlichungen live schalten -- projektübergreifend, für explizite Cron-Aufrufe
 if ($uri === '/api/cron/publish') {
+    require_cron_secret();
     header('Content-Type: application/json');
     echo json_encode(check_and_publish_scheduled(get_db()));
     exit;
@@ -84,6 +90,7 @@ $activeLangs = array_filter(array_map('trim', explode(',', $project['active_lang
 
 // Cron Audit Endpoint (/api/cron/audit)
 if (!empty($parts) && $parts[0] === 'api' && ($parts[1] ?? '') === 'cron' && ($parts[2] ?? '') === 'audit') {
+    require_cron_secret();
     handle_cron_audit($project, $db);
     exit;
 }
