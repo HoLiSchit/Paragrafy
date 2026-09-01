@@ -34,6 +34,11 @@ if (str_starts_with($earlyRoute, '/admin/reset-password')) {
     exit;
 }
 
+if (str_starts_with($earlyRoute, '/admin/sso')) {
+    handle_sso_login($config);
+    exit;
+}
+
 if (isset($_POST['action']) && $_POST['action'] === 'login') {
     $clientIp = get_client_ip();
     $waitSeconds = login_rate_limit_wait($db, $clientIp);
@@ -692,6 +697,49 @@ function render_reset_password_view(?array $user, ?string $error): void {
     </body>
     </html>
     <?php
+}
+
+function handle_sso_login(array $config): void {
+    $ssoSecret = $config['sso_secret'] ?? '';
+    if ($ssoSecret === '') {
+        header('Location: /admin');
+        return;
+    }
+
+    $token = $_GET['token'] ?? '';
+    $parts = explode('.', $token);
+    if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') {
+        header('Location: /admin');
+        return;
+    }
+    [$payloadB64Url, $signature] = $parts;
+
+    $expectedSignature = hash_hmac('sha256', $payloadB64Url, $ssoSecret);
+    if (!hash_equals($expectedSignature, $signature)) {
+        header('Location: /admin');
+        return;
+    }
+
+    $base64 = strtr($payloadB64Url, '-_', '+/');
+    $padded = $base64 . str_repeat('=', (4 - strlen($base64) % 4) % 4);
+    $json = base64_decode($padded, true);
+    $payload = $json === false ? null : json_decode($json, true);
+
+    if (!is_array($payload) || !isset($payload['exp']) || !is_int($payload['exp'])) {
+        header('Location: /admin');
+        return;
+    }
+
+    if ($payload['exp'] < time()) {
+        header('Location: /admin');
+        return;
+    }
+
+    $_SESSION['paragrafy_admin'] = true;
+    $_SESSION['paragrafy_user_name'] = 'Admin';
+    unset($_SESSION['paragrafy_user_id'], $_SESSION['paragrafy_user_email']);
+    header('Location: /admin');
+    exit;
 }
 
 $subRoute = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
