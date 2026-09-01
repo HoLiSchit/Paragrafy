@@ -738,7 +738,8 @@ function handle_sso_login(array $config): void {
     $_SESSION['paragrafy_admin'] = true;
     $_SESSION['paragrafy_user_name'] = 'Admin';
     unset($_SESSION['paragrafy_user_id'], $_SESSION['paragrafy_user_email']);
-    header('Location: /admin');
+    $projectId = (int)($_GET['project_id'] ?? 0);
+    header('Location: /admin' . ($projectId > 0 ? '?project_id=' . $projectId : ''));
     exit;
 }
 

@@ -1243,6 +1243,7 @@ function render_sidebar(string $active, array $project, array $projects): string
         if (mb_strlen($initials) >= 2) break;
     }
     if ($initials === '') { $initials = 'A'; }
+    $isManagedCloud = !empty(get_config()['managed_cloud']);
     ob_start();
     ?>
     <aside class="pg-sidebar">
@@ -1281,10 +1282,14 @@ function render_sidebar(string $active, array $project, array $projects): string
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:10px">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
                 <span style="width:6px;height:6px;border-radius:50%;background:var(--text-faint);display:inline-block"></span>
-                <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Self-Hosted &middot; v<?= PARAGRAFY_VERSION ?></span>
+                <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em"><?php if ($isManagedCloud): ?>Managed Cloud &middot; v<?= PARAGRAFY_VERSION ?><?php else: ?>Self-Hosted &middot; v<?= PARAGRAFY_VERSION ?><?php endif; ?></span>
             </div>
-            <p style="font-size:12px;color:var(--text-faint);margin:0;line-height:1.5">Open Source &amp; unter deiner Kontrolle.</p>
+            <p style="font-size:12px;color:var(--text-faint);margin:0;line-height:1.5"><?php if ($isManagedCloud): ?>Gehostet &amp; verwaltet von Paragrafy Cloud.<?php else: ?>Open Source &amp; unter deiner Kontrolle.<?php endif; ?></p>
         </div>
+
+        <?php if ($isManagedCloud): ?>
+            <a href="https://app.paragrafy.cloud/dashboard" class="pg-viewer-link">&larr; Zurück zum Kundenportal</a>
+        <?php endif; ?>
 
         <a href="https://<?= htmlspecialchars($project['domain']) ?>" target="_blank" class="pg-viewer-link">Öffentliche Seite ansehen<span>↗</span></a>
 
