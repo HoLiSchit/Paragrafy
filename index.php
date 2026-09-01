@@ -257,48 +257,7 @@ function get_i18n_strings(string $lang): array {
 
 function handle_cron_audit(array $project, PDO $db): void {
     header('Content-Type: application/json');
-    $recipient = trim($project['audit_email_recipient'] ?? '') ?: ($project['email'] ?? '');
-    if (empty($recipient)) {
-        echo json_encode(['success' => false, 'error' => 'Keine Audit-Empfänger E-Mail hinterlegt.']);
-        return;
-    }
-
-    $auditMonths = (int)($project['audit_interval_months'] ?? 12);
-    $stmt = $db->prepare("
-        SELECT t.title, t.lang, t.updated_at, dt.title as type_title
-        FROM translations t
-        JOIN documents d ON t.document_id = d.id
-        JOIN doc_types dt ON d.doc_type_id = dt.id
-        WHERE d.project_id = ? AND t.status = 'published'
-    ");
-    $stmt->execute([$project['id']]);
-    $docs = $stmt->fetchAll();
-
-    $now = new DateTime();
-    $overdue = [];
-    foreach ($docs as $d) {
-        if (!empty($d['updated_at'])) {
-            $updated = new DateTime($d['updated_at']);
-            $diffMonths = (($now->format('Y') - $updated->format('Y')) * 12) + ($now->format('m') - $updated->format('m'));
-            if ($diffMonths >= $auditMonths) {
-                $days = $now->diff($updated)->days;
-                $overdue[] = "<li><strong>" . htmlspecialchars($d['title']) . "</strong> (" . strtoupper($d['lang']) . ") - Zuletzt geprüft vor $days Tagen (Stand: " . date('d.m.Y', strtotime($d['updated_at'])) . ")</li>";
-            }
-        }
-    }
-
-    if (empty($overdue)) {
-        echo json_encode(['success' => true, 'message' => 'Alle Rechtstexte sind aktuell. Keine E-Mail erforderlich.']);
-        return;
-    }
-
-    $html = "<h2>Paragrafy Compliance-Audit: Prüfung fällig</h2>";
-    $html .= "<p>Für dein Projekt <strong>" . htmlspecialchars($project['name']) . "</strong> (" . htmlspecialchars($project['domain']) . ") sind folgende Rechtstexte seit mehr als $auditMonths Monaten ungeprüft:</p>";
-    $html .= "<ul>" . implode('', $overdue) . "</ul>";
-    $html .= "<p><a href='https://" . htmlspecialchars($project['domain']) . "/admin' style='background:#e11d48;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Zum Admin-Dashboard</a></p>";
-
-    $res = send_smtp_mail($project, $recipient, "[Paragrafy] Audit-Erinnerung: " . count($overdue) . " Rechtstexte prüfen", $html);
-    echo json_encode($res);
+    echo json_encode(run_audit_check($project, $db));
 }
 
 function handle_json_api(array $parts, array $project, PDO $db, string $primaryLang, bool $isPreview = false): void {

@@ -331,6 +331,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $brandColor = '#' . $brandColor;
         }
 
+        $isManagedCloud = !empty(get_config()['managed_cloud']);
+        $domainToSave = $isManagedCloud ? $project['domain'] : $_POST['domain'];
+
         $stmt = $db->prepare("
             UPDATE projects SET
                 name=?, domain=?, brand_color=?, primary_lang=?, active_languages=?,
@@ -341,7 +344,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             WHERE id=?
         ");
         $stmt->execute([
-            $_POST['name'], $_POST['domain'], $brandColor, $_POST['primary_lang'], $activeLangs,
+            $_POST['name'], $domainToSave, $brandColor, $_POST['primary_lang'], $activeLangs,
             $deeplKey, $logoUrl, $webhookUrl, $webhookSecret, $auditMonths,
             $smtpHost, $smtpPort, $smtpUser, $smtpPass, $smtpSecure, $smtpFrom, $auditRecipient,
             $cookieBanner, $cookieBannerText,
@@ -1224,6 +1227,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
     $cronHost = $_SERVER['HTTP_HOST'] ?? $project['domain'];
     $cronBase = $cronScheme . '://' . $cronHost;
     $queueSummary = webhook_queue_summary($db, $project['id']);
+    $isManagedCloud = !empty(get_config()['managed_cloud']);
     ?>
     <!DOCTYPE html>
     <html lang="de">
@@ -1323,7 +1327,12 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                 </div>
                                 <div>
                                     <label class="pg-label" style="margin-top:0">Domain / Subdomain</label>
-                                    <input type="text" name="domain" value="<?= htmlspecialchars($project['domain']) ?>" required style="width:100%">
+                                    <?php if ($isManagedCloud): ?>
+                                        <input type="text" value="<?= htmlspecialchars($project['domain']) ?>" disabled style="width:100%;opacity:.6;cursor:not-allowed">
+                                        <p class="pg-card-sub" style="margin-top:6px">Wird über dein Managed-Cloud-Kundenportal verwaltet, hier nicht änderbar.</p>
+                                    <?php else: ?>
+                                        <input type="text" name="domain" value="<?= htmlspecialchars($project['domain']) ?>" required style="width:100%">
+                                    <?php endif; ?>
                                 </div>
                             </div>
 
