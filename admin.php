@@ -248,6 +248,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Neues Projekt anlegen
     if ($action === 'create_project') {
+        if (!empty(get_config()['managed_cloud'])) {
+            header('Location: /admin?msg=managed_cloud_blocked');
+            exit;
+        }
         $newName = trim($_POST['new_project_name'] ?? '');
         $newDomain = trim($_POST['new_project_domain'] ?? '');
         $newLang = trim($_POST['new_primary_lang'] ?? 'de');
@@ -864,6 +868,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
         }
     }
     $complianceScore = $totalRequired > 0 ? (int)round(($publishedRequired / $totalRequired) * 100) : 100;
+    $isManagedCloud = !empty(get_config()['managed_cloud']);
     ?>
     <!DOCTYPE html>
     <html lang="de">
@@ -898,7 +903,9 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                             </div>
                         </div>
                         <?php $projectLimitReached = get_project_limit() !== null && count($projects) >= get_project_limit(); ?>
-                        <?php if ($projectLimitReached): ?>
+                        <?php if ($isManagedCloud): ?>
+                            <a href="https://app.paragrafy.cloud/dashboard" class="pg-viewer-link">Weitere Projekte über dein Kundenportal anlegen &rarr;</a>
+                        <?php elseif ($projectLimitReached): ?>
                             <span class="pg-pill pg-pill-muted" title="Diese Instanz erlaubt maximal <?= (int)get_project_limit() ?> Projekt<?= get_project_limit() === 1 ? '' : 'e' ?>.">Projektlimit erreicht</span>
                         <?php else: ?>
                             <button type="button" class="pg-btn" onclick="openNewProjectModal()">+ Neues Projekt</button>
@@ -908,6 +915,12 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                     <?php if (($_GET['msg'] ?? '') === 'project_limit_reached'): ?>
                         <div class="pg-alert pg-alert-red">
                             <div><strong>Projektlimit erreicht:</strong> Diese Instanz erlaubt maximal <?= (int)get_project_limit() ?> Projekt<?= get_project_limit() === 1 ? '' : 'e' ?>. Es kann kein weiteres Projekt angelegt werden.</div>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (($_GET['msg'] ?? '') === 'managed_cloud_blocked'): ?>
+                        <div class="pg-alert pg-alert-red">
+                            <div>Neue Projekte bitte über dein Kundenportal anlegen.</div>
                         </div>
                     <?php endif; ?>
 
@@ -1280,39 +1293,44 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     </div>
 
                     <div class="pg-card pg-card-pad">
-                        <h2>Automatisierung (Cron)</h2>
-                        <p class="pg-card-sub" style="margin-bottom:16px">Diese Adressen extern per Cron-Job (oder Uptime-Monitor) aufrufen, damit geplante Veröffentlichungen live gehen, Webhooks zugestellt und Backups angelegt werden. Alle vier sind mit einem geheimen Schlüssel geschützt — ohne korrektes <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">?secret=</code> antworten sie mit 403.</p>
+                        <?php if ($isManagedCloud): ?>
+                            <h2>Automatisierung</h2>
+                            <p class="pg-card-sub">Geplante Veröffentlichungen, Backups und Prüfberichte laufen bei Managed Cloud automatisch im Hintergrund — keine Einrichtung nötig.</p>
+                        <?php else: ?>
+                            <h2>Automatisierung (Cron)</h2>
+                            <p class="pg-card-sub" style="margin-bottom:16px">Diese Adressen extern per Cron-Job (oder Uptime-Monitor) aufrufen, damit geplante Veröffentlichungen live gehen, Webhooks zugestellt und Backups angelegt werden. Alle vier sind mit einem geheimen Schlüssel geschützt — ohne korrektes <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">?secret=</code> antworten sie mit 403.</p>
 
-                        <?php if (($_GET['msg'] ?? '') === 'cron_secret_regenerated'): ?>
-                            <p style="font-size:12px;color:var(--green);margin:0 0 12px">Neues Secret erzeugt — bitte die Cron-Jobs mit den Adressen unten aktualisieren.</p>
-                        <?php endif; ?>
+                            <?php if (($_GET['msg'] ?? '') === 'cron_secret_regenerated'): ?>
+                                <p style="font-size:12px;color:var(--green);margin:0 0 12px">Neues Secret erzeugt — bitte die Cron-Jobs mit den Adressen unten aktualisieren.</p>
+                            <?php endif; ?>
 
-                        <?php
-                        $cronRows = [
-                            ['Geplante Veröffentlichungen', '/api/cron/publish', 'jede Minute', '* * * * *'],
-                            ['Webhook-Warteschlange', '/api/cron/webhooks', 'alle 5 Minuten', '*/5 * * * *'],
-                            ['Rollierendes Backup', '/api/cron/backup', 'täglich um 3 Uhr', '0 3 * * *'],
-                            ['Prüfbericht per E-Mail', '/api/cron/audit', 'täglich um 8 Uhr', '0 8 * * *'],
-                        ];
-                        ?>
-                        <p class="pg-card-sub" style="margin-bottom:12px">Jede Zeile ist eine fertige Crontab-Zeile mit empfohlenem Zeitplan — einfach kopieren und per <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">crontab -e</code> einfügen.</p>
-                        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
-                            <?php foreach ($cronRows as [$cronLabel, $cronPath, $cronFreq, $cronSchedule]): ?>
-                                <?php $cronLine = $cronSchedule . ' curl -fsS "' . $cronBase . $cronPath . '?secret=' . $cronSecret . '" > /dev/null'; ?>
-                                <div>
-                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars($cronLabel) ?> <span style="color:var(--text-faint);font-weight:400">(empfohlen: <?= htmlspecialchars($cronFreq) ?>)</span></label>
-                                    <div style="display:flex;gap:6px">
-                                        <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars($cronLine) ?>" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted)">
-                                        <button type="button" class="pg-icon-btn" title="Kopieren" onclick="copyToClipboard('<?= htmlspecialchars($cronLine, ENT_QUOTES) ?>')"><?= svg_icon('copy', '', 14) ?></button>
+                            <?php
+                            $cronRows = [
+                                ['Geplante Veröffentlichungen', '/api/cron/publish', 'jede Minute', '* * * * *'],
+                                ['Webhook-Warteschlange', '/api/cron/webhooks', 'alle 5 Minuten', '*/5 * * * *'],
+                                ['Rollierendes Backup', '/api/cron/backup', 'täglich um 3 Uhr', '0 3 * * *'],
+                                ['Prüfbericht per E-Mail', '/api/cron/audit', 'täglich um 8 Uhr', '0 8 * * *'],
+                            ];
+                            ?>
+                            <p class="pg-card-sub" style="margin-bottom:12px">Jede Zeile ist eine fertige Crontab-Zeile mit empfohlenem Zeitplan — einfach kopieren und per <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">crontab -e</code> einfügen.</p>
+                            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+                                <?php foreach ($cronRows as [$cronLabel, $cronPath, $cronFreq, $cronSchedule]): ?>
+                                    <?php $cronLine = $cronSchedule . ' curl -fsS "' . $cronBase . $cronPath . '?secret=' . $cronSecret . '" > /dev/null'; ?>
+                                    <div>
+                                        <label class="pg-label" style="margin-top:0"><?= htmlspecialchars($cronLabel) ?> <span style="color:var(--text-faint);font-weight:400">(empfohlen: <?= htmlspecialchars($cronFreq) ?>)</span></label>
+                                        <div style="display:flex;gap:6px">
+                                            <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars($cronLine) ?>" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted)">
+                                            <button type="button" class="pg-icon-btn" title="Kopieren" onclick="copyToClipboard('<?= htmlspecialchars($cronLine, ENT_QUOTES) ?>')"><?= svg_icon('copy', '', 14) ?></button>
+                                        </div>
                                     </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
+                                <?php endforeach; ?>
+                            </div>
 
-                        <form method="post" onsubmit="return confirm('Neues Secret erzeugen? Die alten URLs funktionieren danach nicht mehr — bestehende Cron-Jobs müssen aktualisiert werden.');">
-                            <input type="hidden" name="action" value="regenerate_cron_secret">
-                            <button type="submit" class="pg-btn-secondary">Secret neu generieren</button>
-                        </form>
+                            <form method="post" onsubmit="return confirm('Neues Secret erzeugen? Die alten URLs funktionieren danach nicht mehr — bestehende Cron-Jobs müssen aktualisiert werden.');">
+                                <input type="hidden" name="action" value="regenerate_cron_secret">
+                                <button type="submit" class="pg-btn-secondary">Secret neu generieren</button>
+                            </form>
+                        <?php endif; ?>
                     </div>
 
                     <div class="pg-card pg-card-pad">
@@ -1652,7 +1670,11 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <?php elseif ($backupMsg === 'backup_failed'): ?>
                                 <p style="font-size:12px;color:var(--red);margin:4px 0 10px">Backup fehlgeschlagen.</p>
                             <?php endif; ?>
-                            <p class="pg-card-sub" style="margin:0 0 10px">Ohne eingerichteten Cron-Job entstehen hier nur Backups, die du manuell auslöst.</p>
+                            <?php if ($isManagedCloud): ?>
+                                <p class="pg-card-sub" style="margin:0 0 10px">Läuft bei Managed Cloud automatisch täglich — kein Cron-Job nötig.</p>
+                            <?php else: ?>
+                                <p class="pg-card-sub" style="margin:0 0 10px">Ohne eingerichteten Cron-Job entstehen hier nur Backups, die du manuell auslöst.</p>
+                            <?php endif; ?>
 
                             <?php if (empty($backups)): ?>
                                 <div style="color:var(--text-faint);font-size:13px;font-style:italic">Noch keine automatischen Backups vorhanden.</div>
