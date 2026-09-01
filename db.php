@@ -86,6 +86,24 @@ function verify_cron_secret(): bool {
 }
 
 /**
+ * Optional cap on how many rows the `projects` table may hold in this
+ * instance, read from config.php's `project_limit` (int|null). Absent by
+ * default (existing installs never gained this key) -- returning null means
+ * unlimited, so bare self-hosted installs are unaffected. A SaaS layer that
+ * provisions one Paragrafy instance per account can set this via
+ * write_config() at provisioning time (e.g. 1 for a single-project plan, a
+ * configurable ceiling for an agency plan) to prevent an account from
+ * bypassing its plan's project limit through this instance's own /admin.
+ */
+function get_project_limit(): ?int {
+    $config = get_config();
+    if (!isset($config['project_limit']) || $config['project_limit'] === null || $config['project_limit'] === '') {
+        return null;
+    }
+    return (int)$config['project_limit'];
+}
+
+/**
  * Call at the top of a /api/cron/* handler; exits with 403 JSON unless either
  * ?secret= matches or the request comes from an already-logged-in admin
  * session (so in-app buttons like "Prüfbericht jetzt senden" keep working

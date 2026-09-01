@@ -249,6 +249,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newColor = trim($_POST['new_brand_color'] ?? '#e11d48');
         if (!str_starts_with($newColor, '#')) $newColor = '#' . $newColor;
 
+        $projectLimit = get_project_limit();
+        if ($projectLimit !== null && count($projects) >= $projectLimit) {
+            header("Location: /admin?msg=project_limit_reached");
+            exit;
+        }
+
         if (!empty($newName) && !empty($newDomain)) {
             $stmt = $db->prepare("INSERT INTO projects (name, domain, brand_color, primary_lang, active_languages) VALUES (?, ?, ?, ?, 'de,en')");
             $stmt->execute([$newName, $newDomain, $newColor, $newLang]);
@@ -839,8 +845,19 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                                 <span>Technische Schnittstelle: <span class="api-pill">/api/:lang/:slug</span></span>
                             </div>
                         </div>
-                        <button type="button" class="pg-btn" onclick="openNewProjectModal()">+ Neues Projekt</button>
+                        <?php $projectLimitReached = get_project_limit() !== null && count($projects) >= get_project_limit(); ?>
+                        <?php if ($projectLimitReached): ?>
+                            <span class="pg-pill pg-pill-muted" title="Diese Instanz erlaubt maximal <?= (int)get_project_limit() ?> Projekt<?= get_project_limit() === 1 ? '' : 'e' ?>.">Projektlimit erreicht</span>
+                        <?php else: ?>
+                            <button type="button" class="pg-btn" onclick="openNewProjectModal()">+ Neues Projekt</button>
+                        <?php endif; ?>
                     </div>
+
+                    <?php if (($_GET['msg'] ?? '') === 'project_limit_reached'): ?>
+                        <div class="pg-alert pg-alert-red">
+                            <div><strong>Projektlimit erreicht:</strong> Diese Instanz erlaubt maximal <?= (int)get_project_limit() ?> Projekt<?= get_project_limit() === 1 ? '' : 'e' ?>. Es kann kein weiteres Projekt angelegt werden.</div>
+                        </div>
+                    <?php endif; ?>
 
                     <!-- Health KPI Cards -->
                     <div class="pg-kpi-grid">

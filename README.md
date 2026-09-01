@@ -166,7 +166,7 @@ Nur folgende Werte kommen tatsächlich aus Dateien statt aus der Datenbank:
 
 | Datei / Variable | Zweck |
 | :--- | :--- |
-| `config.php` (auto-generiert) | Admin-Passwort-Hash (Legacy-Login) und das Cron-Secret. Wird beim Setup-Wizard angelegt, nicht manuell bearbeiten. |
+| `config.php` (auto-generiert) | Admin-Passwort-Hash (Legacy-Login) und das Cron-Secret. Wird beim Setup-Wizard angelegt, nicht manuell bearbeiten. Optional: `project_limit` (int) begrenzt die Anzahl `projects`-Zeilen dieser Instanz — fehlt der Schlüssel (Standard), gilt kein Limit. Gedacht für Betreiber, die Paragrafy hinter einer eigenen SaaS-/Abrechnungsschicht mit einer Instanz pro Account/Plan betreiben. |
 | `.env` / `.env.local` (optional) | `DEEPL_API_KEY=...` als projektübergreifender Fallback, falls im jeweiligen Projekt kein eigener DeepL-Key hinterlegt ist. Beide Dateien sind optional — ohne sie funktioniert alles außer diesem Fallback. |
 | `PARAGRAFY_DATA_DIR` (Umgebungsvariable) | Nur für Docker relevant: verlegt `config.php`, die SQLite-Datenbank, `/backups` und `.env.local` in ein persistentes Verzeichnis. Siehe Abschnitt „Docker Setup & Deployment" weiter oben. |
 
