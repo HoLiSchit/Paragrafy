@@ -84,9 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $customRequired = $_POST['custom_required'] ?? [];
 
     if (strlen($adminPass) < 6) {
-        $error = "Das Admin-Passwort muss mindestens 6 Zeichen lang sein.";
+        $error = t('install.error.password_too_short');
     } elseif (empty($projectName) || empty($projectDomain)) {
-        $error = "Bitte Projektnamen und Domain angeben.";
+        $error = t('install.error.missing_fields');
     } else {
         try {
             $pdo = get_db();
@@ -96,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'admin_password_hash' => password_hash($adminPass, PASSWORD_DEFAULT),
                 'installed_at' => date('c'),
                 'cron_secret' => bin2hex(random_bytes(32)),
+                'ui_locale' => current_locale(),
             ]);
 
             $docTypeIds = [];
@@ -192,16 +193,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: /admin');
             exit;
         } catch (Throwable $e) {
-            $error = "Fehler bei der Installation: " . $e->getMessage();
+            $error = t('install.error.install_failed', ['message' => $e->getMessage()]);
         }
     }
 }
 ?>
 <!DOCTYPE html>
-<html lang="de">
+<html lang="<?= htmlspecialchars(current_locale()) ?>">
 <head>
     <meta charset="utf-8">
-    <title>Paragrafy Setup & Installation</title>
+    <title><?= htmlspecialchars(t('install.page_title')) ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
     <style>
@@ -252,9 +253,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="wizard-container">
         <div class="logo-header">
             <img src="/paragrafy.svg" alt="Paragrafy Logo">
-            <h1>Paragrafy Setup</h1>
+            <h1><?= htmlspecialchars(t('install.heading')) ?></h1>
         </div>
-        <div class="subtitle">Zentrale Verwaltung für rechtliche Pflichttexte, Mehrsprachigkeit & Headless API.</div>
+        <div class="subtitle"><?= htmlspecialchars(t('install.subtitle')) ?></div>
 
         <?php if ($error): ?>
             <div class="error-box"><?= htmlspecialchars($error) ?></div>
@@ -262,33 +263,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <form method="post">
             <div class="section">
-                <div class="section-title">1. Administrator-Zugang</div>
-                <label>Admin-Passwort:</label>
-                <input type="password" name="admin_password" placeholder="Sicheres Passwort für das /admin Dashboard" required autofocus>
+                <div class="section-title"><?= htmlspecialchars(t('install.section1.title')) ?></div>
+                <label><?= htmlspecialchars(t('install.section1.password_label')) ?></label>
+                <input type="password" name="admin_password" placeholder="<?= htmlspecialchars(t('install.section1.password_placeholder')) ?>" required autofocus>
             </div>
 
             <div class="section">
-                <div class="section-title">2. Projekt, Branding & DeepL</div>
+                <div class="section-title"><?= htmlspecialchars(t('install.section2.title')) ?></div>
                 <div class="grid">
                     <div>
-                        <label>Projektname:</label>
-                        <input type="text" name="project_name" placeholder="z. B. Meine App" required>
+                        <label><?= htmlspecialchars(t('install.section2.project_name_label')) ?></label>
+                        <input type="text" name="project_name" placeholder="<?= htmlspecialchars(t('install.section2.project_name_placeholder')) ?>" required>
                     </div>
                     <div>
-                        <label>Subdomain / Domain:</label>
+                        <label><?= htmlspecialchars(t('install.section2.domain_label')) ?></label>
                         <input type="text" name="project_domain" value="<?= htmlspecialchars($host) ?>" required>
                     </div>
                 </div>
                 <div class="grid" style="margin-top: 1rem;">
                     <div>
-                        <label>Primärsprache:</label>
+                        <label><?= htmlspecialchars(t('install.section2.primary_lang_label')) ?></label>
                         <select name="primary_lang">
-                            <option value="de" selected>Deutsch (DE)</option>
-                            <option value="en">Englisch (EN)</option>
+                            <option value="de" selected><?= htmlspecialchars(t('install.section2.lang_de')) ?></option>
+                            <option value="en"><?= htmlspecialchars(t('install.section2.lang_en')) ?></option>
                         </select>
                     </div>
                     <div>
-                        <label>Akzentfarbe (HEX):</label>
+                        <label><?= htmlspecialchars(t('install.section2.brand_color_label')) ?></label>
                         <div class="color-picker-wrap">
                             <input type="color" id="color_picker" value="#6366F1" oninput="syncColor(this.value, 'text')">
                             <input type="text" id="color_text" name="brand_color" value="#6366F1" placeholder="#6366F1" maxlength="7" oninput="syncColor(this.value, 'picker')">
@@ -297,24 +298,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div style="margin-top: 1rem;">
-                    <label>DeepL API-Key (optional, für 1-Klick-Übersetzungen):</label>
-                    <input type="text" name="deepl_api_key" placeholder="z. B. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx">
+                    <label><?= htmlspecialchars(t('install.section2.deepl_label')) ?></label>
+                    <input type="text" name="deepl_api_key" placeholder="<?= htmlspecialchars(t('install.section2.deepl_placeholder')) ?>">
                 </div>
 
                 <div style="margin-top: 1rem;">
-                    <label>Aktivierte Sprachen für Übersetzungen:</label>
+                    <label><?= htmlspecialchars(t('install.section2.active_langs_label')) ?></label>
                     <div class="checkbox-group">
-                        <label class="checkbox-card"><input type="checkbox" name="active_languages[]" value="de" checked disabled> Deutsch (DE - Basis)</label>
-                        <label class="checkbox-card"><input type="checkbox" name="active_languages[]" value="en" checked> Englisch (EN)</label>
-                        <label class="checkbox-card"><input type="checkbox" name="active_languages[]" value="es"> Spanisch (ES)</label>
-                        <label class="checkbox-card"><input type="checkbox" name="active_languages[]" value="fr"> Französisch (FR)</label>
+                        <label class="checkbox-card"><input type="checkbox" name="active_languages[]" value="de" checked disabled> <?= htmlspecialchars(t('install.section2.lang_de_base')) ?></label>
+                        <label class="checkbox-card"><input type="checkbox" name="active_languages[]" value="en" checked> <?= htmlspecialchars(t('install.section2.lang_en')) ?></label>
+                        <label class="checkbox-card"><input type="checkbox" name="active_languages[]" value="es"> <?= htmlspecialchars(t('install.section2.lang_es')) ?></label>
+                        <label class="checkbox-card"><input type="checkbox" name="active_languages[]" value="fr"> <?= htmlspecialchars(t('install.section2.lang_fr')) ?></label>
                     </div>
                 </div>
             </div>
 
             <div class="section">
-                <div class="section-title">3. Erforderliche Rechtstexte & Vorlagen</div>
-                <p style="color: var(--muted); font-size: 0.8125rem; margin-top: 0;">Wähle die Basis-Dokumente aus oder erstelle beliebig viele eigene:</p>
+                <div class="section-title"><?= htmlspecialchars(t('install.section3.title')) ?></div>
+                <p style="color: var(--muted); font-size: 0.8125rem; margin-top: 0;"><?= htmlspecialchars(t('install.section3.help')) ?></p>
 
                 <div class="checkbox-group">
                     <?php foreach ($standardTemplates as $k => $t): ?>
@@ -326,45 +327,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div style="margin-top: 1.5rem;">
-                    <label>Eigene zusätzliche Rechtstexte definieren:</label>
+                    <label><?= htmlspecialchars(t('install.section3.custom_label')) ?></label>
                     <div id="custom_docs_container"></div>
-                    <button type="button" class="btn-add" onclick="addCustomDoc()">+ Weiteren Rechtstext hinzufügen</button>
+                    <button type="button" class="btn-add" onclick="addCustomDoc()"><?= htmlspecialchars(t('install.section3.add_btn')) ?></button>
                 </div>
             </div>
 
             <div class="section">
-                <div class="section-title">4. Unternehmensangaben (Platzhalter)</div>
+                <div class="section-title"><?= htmlspecialchars(t('install.section4.title')) ?></div>
                 <div class="grid">
                     <div>
-                        <label>Firmenname / Inhaber:</label>
-                        <input type="text" name="company_name" placeholder="z. B. Max Mustermann Webentwicklung">
+                        <label><?= htmlspecialchars(t('install.section4.company_label')) ?></label>
+                        <input type="text" name="company_name" placeholder="<?= htmlspecialchars(t('install.section4.company_placeholder')) ?>">
                     </div>
                     <div>
-                        <label>Vertretungsberechtigte Person:</label>
-                        <input type="text" name="representative" placeholder="z. B. Max Mustermann">
+                        <label><?= htmlspecialchars(t('install.section4.representative_label')) ?></label>
+                        <input type="text" name="representative" placeholder="<?= htmlspecialchars(t('install.section4.representative_placeholder')) ?>">
                     </div>
                 </div>
                 <div style="margin-top: 1rem;">
-                    <label>Vollständige Anschrift:</label>
+                    <label><?= htmlspecialchars(t('install.section4.address_label')) ?></label>
                     <textarea name="address" rows="2" placeholder="Musterweg 1&#10;12345 Musterstadt, Deutschland"></textarea>
                 </div>
                 <div class="grid" style="margin-top: 1rem;">
                     <div>
-                        <label>Kontakt-E-Mail:</label>
-                        <input type="email" name="email" placeholder="kontakt@deinedomain.de">
+                        <label><?= htmlspecialchars(t('install.section4.email_label')) ?></label>
+                        <input type="email" name="email" placeholder="<?= htmlspecialchars(t('install.section4.email_placeholder')) ?>">
                     </div>
                     <div>
-                        <label>Telefonnummer (optional):</label>
-                        <input type="text" name="phone" placeholder="+49 123 456789">
+                        <label><?= htmlspecialchars(t('install.section4.phone_label')) ?></label>
+                        <input type="text" name="phone" placeholder="<?= htmlspecialchars(t('install.section4.phone_placeholder')) ?>">
                     </div>
                 </div>
                 <div style="margin-top: 1rem;">
-                    <label>Registergericht & Nummer (falls vorhanden):</label>
-                    <input type="text" name="register_info" placeholder="Amtsgericht Musterstadt, HRB 12345">
+                    <label><?= htmlspecialchars(t('install.section4.register_label')) ?></label>
+                    <input type="text" name="register_info" placeholder="<?= htmlspecialchars(t('install.section4.register_placeholder')) ?>">
                 </div>
             </div>
 
-            <button type="submit" class="btn">Paragrafy initialisieren & Dashboard öffnen &rarr;</button>
+            <button type="submit" class="btn"><?= t('install.submit_btn') ?></button>
         </form>
     </div>
 
@@ -381,6 +382,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        const i18n = {
+            customTitlePlaceholder: <?= json_encode(t('install.custom_title_placeholder')) ?>,
+            customSlugPlaceholder: <?= json_encode(t('install.custom_slug_placeholder')) ?>,
+            customRequiredLabel: <?= json_encode(t('install.custom_required_label')) ?>
+        };
+
         let customIdx = 0;
         function addCustomDoc(title = '', slug = '', isReq = false) {
             const container = document.getElementById('custom_docs_container');
@@ -388,10 +395,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             div.className = 'custom-row';
             div.id = 'crow_' + customIdx;
             div.innerHTML = `
-                <input type="text" name="custom_title[]" value="${title}" placeholder="Titel (z.B. AGB B2B)" required oninput="autoSlug(this, ${customIdx})">
-                <input type="text" name="custom_slug[]" id="cslug_${customIdx}" value="${slug}" placeholder="URL-Slug (z.B. agb-b2b)" required>
+                <input type="text" name="custom_title[]" value="${title}" placeholder="${i18n.customTitlePlaceholder}" required oninput="autoSlug(this, ${customIdx})">
+                <input type="text" name="custom_slug[]" id="cslug_${customIdx}" value="${slug}" placeholder="${i18n.customSlugPlaceholder}" required>
                 <label style="display:flex; align-items:center; gap:0.3rem; margin:0; font-size:0.75rem; white-space:nowrap; cursor:pointer;">
-                    <input type="checkbox" name="custom_required[${customIdx}]" value="1" ${isReq ? 'checked' : ''} style="width:14px; height:14px;"> Pflichtseite
+                    <input type="checkbox" name="custom_required[${customIdx}]" value="1" ${isReq ? 'checked' : ''} style="width:14px; height:14px;"> ${i18n.customRequiredLabel}
                 </label>
                 <button type="button" class="btn-del" onclick="document.getElementById('crow_${customIdx}').remove()">&times;</button>
             `;

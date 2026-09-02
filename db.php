@@ -118,7 +118,7 @@ function require_cron_secret(): void {
     if (!verify_cron_secret()) {
         http_response_code(403);
         header('Content-Type: application/json');
-        echo json_encode(['error' => 'Ungültiges oder fehlendes Secret. ?secret=<dein-cron-secret> anhängen (siehe Einstellungen).']);
+        echo json_encode(['error' => t('db.cron.invalid_secret')]);
         exit;
     }
 }
@@ -161,6 +161,15 @@ function ensure_schema_migrations(PDO $pdo): void {
                 if (!in_array($c, $colNames)) {
                     $pdo->exec("ALTER TABLE projects ADD COLUMN " . $c . " " . $type);
                 }
+            }
+        }
+
+        $stmtUsers = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='users'");
+        if ($stmtUsers && $stmtUsers->fetch()) {
+            $colsUsers = $pdo->query("PRAGMA table_info(users)")->fetchAll();
+            $userColNames = array_column($colsUsers, 'name');
+            if (!in_array('locale', $userColNames)) {
+                $pdo->exec("ALTER TABLE users ADD COLUMN locale TEXT DEFAULT 'de'");
             }
         }
 
@@ -360,7 +369,8 @@ function init_database_schema(PDO $pdo): void {
             status TEXT DEFAULT 'invited',
             invite_token TEXT DEFAULT '',
             invited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            activated_at DATETIME DEFAULT NULL
+            activated_at DATETIME DEFAULT NULL,
+            locale TEXT DEFAULT 'de'
         );
 
         CREATE TABLE IF NOT EXISTS audit_log (
@@ -462,7 +472,7 @@ function check_and_publish_scheduled(PDO $pdo, ?array $project = null): array {
                 $row['scheduled_content'] !== '' ? $row['scheduled_content'] : $row['content'],
                 $row['scheduled_note'],
                 'published',
-                'Geplante Veröffentlichung'
+                t('db.scheduled_publish_note')
             );
 
             enqueue_webhook($row, [
@@ -558,13 +568,13 @@ function send_smtp_mail(array $project, string $to, string $subject, string $bod
     if (empty($host)) {
         $headers = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: " . $from;
         $sent = @mail($to, $subject, $bodyHtml, $headers);
-        return $sent ? ['success' => true] : ['success' => false, 'error' => 'mail() Funktion fehlgeschlagen. Bitte SMTP-Server konfigurieren.'];
+        return $sent ? ['success' => true] : ['success' => false, 'error' => t('db.smtp.mail_function_failed')];
     }
 
     $socketHost = ($secure === 'ssl') ? 'ssl://' . $host : $host;
     $socket = @fsockopen($socketHost, $port, $errno, $errstr, 15);
     if (!$socket) {
-        return ['success' => false, 'error' => "Verbindung zu $host:$port fehlgeschlagen: $errstr ($errno)"];
+        return ['success' => false, 'error' => t('db.smtp.connection_failed', ['host' => $host, 'port' => $port, 'error' => $errstr, 'errno' => $errno])];
     }
 
     $read = function() use ($socket) {
@@ -589,7 +599,7 @@ function send_smtp_mail(array $project, string $to, string $subject, string $bod
         $tlsRes = $read();
         if (!str_starts_with($tlsRes, '220')) {
             fclose($socket);
-            return ['success' => false, 'error' => "STARTTLS fehlgeschlagen: $tlsRes"];
+            return ['success' => false, 'error' => t('db.smtp.starttls_failed', ['response' => $tlsRes])];
         }
         stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
         $write("EHLO " . gethostname());
@@ -605,7 +615,7 @@ function send_smtp_mail(array $project, string $to, string $subject, string $bod
         $authRes = $read();
         if (!str_starts_with($authRes, '235')) {
             fclose($socket);
-            return ['success' => false, 'error' => "SMTP Authentifizierung fehlgeschlagen: $authRes"];
+            return ['success' => false, 'error' => t('db.smtp.auth_failed', ['response' => $authRes])];
         }
     }
 
@@ -615,7 +625,7 @@ function send_smtp_mail(array $project, string $to, string $subject, string $bod
     $rcptRes = $read();
     if (!str_starts_with($rcptRes, '250')) {
         fclose($socket);
-        return ['success' => false, 'error' => "Empfänger abgelehnt: $rcptRes"];
+        return ['success' => false, 'error' => t('db.smtp.recipient_rejected', ['response' => $rcptRes])];
     }
 
     $write("DATA");
@@ -639,7 +649,7 @@ function send_smtp_mail(array $project, string $to, string $subject, string $bod
     if (str_starts_with($dataRes, '250')) {
         return ['success' => true];
     }
-    return ['success' => false, 'error' => "E-Mail Senden fehlgeschlagen: $dataRes"];
+    return ['success' => false, 'error' => t('db.smtp.send_failed', ['response' => $dataRes])];
 }
 
 /**
@@ -728,7 +738,7 @@ function send_webhook_http(string $url, string $payload, string $eventName, stri
         $errorMessage = curl_error($ch);
         curl_close($ch);
     } else {
-        $errorMessage = 'cURL PHP-Erweiterung nicht verfügbar';
+        $errorMessage = t('db.webhook.curl_unavailable');
     }
 
     $durationMs = (int)round((microtime(true) - $startTime) * 1000);
@@ -739,7 +749,7 @@ function send_webhook_http(string $url, string $payload, string $eventName, stri
         'status_code' => $statusCode,
         'duration_ms' => $durationMs,
         'response' => substr($responseBody, 0, 500),
-        'error' => $errorMessage ?: ($success ? '' : "HTTP-Status $statusCode erhalten")
+        'error' => $errorMessage ?: ($success ? '' : t('db.webhook.http_status_received', ['status' => $statusCode]))
     ];
 }
 
@@ -753,7 +763,7 @@ function dispatch_webhook(array $project, array $eventData): array {
     $built = build_webhook_payload($project, $eventData);
 
     if (empty($built['url']) || !filter_var($built['url'], FILTER_VALIDATE_URL)) {
-        return ['success' => false, 'error' => 'Keine gültige Webhook-URL konfiguriert.'];
+        return ['success' => false, 'error' => t('db.webhook.no_url_configured')];
     }
 
     $result = send_webhook_http($built['url'], $built['payload'], $built['event_name'], $project['webhook_secret'] ?? '', 6);
@@ -836,7 +846,7 @@ function process_webhook_queue(int $limit = 20): array {
             $url = trim($project['webhook_url'] ?? '');
             if (!$project || empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
                 $upd = $db->prepare("UPDATE webhook_queue SET status = 'failed', last_error = ? WHERE id = ?");
-                $upd->execute(['Keine gültige Webhook-URL mehr konfiguriert.', $row['id']]);
+                $upd->execute([t('db.webhook.no_url_configured_queue'), $row['id']]);
                 $failed++;
                 continue;
             }
@@ -895,11 +905,11 @@ function webhook_queue_summary(PDO $db, int $projectId): array {
 
 function translate_with_deepl(string $text, string $sourceLang, string $targetLang, string $apiKey): array {
     if (empty(trim($apiKey))) {
-        return ['success' => false, 'error' => 'Kein DeepL API-Key hinterlegt.'];
+        return ['success' => false, 'error' => t('db.deepl.no_api_key')];
     }
 
     if (!function_exists('curl_init')) {
-        return ['success' => false, 'error' => 'cURL PHP-Erweiterung (php-curl) ist auf dem Server nicht aktiv.'];
+        return ['success' => false, 'error' => t('db.deepl.curl_missing')];
     }
 
     $isFreeTier = str_ends_with(trim($apiKey), ':fx');
@@ -941,13 +951,13 @@ function translate_with_deepl(string $text, string $sourceLang, string $targetLa
     curl_close($ch);
 
     if ($curlError) {
-        return ['success' => false, 'error' => 'cURL Fehler: ' . $curlError];
+        return ['success' => false, 'error' => t('db.deepl.curl_error', ['error' => $curlError])];
     }
 
     $data = json_decode((string)$response, true);
     if ($httpCode !== 200 || !isset($data['translations'][0]['text'])) {
         $msg = $data['message'] ?? ("HTTP " . $httpCode . ": " . substr((string)$response, 0, 150));
-        return ['success' => false, 'error' => 'DeepL API Fehler: ' . $msg];
+        return ['success' => false, 'error' => t('db.deepl.api_error', ['message' => $msg])];
     }
 
     $translated = $data['translations'][0]['text'];
@@ -971,6 +981,104 @@ function lang_meta(string $code): array {
         'nl' => ['flag' => '🇳🇱', 'label' => 'Nederlands'],
     ];
     return $map[$code] ?? ['flag' => '', 'label' => strtoupper($code)];
+}
+
+/**
+ * UI languages Paragrafy's own admin/editor/public chrome is translated into
+ * (lang/<code>.php). Separate from lang_meta(), which lists the languages a
+ * *document's content* can be translated into.
+ */
+function ui_locales(): array {
+    return [
+        'de' => ['flag' => '🇩🇪', 'label' => 'Deutsch'],
+        'en' => ['flag' => '🇬🇧', 'label' => 'English'],
+    ];
+}
+
+/**
+ * Resolves the UI language for the current request: explicit ?locale= (public
+ * pages, also persisted to a cookie) or the logged-in user's saved
+ * preference, falling back to the browser's Accept-Language header, then 'de'.
+ */
+function current_locale(): string {
+    static $resolved = null;
+    if ($resolved !== null) {
+        return $resolved;
+    }
+    $known = array_keys(ui_locales());
+
+    if (!empty($_GET['locale']) && in_array($_GET['locale'], $known, true)) {
+        $resolved = $_GET['locale'];
+        if (!headers_sent()) {
+            setcookie('paragrafy_locale', $resolved, time() + 60 * 60 * 24 * 30, '/');
+        }
+        return $resolved;
+    }
+
+    if (!empty($_SESSION['paragrafy_user_locale']) && in_array($_SESSION['paragrafy_user_locale'], $known, true)) {
+        $resolved = $_SESSION['paragrafy_user_locale'];
+        return $resolved;
+    }
+
+    if (!empty($_COOKIE['paragrafy_locale']) && in_array($_COOKIE['paragrafy_locale'], $known, true)) {
+        $resolved = $_COOKIE['paragrafy_locale'];
+        return $resolved;
+    }
+
+    $accept = (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '');
+    if ($accept !== '') {
+        foreach (explode(',', $accept) as $part) {
+            $code = strtolower(substr(trim(explode(';', $part)[0]), 0, 2));
+            if (in_array($code, $known, true)) {
+                $resolved = $code;
+                return $resolved;
+            }
+        }
+    }
+
+    if (is_installed()) {
+        $configLocale = get_config()['ui_locale'] ?? null;
+        if ($configLocale && in_array($configLocale, $known, true)) {
+            $resolved = $configLocale;
+            return $resolved;
+        }
+    }
+
+    $resolved = 'de';
+    return $resolved;
+}
+
+/**
+ * Translates a UI string key using lang/de.php as the exhaustive baseline,
+ * overlaid with lang/<locale>.php when available. :placeholder params are
+ * interpolated via strtr; pass $count to select a '<key>.plural' variant.
+ */
+function t(string $key, array $params = [], ?int $count = null): string {
+    static $strings = [];
+    $locale = current_locale();
+
+    if (!isset($strings[$locale])) {
+        $baseline = require PARAGRAFY_DIR . '/lang/de.php';
+        if ($locale !== 'de') {
+            $override = @include PARAGRAFY_DIR . "/lang/{$locale}.php";
+            if (is_array($override)) {
+                $baseline = array_merge($baseline, $override);
+            }
+        }
+        $strings[$locale] = $baseline;
+    }
+
+    $lookupKey = ($count !== null && $count !== 1) ? $key . '.plural' : $key;
+    $raw = $strings[$locale][$lookupKey] ?? $strings[$locale][$key] ?? $key;
+
+    if (!$params) {
+        return $raw;
+    }
+    $replacements = [];
+    foreach ($params as $name => $value) {
+        $replacements[':' . $name] = (string)$value;
+    }
+    return strtr($raw, $replacements);
 }
 
 function log_audit(?int $projectId, string $projectName, string $action): void {
@@ -1041,15 +1149,15 @@ function clear_login_failures(PDO $db, string $identifier): void {
 function run_scheduled_backup(): array {
     try {
         if (!file_exists(DB_FILE)) {
-            return ['success' => false, 'error' => 'Keine Datenbank gefunden.'];
+            return ['success' => false, 'error' => t('db.backup.no_database')];
         }
         if (!is_dir(BACKUP_DIR) && !mkdir(BACKUP_DIR, 0755, true) && !is_dir(BACKUP_DIR)) {
-            return ['success' => false, 'error' => 'Backup-Ordner konnte nicht angelegt werden.'];
+            return ['success' => false, 'error' => t('db.backup.dir_creation_failed')];
         }
 
         $filename = 'paragrafy_backup_' . date('Y-m-d_His') . '.sqlite';
         if (!copy(DB_FILE, BACKUP_DIR . '/' . $filename)) {
-            return ['success' => false, 'error' => 'Kopieren der Datenbank fehlgeschlagen.'];
+            return ['success' => false, 'error' => t('db.backup.copy_failed')];
         }
 
         $cutoff = time() - (BACKUP_RETENTION_DAYS * 24 * 60 * 60);
@@ -1070,7 +1178,7 @@ function run_scheduled_backup(): array {
 function run_audit_check(array $project, PDO $db): array {
     $recipient = trim($project['audit_email_recipient'] ?? '') ?: ($project['email'] ?? '');
     if (empty($recipient)) {
-        return ['success' => false, 'error' => 'Keine Audit-Empfänger E-Mail hinterlegt.'];
+        return ['success' => false, 'error' => t('db.audit.no_recipient')];
     }
 
     $auditMonths = (int)($project['audit_interval_months'] ?? 12);
@@ -1092,21 +1200,21 @@ function run_audit_check(array $project, PDO $db): array {
             $diffMonths = (($now->format('Y') - $updated->format('Y')) * 12) + ($now->format('m') - $updated->format('m'));
             if ($diffMonths >= $auditMonths) {
                 $days = $now->diff($updated)->days;
-                $overdue[] = "<li><strong>" . htmlspecialchars($d['title']) . "</strong> (" . strtoupper($d['lang']) . ") - Zuletzt geprüft vor $days Tagen (Stand: " . date('d.m.Y', strtotime($d['updated_at'])) . ")</li>";
+                $overdue[] = t('db.audit.overdue_item', ['title' => htmlspecialchars($d['title']), 'lang' => strtoupper($d['lang']), 'days' => $days, 'date' => date('d.m.Y', strtotime($d['updated_at']))]);
             }
         }
     }
 
     if (empty($overdue)) {
-        return ['success' => true, 'message' => 'Alle Rechtstexte sind aktuell. Keine E-Mail erforderlich.'];
+        return ['success' => true, 'message' => t('db.audit.all_current')];
     }
 
-    $html = "<h2>Paragrafy Compliance-Audit: Prüfung fällig</h2>";
-    $html .= "<p>Für dein Projekt <strong>" . htmlspecialchars($project['name']) . "</strong> (" . htmlspecialchars($project['domain']) . ") sind folgende Rechtstexte seit mehr als $auditMonths Monaten ungeprüft:</p>";
+    $html = "<h2>" . htmlspecialchars(t('db.audit.mail_heading')) . "</h2>";
+    $html .= "<p>" . t('db.audit.mail_intro', ['project' => htmlspecialchars($project['name']), 'domain' => htmlspecialchars($project['domain']), 'months' => $auditMonths]) . "</p>";
     $html .= "<ul>" . implode('', $overdue) . "</ul>";
     $html .= "<p><a href='https://" . htmlspecialchars($project['domain']) . "/admin' style='background:#6366F1;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Zum Admin-Dashboard</a></p>";
 
-    return send_smtp_mail($project, $recipient, "[Paragrafy] Audit-Erinnerung: " . count($overdue) . " Rechtstexte prüfen", $html);
+    return send_smtp_mail($project, $recipient, t('db.audit.mail_subject', ['count' => count($overdue)]), $html);
 }
 
 /** Returns rolling backups newest-first as [filename, size_bytes, created_at]. */
@@ -1284,9 +1392,9 @@ function theme_base_css(string $accent = '#6366F1', bool $enableDarkMode = true)
 
 function render_sidebar(string $active, array $project, array $projects): string {
     $items = [
-        'dashboard' => ['/admin', 'Dashboard', 'grid'],
-        'users' => ['/admin/users', 'Benutzer', 'users'],
-        'audit' => ['/admin/audit?project_id=' . $project['id'], 'Protokoll', 'clock'],
+        'dashboard' => ['/admin', t('admin.common.nav.dashboard'), 'grid'],
+        'users' => ['/admin/users', t('admin.common.nav.users'), 'users'],
+        'audit' => ['/admin/audit?project_id=' . $project['id'], t('admin.common.nav.audit'), 'clock'],
     ];
     $currentUserName = $_SESSION['paragrafy_user_name'] ?? 'Admin';
     $initials = '';
@@ -1334,31 +1442,38 @@ function render_sidebar(string $active, array $project, array $projects): string
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:10px">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
                 <span style="width:6px;height:6px;border-radius:50%;background:var(--text-faint);display:inline-block"></span>
-                <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em"><?php if ($isManagedCloud): ?>Managed Cloud &middot; v<?= PARAGRAFY_VERSION ?><?php else: ?>Self-Hosted &middot; v<?= PARAGRAFY_VERSION ?><?php endif; ?></span>
+                <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em"><?= $isManagedCloud ? t('admin.common.sidebar.managed_cloud', ['version' => PARAGRAFY_VERSION]) : t('admin.common.sidebar.self_hosted', ['version' => PARAGRAFY_VERSION]) ?></span>
             </div>
-            <p style="font-size:12px;color:var(--text-faint);margin:0;line-height:1.5"><?php if ($isManagedCloud): ?>Gehostet &amp; verwaltet von Paragrafy Cloud.<?php else: ?>Open Source &amp; unter deiner Kontrolle.<?php endif; ?></p>
-            <a href="/CHANGELOG.md" target="_blank" style="display:inline-block;margin-top:6px;font-size:11px;font-weight:600;color:var(--text-faint);text-decoration:none">Was ist neu? &rarr;</a>
+            <p style="font-size:12px;color:var(--text-faint);margin:0;line-height:1.5"><?= $isManagedCloud ? t('admin.common.sidebar.hosted_by_cloud') : t('admin.common.sidebar.open_source') ?></p>
+            <a href="/CHANGELOG.md" target="_blank" style="display:inline-block;margin-top:6px;font-size:11px;font-weight:600;color:var(--text-faint);text-decoration:none"><?= t('admin.common.sidebar.whats_new') ?></a>
         </div>
 
         <?php if ($isManagedCloud): ?>
-            <a href="https://app.paragrafy.cloud/dashboard" class="pg-viewer-link">&larr; Zurück zum Kundenportal</a>
+            <a href="https://app.paragrafy.cloud/dashboard" class="pg-viewer-link"><?= t('admin.common.sidebar.back_to_portal') ?></a>
         <?php endif; ?>
 
-        <a href="https://<?= htmlspecialchars($project['domain']) ?>" target="_blank" class="pg-viewer-link">Öffentliche Seite ansehen<span>↗</span></a>
+        <a href="https://<?= htmlspecialchars($project['domain']) ?>" target="_blank" class="pg-viewer-link"><?= htmlspecialchars(t('admin.common.sidebar.view_public_site')) ?><span>↗</span></a>
 
         <a href="/admin/settings?project_id=<?= $project['id'] ?>" class="pg-viewer-link pg-settings-link <?= $active === 'settings' ? 'active' : '' ?>">
             <span style="display:flex;align-items:center;gap:10px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                Einstellungen
+                <?= htmlspecialchars(t('admin.common.nav.settings')) ?>
             </span>
         </a>
+
+        <div style="display:flex;gap:6px;padding:0 2px 8px;font-size:11px">
+            <?php $curLocale = current_locale(); ?>
+            <?php foreach (ui_locales() as $localeCode => $localeMeta): ?>
+                <a href="/admin/settings?project_id=<?= $project['id'] ?>&locale=<?= htmlspecialchars($localeCode) ?>" style="text-decoration:none;color:var(--text-faint);<?= $localeCode === $curLocale ? 'font-weight:700;color:var(--text)' : '' ?>" title="<?= htmlspecialchars($localeMeta['label'] ?? strtoupper($localeCode)) ?>"><?= htmlspecialchars($localeMeta['flag'] ?? strtoupper($localeCode)) ?></a>
+            <?php endforeach; ?>
+        </div>
 
         <div class="pg-user-row">
             <div class="pg-user-avatar"><?= htmlspecialchars($initials) ?></div>
             <div style="flex:1;min-width:0">
                 <div class="pg-user-name"><?= htmlspecialchars($currentUserName) ?></div>
             </div>
-            <a href="/admin?logout=1" class="pg-logout" title="Abmelden">⏻</a>
+            <a href="/admin?logout=1" class="pg-logout" title="<?= htmlspecialchars(t('admin.common.sidebar.logout_title')) ?>">⏻</a>
         </div>
     </aside>
     <?php

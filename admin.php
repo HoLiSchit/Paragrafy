@@ -44,7 +44,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'login') {
     $waitSeconds = login_rate_limit_wait($db, $clientIp);
 
     if ($waitSeconds > 0) {
-        $error = "Zu viele fehlgeschlagene Versuche. Bitte warte " . (int)ceil($waitSeconds / 60) . " Minute(n) und versuche es erneut.";
+        $error = t('admin.login.rate_limited', ['minutes' => (int)ceil($waitSeconds / 60)]);
     } else {
         $email = trim(strtolower($_POST['email'] ?? ''));
         $pass = $_POST['password'] ?? '';
@@ -59,12 +59,13 @@ if (isset($_POST['action']) && $_POST['action'] === 'login') {
                 $_SESSION['paragrafy_user_id'] = (int)$user['id'];
                 $_SESSION['paragrafy_user_name'] = $user['name'];
                 $_SESSION['paragrafy_user_email'] = $user['email'];
+                $_SESSION['paragrafy_user_locale'] = $user['locale'] ?? 'de';
                 $loggedIn = true;
             }
         } elseif (password_verify($pass, $config['admin_password_hash'] ?? '')) {
             $_SESSION['paragrafy_admin'] = true;
             $_SESSION['paragrafy_user_name'] = 'Admin';
-            unset($_SESSION['paragrafy_user_id'], $_SESSION['paragrafy_user_email']);
+            unset($_SESSION['paragrafy_user_id'], $_SESSION['paragrafy_user_email'], $_SESSION['paragrafy_user_locale']);
             $loggedIn = true;
         }
 
@@ -74,12 +75,12 @@ if (isset($_POST['action']) && $_POST['action'] === 'login') {
             exit;
         }
         record_login_failure($db, $clientIp);
-        $error = "Falsche Zugangsdaten.";
+        $error = t('admin.login.invalid_credentials');
     }
 }
 
 if (isset($_GET['logout'])) {
-    unset($_SESSION['paragrafy_admin'], $_SESSION['paragrafy_user_id'], $_SESSION['paragrafy_user_name'], $_SESSION['paragrafy_user_email']);
+    unset($_SESSION['paragrafy_admin'], $_SESSION['paragrafy_user_id'], $_SESSION['paragrafy_user_name'], $_SESSION['paragrafy_user_email'], $_SESSION['paragrafy_user_locale']);
     header('Location: /admin');
     exit;
 }
@@ -120,14 +121,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_backup_file') {
         exit;
     }
     http_response_code(404);
-    echo 'Backup nicht gefunden.';
+    echo htmlspecialchars(t('admin.common.backup_not_found'));
     exit;
 }
 
 // 1c. Rollierendes Backup manuell anstoßen
 if (isset($_POST['action']) && $_POST['action'] === 'run_backup_now') {
     $result = run_scheduled_backup();
-    log_audit(null, '', $result['success'] ? 'Backup manuell ausgelöst' : 'Backup fehlgeschlagen: ' . ($result['error'] ?? ''));
+    log_audit(null, '', $result['success'] ? t('admin.common.audit.backup_triggered') : t('admin.common.audit.backup_failed', ['error' => $result['error'] ?? '']));
     header("Location: /admin/settings?project_id=$projectId&msg=" . ($result['success'] ? 'backup_created' : 'backup_failed'));
     exit;
 }
@@ -142,7 +143,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'run_webhook_queue_now') {
 // 1e. Cron-Secret neu generieren (macht bestehende Cron-URLs ungültig)
 if (isset($_POST['action']) && $_POST['action'] === 'regenerate_cron_secret') {
     regenerate_cron_secret();
-    log_audit(null, '', 'Cron-Secret neu generiert');
+    log_audit(null, '', t('admin.common.audit.cron_secret_regenerated'));
     header("Location: /admin/settings?project_id=$projectId&msg=cron_secret_regenerated");
     exit;
 }
@@ -166,7 +167,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_markdown') {
 
         foreach ($docs as $d) {
             $filename = $d['lang'] . '/' . $d['slug'] . '.md';
-            $md = "# " . $d['title'] . "\n\n> Stand: " . $d['updated_at'] . "\n\n" . strip_tags($d['content']);
+            $md = "# " . $d['title'] . "\n\n" . t('admin.matrix.export.md_stand', ['date' => $d['updated_at']]) . "\n\n" . strip_tags($d['content']);
             $zip->addFromString($filename, $md);
         }
         $zip->close();
@@ -182,8 +183,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_markdown') {
         header('Content-Disposition: attachment; filename="' . preg_replace('/[^a-zA-Z0-9]+/', '_', $project['name']) . '_legal_export.txt"');
         foreach ($docs as $d) {
             echo "========================================\n";
-            echo "DOKUMENT: " . $d['title'] . " (" . strtoupper($d['lang']) . ") - /" . $d['lang'] . "/" . $d['slug'] . "\n";
-            echo "STAND: " . $d['updated_at'] . "\n";
+            echo t('admin.matrix.export.txt_document', ['title' => $d['title'], 'lang' => strtoupper($d['lang']), 'slug' => $d['slug']]) . "\n";
+            echo t('admin.matrix.export.txt_stand', ['date' => $d['updated_at']]) . "\n";
             echo "========================================\n\n";
             echo strip_tags($d['content']) . "\n\n\n";
         }
@@ -201,7 +202,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_audit_csv') {
     header('Content-Disposition: attachment; filename="' . preg_replace('/[^a-zA-Z0-9]+/', '_', $project['name']) . '_protokoll.csv"');
     $out = fopen('php://output', 'w');
     fputs($out, "\xEF\xBB\xBF");
-    fputcsv($out, ['Zeitpunkt', 'Benutzer', 'Aktion', 'Projekt']);
+    fputcsv($out, [t('admin.audit.col_time'), t('admin.audit.col_user'), t('admin.audit.col_action'), t('admin.audit.col_project')]);
     foreach ($entries as $e) {
         fputcsv($out, [$e['created_at'], $e['user_name'], $e['action'], $e['project_name']]);
     }
@@ -214,7 +215,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'test_webhook') {
     header('Content-Type: application/json');
     $result = dispatch_webhook($project, [
         'test' => true,
-        'message' => 'Paragrafy Webhook Test erfolgreich ausgelöst',
+        'message' => t('admin.settings.webhook_test_message'),
         'triggered_at' => date('c')
     ]);
     echo json_encode($result);
@@ -226,11 +227,11 @@ if (isset($_POST['action']) && $_POST['action'] === 'test_smtp') {
     header('Content-Type: application/json');
     $recipient = trim($project['audit_email_recipient'] ?? '') ?: ($project['email'] ?? '');
     if (empty($recipient)) {
-        echo json_encode(['success' => false, 'error' => 'Bitte zuerst eine Empfänger-E-Mail angeben.']);
+        echo json_encode(['success' => false, 'error' => t('admin.settings.smtp_test_missing_recipient')]);
         exit;
     }
-    $html = "<h2>Paragrafy SMTP-Test</h2><p>Deine E-Mail-Serverkonfiguration für <strong>" . htmlspecialchars($project['name']) . "</strong> funktioniert einwandfrei!</p>";
-    $res = send_smtp_mail($project, $recipient, "[Paragrafy] SMTP Test-E-Mail", $html);
+    $html = "<h2>" . htmlspecialchars(t('admin.settings.smtp_test_heading')) . "</h2><p>" . t('admin.settings.smtp_test_body', ['project' => htmlspecialchars($project['name'])]) . "</p>";
+    $res = send_smtp_mail($project, $recipient, t('admin.settings.smtp_test_subject'), $html);
     echo json_encode($res);
     exit;
 }
@@ -245,6 +246,18 @@ if (isset($_POST['action']) && $_POST['action'] === 'clear_webhook_logs') {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+
+    // Admin-UI-Sprache des eingeloggten Benutzers speichern
+    if ($action === 'save_locale') {
+        $newLocale = $_POST['locale'] ?? '';
+        if (isset(ui_locales()[$newLocale]) && !empty($_SESSION['paragrafy_user_id'])) {
+            $upd = $db->prepare("UPDATE users SET locale = ? WHERE id = ?");
+            $upd->execute([$newLocale, (int)$_SESSION['paragrafy_user_id']]);
+            $_SESSION['paragrafy_user_locale'] = $newLocale;
+        }
+        header("Location: /admin/settings?project_id=$projectId&msg=locale_saved");
+        exit;
+    }
 
     // Neues Projekt anlegen
     if ($action === 'create_project') {
@@ -275,7 +288,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insDoc->execute([$newProjectId, $dt['id']]);
             }
 
-            log_audit($newProjectId, $newName, 'Projekt erstellt');
+            log_audit($newProjectId, $newName, t('admin.common.audit.project_created'));
             header("Location: /admin?project_id=$newProjectId&msg=project_created");
             exit;
         }
@@ -289,7 +302,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($projects as $p) { if ((int)$p['id'] === $delId) { $delName = $p['name']; break; } }
             $stmt = $db->prepare("DELETE FROM projects WHERE id = ?");
             $stmt->execute([$delId]);
-            log_audit(null, $delName, 'Projekt gelöscht');
+            log_audit(null, $delName, t('admin.common.audit.project_deleted'));
             header("Location: /admin?msg=project_deleted");
             exit;
         }
@@ -355,7 +368,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['company_name'], $_POST['address'], $_POST['email'], $_POST['phone'], $_POST['representative'], $_POST['register_info'],
             $projectId
         ]);
-        log_audit($projectId, $_POST['name'], 'Einstellungen aktualisiert');
+        log_audit($projectId, $_POST['name'], t('admin.common.audit.settings_updated'));
         header("Location: /admin/settings?project_id=$projectId&msg=saved");
         exit;
     }
@@ -379,7 +392,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $docStmt->execute([$p['id'], $newTypeId]);
             }
 
-            log_audit(null, '', "Rechtstext-Typ „$title\" angelegt");
+            log_audit(null, '', t('admin.matrix.audit.doctype_created', ['title' => $title]));
         }
         header("Location: /admin?project_id=$projectId&msg=type_created");
         exit;
@@ -390,7 +403,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $typeTitle = (string)($db->query("SELECT title FROM doc_types WHERE id = " . (int)$typeId)->fetchColumn() ?: '');
         $stmt = $db->prepare("DELETE FROM doc_types WHERE id = ?");
         $stmt->execute([$typeId]);
-        log_audit(null, '', "Rechtstext-Typ „$typeTitle\" gelöscht");
+        log_audit(null, '', t('admin.matrix.audit.doctype_deleted', ['title' => $typeTitle]));
         header("Location: /admin?project_id=$projectId&msg=type_deleted");
         exit;
     }
@@ -415,7 +428,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = bin2hex(random_bytes(32));
         $ins = $db->prepare("INSERT INTO users (name, email, status, invite_token) VALUES (?, ?, 'invited', ?)");
         $ins->execute([$name, $email, $token]);
-        log_audit(null, '', "Person eingeladen: $name ($email)");
+        log_audit(null, '', t('admin.users.audit.invited', ['name' => $name, 'email' => $email]));
 
         $res = send_invite_mail($project, $name, $email, $token);
         header("Location: /admin/users?msg=" . ($res['success'] ? 'invited' : 'invite_mail_failed'));
@@ -448,7 +461,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $delUserName = (string)($db->query("SELECT name FROM users WHERE id = " . (int)$uid)->fetchColumn() ?: '');
             $del = $db->prepare("DELETE FROM users WHERE id = ?");
             $del->execute([$uid]);
-            log_audit(null, '', "Zugang entfernt: $delUserName");
+            log_audit(null, '', t('admin.users.audit.deleted', ['name' => $delUserName]));
         }
         header("Location: /admin/users?msg=user_deleted");
         exit;
@@ -460,13 +473,13 @@ function send_invite_mail(array $project, string $name, string $email, string $t
     $host = $_SERVER['HTTP_HOST'] ?? $project['domain'];
     $inviteLink = $scheme . '://' . $host . '/admin/accept-invite?token=' . $token;
 
-    $html = "<h2>Einladung zu Paragrafy</h2>"
-        . "<p>Hallo " . htmlspecialchars($name) . ",</p>"
-        . "<p>du wurdest eingeladen, dem Paragrafy Admin-Panel beizutreten. Jede eingeladene Person hat vollen Zugriff auf alle Projekte — es gibt keine Rollen oder Rechte einzustellen.</p>"
-        . "<p><a href='" . htmlspecialchars($inviteLink) . "' style='background:#6366F1;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Zugang aktivieren</a></p>"
-        . "<p>Oder kopiere diesen Link in deinen Browser:<br>" . htmlspecialchars($inviteLink) . "</p>";
+    $html = "<h2>" . htmlspecialchars(t('admin.login.invite_mail_heading')) . "</h2>"
+        . "<p>" . htmlspecialchars(t('admin.login.invite_mail_greeting', ['name' => $name])) . "</p>"
+        . "<p>" . htmlspecialchars(t('admin.login.invite_mail_body')) . "</p>"
+        . "<p><a href='" . htmlspecialchars($inviteLink) . "' style='background:#6366F1;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>" . htmlspecialchars(t('admin.login.invite_mail_button')) . "</a></p>"
+        . "<p>" . htmlspecialchars(t('admin.login.invite_mail_link_hint')) . "<br>" . htmlspecialchars($inviteLink) . "</p>";
 
-    return send_smtp_mail($project, $email, "Einladung zu Paragrafy", $html);
+    return send_smtp_mail($project, $email, t('admin.login.invite_mail_subject'), $html);
 }
 
 function handle_accept_invite(PDO $db): void {
@@ -480,9 +493,9 @@ function handle_accept_invite(PDO $db): void {
         $pass = $_POST['password'] ?? '';
         $confirm = $_POST['password_confirm'] ?? '';
         if (strlen($pass) < 8) {
-            $error = "Das Passwort muss mindestens 8 Zeichen lang sein.";
+            $error = t('admin.login.password_too_short');
         } elseif ($pass !== $confirm) {
-            $error = "Die Passwörter stimmen nicht überein.";
+            $error = t('admin.login.passwords_mismatch');
         } else {
             $upd = $db->prepare("UPDATE users SET password_hash = ?, status = 'active', invite_token = '', activated_at = CURRENT_TIMESTAMP WHERE id = ?");
             $upd->execute([password_hash($pass, PASSWORD_DEFAULT), $user['id']]);
@@ -502,9 +515,9 @@ function handle_accept_invite(PDO $db): void {
 function render_accept_invite_view(?array $user, ?string $error): void {
     ?>
     <!DOCTYPE html>
-    <html lang="de">
+    <html lang="<?= htmlspecialchars(current_locale()) ?>">
     <head>
-        <meta charset="utf-8"><title>Zugang aktivieren - Paragrafy</title>
+        <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.login.accept_invite.page_title')) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
@@ -522,21 +535,21 @@ function render_accept_invite_view(?array $user, ?string $error): void {
         <div class="login-card">
             <div class="logo-header">
                 <img src="/paragrafy.svg" alt="Paragrafy">
-                <h2>Zugang aktivieren</h2>
+                <h2><?= htmlspecialchars(t('admin.login.accept_invite.heading')) ?></h2>
             </div>
             <?php if (!$user): ?>
-                <p style="font-size:13px;color:var(--text-muted)">Dieser Einladungslink ist ungültig oder wurde bereits verwendet. Bitte wende dich an eine andere Person mit Zugriff auf das Admin-Panel, um erneut eingeladen zu werden.</p>
+                <p style="font-size:13px;color:var(--text-muted)"><?= htmlspecialchars(t('admin.login.accept_invite.invalid_token')) ?></p>
             <?php else: ?>
-                <p style="font-size:13px;color:var(--text-muted);margin:0 0 6px">Willkommen, <strong style="color:var(--text)"><?= htmlspecialchars($user['name']) ?></strong>. Lege ein Passwort für <strong style="color:var(--text)"><?= htmlspecialchars($user['email']) ?></strong> fest.</p>
+                <p style="font-size:13px;color:var(--text-muted);margin:0 0 6px"><?= t('admin.login.accept_invite.welcome', ['name' => '<strong style="color:var(--text)">' . htmlspecialchars($user['name']) . '</strong>', 'email' => '<strong style="color:var(--text)">' . htmlspecialchars($user['email']) . '</strong>']) ?></p>
                 <?php if ($error): ?><div class="err"><?= htmlspecialchars($error) ?></div><?php endif; ?>
                 <form method="post">
                     <input type="hidden" name="action" value="set_password">
                     <input type="hidden" name="token" value="<?= htmlspecialchars($_GET['token'] ?? '') ?>">
-                    <label class="pg-label" style="margin-top:0;">Passwort (mind. 8 Zeichen)</label>
+                    <label class="pg-label" style="margin-top:0;"><?= htmlspecialchars(t('admin.login.accept_invite.password_label')) ?></label>
                     <input type="password" name="password" required style="width:100%;margin-bottom:10px;">
-                    <label class="pg-label" style="margin-top:0;">Passwort bestätigen</label>
+                    <label class="pg-label" style="margin-top:0;"><?= htmlspecialchars(t('admin.login.accept_invite.password_confirm_label')) ?></label>
                     <input type="password" name="password_confirm" required style="width:100%;margin-bottom:1rem;">
-                    <button type="submit" class="pg-btn" style="width:100%;justify-content:center;">Zugang aktivieren &rarr;</button>
+                    <button type="submit" class="pg-btn" style="width:100%;justify-content:center;"><?= t('admin.login.accept_invite.submit_button') ?></button>
                 </form>
             <?php endif; ?>
         </div>
@@ -565,12 +578,12 @@ function handle_forgot_password(PDO $db): void {
                     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
                     $host = $_SERVER['HTTP_HOST'] ?? $project['domain'];
                     $resetLink = $scheme . '://' . $host . '/admin/reset-password?token=' . $token;
-                    $html = "<h2>Passwort zurücksetzen</h2>"
-                        . "<p>Hallo " . htmlspecialchars($user['name']) . ",</p>"
-                        . "<p>klicke auf den folgenden Link, um ein neues Passwort für dein Paragrafy-Konto festzulegen:</p>"
-                        . "<p><a href='" . htmlspecialchars($resetLink) . "' style='background:#6366F1;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Neues Passwort festlegen</a></p>"
-                        . "<p>Falls du das nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>";
-                    send_smtp_mail($project, $user['email'], "Paragrafy: Passwort zurücksetzen", $html);
+                    $html = "<h2>" . htmlspecialchars(t('admin.login.forgot.mail_heading')) . "</h2>"
+                        . "<p>" . htmlspecialchars(t('admin.login.forgot.mail_greeting', ['name' => $user['name']])) . "</p>"
+                        . "<p>" . htmlspecialchars(t('admin.login.forgot.mail_body')) . "</p>"
+                        . "<p><a href='" . htmlspecialchars($resetLink) . "' style='background:#6366F1;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>" . htmlspecialchars(t('admin.login.forgot.mail_button')) . "</a></p>"
+                        . "<p>" . htmlspecialchars(t('admin.login.forgot.mail_ignore_hint')) . "</p>";
+                    send_smtp_mail($project, $user['email'], t('admin.login.forgot.mail_subject'), $html);
                 }
             }
         }
@@ -583,9 +596,9 @@ function handle_forgot_password(PDO $db): void {
 function render_forgot_password_view(bool $sent): void {
     ?>
     <!DOCTYPE html>
-    <html lang="de">
+    <html lang="<?= htmlspecialchars(current_locale()) ?>">
     <head>
-        <meta charset="utf-8"><title>Passwort vergessen - Paragrafy</title>
+        <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.login.forgot.page_title')) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
@@ -602,22 +615,22 @@ function render_forgot_password_view(bool $sent): void {
         <div class="login-card">
             <div class="logo-header">
                 <img src="/paragrafy.svg" alt="Paragrafy">
-                <h2>Passwort vergessen</h2>
+                <h2><?= htmlspecialchars(t('admin.login.forgot.heading')) ?></h2>
             </div>
             <?php if ($sent): ?>
-                <p style="font-size:13px;color:var(--text-muted)">Falls zu dieser E-Mail-Adresse ein aktiver Zugang existiert, haben wir gerade einen Link zum Zurücksetzen verschickt. Bitte prüfe dein Postfach.</p>
+                <p style="font-size:13px;color:var(--text-muted)"><?= htmlspecialchars(t('admin.login.forgot.sent_notice')) ?></p>
                 <div style="text-align:center;margin-top:14px">
-                    <a href="/admin" style="font-size:12.5px;color:var(--text-faint)">&larr; Zurück zum Login</a>
+                    <a href="/admin" style="font-size:12.5px;color:var(--text-faint)"><?= t('admin.login.forgot.back_to_login') ?></a>
                 </div>
             <?php else: ?>
-                <p style="font-size:13px;color:var(--text-muted);margin:0 0 6px">Gib deine E-Mail-Adresse ein. Wenn ein aktiver Zugang existiert, schicken wir dir einen Link zum Zurücksetzen.</p>
+                <p style="font-size:13px;color:var(--text-muted);margin:0 0 6px"><?= htmlspecialchars(t('admin.login.forgot.intro')) ?></p>
                 <form method="post">
-                    <label class="pg-label" style="margin-top:0;">E-Mail</label>
-                    <input type="email" name="email" placeholder="name@firma.de" required autofocus style="width:100%;margin-bottom:1rem;">
-                    <button type="submit" class="pg-btn" style="width:100%;justify-content:center;">Link anfordern &rarr;</button>
+                    <label class="pg-label" style="margin-top:0;"><?= htmlspecialchars(t('admin.login.forgot.email_label')) ?></label>
+                    <input type="email" name="email" placeholder="<?= htmlspecialchars(t('admin.login.email_placeholder')) ?>" required autofocus style="width:100%;margin-bottom:1rem;">
+                    <button type="submit" class="pg-btn" style="width:100%;justify-content:center;"><?= t('admin.login.forgot.submit_button') ?></button>
                 </form>
                 <div style="text-align:center;margin-top:14px">
-                    <a href="/admin" style="font-size:12.5px;color:var(--text-faint)">&larr; Zurück zum Login</a>
+                    <a href="/admin" style="font-size:12.5px;color:var(--text-faint)"><?= t('admin.login.forgot.back_to_login') ?></a>
                 </div>
             <?php endif; ?>
         </div>
@@ -637,13 +650,13 @@ function handle_reset_password(PDO $db): void {
         $pass = $_POST['password'] ?? '';
         $confirm = $_POST['password_confirm'] ?? '';
         if (strlen($pass) < 8) {
-            $error = "Das Passwort muss mindestens 8 Zeichen lang sein.";
+            $error = t('admin.login.password_too_short');
         } elseif ($pass !== $confirm) {
-            $error = "Die Passwörter stimmen nicht überein.";
+            $error = t('admin.login.passwords_mismatch');
         } else {
             $upd = $db->prepare("UPDATE users SET password_hash = ?, invite_token = '' WHERE id = ?");
             $upd->execute([password_hash($pass, PASSWORD_DEFAULT), $user['id']]);
-            log_audit(null, '', "Passwort zurückgesetzt: " . $user['name']);
+            log_audit(null, '', t('admin.login.reset.audit_note', ['name' => $user['name']]));
 
             $_SESSION['paragrafy_admin'] = true;
             $_SESSION['paragrafy_user_id'] = (int)$user['id'];
@@ -660,9 +673,9 @@ function handle_reset_password(PDO $db): void {
 function render_reset_password_view(?array $user, ?string $error): void {
     ?>
     <!DOCTYPE html>
-    <html lang="de">
+    <html lang="<?= htmlspecialchars(current_locale()) ?>">
     <head>
-        <meta charset="utf-8"><title>Neues Passwort - Paragrafy</title>
+        <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.login.reset.page_title')) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
@@ -680,24 +693,24 @@ function render_reset_password_view(?array $user, ?string $error): void {
         <div class="login-card">
             <div class="logo-header">
                 <img src="/paragrafy.svg" alt="Paragrafy">
-                <h2>Neues Passwort</h2>
+                <h2><?= htmlspecialchars(t('admin.login.reset.heading')) ?></h2>
             </div>
             <?php if (!$user): ?>
-                <p style="font-size:13px;color:var(--text-muted)">Dieser Link ist ungültig oder abgelaufen. Fordere über „Passwort vergessen" einen neuen Link an.</p>
+                <p style="font-size:13px;color:var(--text-muted)"><?= htmlspecialchars(t('admin.login.reset.invalid_link')) ?></p>
                 <div style="text-align:center;margin-top:14px">
-                    <a href="/admin/forgot-password" style="font-size:12.5px;color:var(--text-faint)">&larr; Neuen Link anfordern</a>
+                    <a href="/admin/forgot-password" style="font-size:12.5px;color:var(--text-faint)"><?= t('admin.login.reset.request_new_link') ?></a>
                 </div>
             <?php else: ?>
-                <p style="font-size:13px;color:var(--text-muted);margin:0 0 6px">Lege ein neues Passwort für <strong style="color:var(--text)"><?= htmlspecialchars($user['email']) ?></strong> fest.</p>
+                <p style="font-size:13px;color:var(--text-muted);margin:0 0 6px"><?= t('admin.login.reset.intro', ['email' => '<strong style="color:var(--text)">' . htmlspecialchars($user['email']) . '</strong>']) ?></p>
                 <?php if ($error): ?><div class="err"><?= htmlspecialchars($error) ?></div><?php endif; ?>
                 <form method="post">
                     <input type="hidden" name="action" value="set_new_password">
                     <input type="hidden" name="token" value="<?= htmlspecialchars($_GET['token'] ?? '') ?>">
-                    <label class="pg-label" style="margin-top:0;">Neues Passwort (mind. 8 Zeichen)</label>
+                    <label class="pg-label" style="margin-top:0;"><?= htmlspecialchars(t('admin.login.reset.password_label')) ?></label>
                     <input type="password" name="password" required style="width:100%;margin-bottom:10px;">
-                    <label class="pg-label" style="margin-top:0;">Passwort bestätigen</label>
+                    <label class="pg-label" style="margin-top:0;"><?= htmlspecialchars(t('admin.login.reset.password_confirm_label')) ?></label>
                     <input type="password" name="password_confirm" required style="width:100%;margin-bottom:1rem;">
-                    <button type="submit" class="pg-btn" style="width:100%;justify-content:center;">Passwort speichern &rarr;</button>
+                    <button type="submit" class="pg-btn" style="width:100%;justify-content:center;"><?= t('admin.login.reset.submit_button') ?></button>
                 </form>
             <?php endif; ?>
         </div>
@@ -777,9 +790,9 @@ render_matrix_view($db, $project, $projects);
 function render_login_view(?string $error): void {
     ?>
     <!DOCTYPE html>
-    <html lang="de">
+    <html lang="<?= htmlspecialchars(current_locale()) ?>">
     <head>
-        <meta charset="utf-8"><title>Paragrafy Admin Login</title>
+        <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.login.page_title')) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
@@ -798,22 +811,22 @@ function render_login_view(?string $error): void {
         <div class="login-card">
             <div class="logo-header">
                 <img src="/paragrafy.svg" alt="Paragrafy">
-                <h2>Paragrafy Admin</h2>
+                <h2><?= htmlspecialchars(t('admin.login.heading')) ?></h2>
             </div>
             <?php if ($error): ?><div class="err"><?= htmlspecialchars($error) ?></div><?php endif; ?>
             <form method="post">
                 <input type="hidden" name="action" value="login">
-                <label class="pg-label" style="margin-top:0;">E-Mail <span style="color:var(--text-faint);font-weight:400">(persönlicher Zugang, sonst leer lassen)</span></label>
-                <input type="email" name="email" placeholder="name@firma.de" style="width:100%;margin-bottom:10px;">
-                <label class="pg-label" style="margin-top:0;">Passwort</label>
-                <input type="password" name="password" placeholder="Passwort eingeben" autofocus required style="width:100%;margin-bottom:1rem;">
-                <button type="submit" class="pg-btn" style="width:100%;justify-content:center;">Anmelden &rarr;</button>
+                <label class="pg-label" style="margin-top:0;"><?= htmlspecialchars(t('admin.login.email_label')) ?> <span style="color:var(--text-faint);font-weight:400"><?= htmlspecialchars(t('admin.login.email_hint')) ?></span></label>
+                <input type="email" name="email" placeholder="<?= htmlspecialchars(t('admin.login.email_placeholder')) ?>" style="width:100%;margin-bottom:10px;">
+                <label class="pg-label" style="margin-top:0;"><?= htmlspecialchars(t('admin.login.password_label')) ?></label>
+                <input type="password" name="password" placeholder="<?= htmlspecialchars(t('admin.login.password_placeholder')) ?>" autofocus required style="width:100%;margin-bottom:1rem;">
+                <button type="submit" class="pg-btn" style="width:100%;justify-content:center;"><?= t('admin.login.submit_button') ?></button>
             </form>
             <div style="text-align:center;margin-top:14px">
-                <a href="/admin/forgot-password" style="font-size:12.5px;color:var(--text-faint)">Passwort vergessen?</a>
+                <a href="/admin/forgot-password" style="font-size:12.5px;color:var(--text-faint)"><?= htmlspecialchars(t('admin.login.forgot_password')) ?></a>
             </div>
         </div>
-        <div class="login-disclaimer">Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.</div>
+        <div class="login-disclaimer"><?= htmlspecialchars(t('admin.common.footer_disclaimer')) ?></div>
     </body>
     </html>
     <?php
@@ -844,7 +857,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
     foreach ($allPublished as $row) {
         $unfilled = check_unfilled_placeholders($row['content'], $project);
         if (!empty($unfilled)) {
-            $unfilledWarnings[] = $row['title'] . " (" . strtoupper($row['lang']) . "): " . implode(', ', $unfilled);
+            $unfilledWarnings[] = t('admin.matrix.unfilled_warning_line', ['title' => $row['title'], 'lang' => strtoupper($row['lang']), 'placeholders' => implode(', ', $unfilled)]);
         }
 
         if (!empty($row['updated_at'])) {
@@ -852,7 +865,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
             $diffMonths = (($now->format('Y') - $updated->format('Y')) * 12) + ($now->format('m') - $updated->format('m'));
             if ($diffMonths >= $auditIntervalMonths) {
                 $days = $now->diff($updated)->days;
-                $auditWarnings[] = $row['title'] . " (" . strtoupper($row['lang']) . ") seit " . $days . " Tagen ungeprüft";
+                $auditWarnings[] = t('admin.matrix.audit_warning_line', ['title' => $row['title'], 'lang' => strtoupper($row['lang']), 'days' => $days]);
             }
         }
     }
@@ -871,9 +884,9 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
     $isManagedCloud = !empty(get_config()['managed_cloud']);
     ?>
     <!DOCTYPE html>
-    <html lang="de">
+    <html lang="<?= htmlspecialchars(current_locale()) ?>">
     <head>
-        <meta charset="utf-8"><title>Paragrafy - <?= htmlspecialchars($project['name']) ?></title>
+        <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.matrix.page_title', ['project' => $project['name']])) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
@@ -889,7 +902,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
 
             <div class="pg-main">
                 <div class="pg-topbar">
-                    <div class="pg-crumb"><?= htmlspecialchars($project['name']) ?> <span style="margin:0 4px">/</span> <strong>Dashboard</strong></div>
+                    <div class="pg-crumb"><?= htmlspecialchars($project['name']) ?> <span style="margin:0 4px">/</span> <strong><?= htmlspecialchars(t('admin.matrix.crumb')) ?></strong></div>
                 </div>
 
                 <div class="pg-content">
@@ -897,64 +910,64 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                         <div>
                             <h1 style="font-size:26px;font-weight:800;margin:0 0 6px;"><?= htmlspecialchars($project['name']) ?></h1>
                             <div style="font-size:13px;color:var(--text-muted);display:flex;gap:14px;flex-wrap:wrap">
-                                <span>Domain: <strong style="color:var(--text);font-weight:600"><?= htmlspecialchars($project['domain']) ?></strong></span>
+                                <span><?= htmlspecialchars(t('admin.matrix.domain_label')) ?> <strong style="color:var(--text);font-weight:600"><?= htmlspecialchars($project['domain']) ?></strong></span>
                                 <span style="color:var(--border-strong)">&middot;</span>
-                                <span>Technische Schnittstelle: <span class="api-pill">/api/:lang/:slug</span></span>
+                                <span><?= htmlspecialchars(t('admin.matrix.api_label')) ?> <span class="api-pill">/api/:lang/:slug</span></span>
                             </div>
                         </div>
                         <?php $projectLimitReached = get_project_limit() !== null && count($projects) >= get_project_limit(); ?>
                         <?php if ($isManagedCloud): ?>
-                            <a href="https://app.paragrafy.cloud/dashboard" class="pg-viewer-link">Weitere Projekte über dein Kundenportal anlegen &rarr;</a>
+                            <a href="https://app.paragrafy.cloud/dashboard" class="pg-viewer-link"><?= t('admin.matrix.cloud_new_project_link') ?></a>
                         <?php elseif ($projectLimitReached): ?>
-                            <span class="pg-pill pg-pill-muted" title="Diese Instanz erlaubt maximal <?= (int)get_project_limit() ?> Projekt<?= get_project_limit() === 1 ? '' : 'e' ?>.">Projektlimit erreicht</span>
+                            <span class="pg-pill pg-pill-muted" title="<?= htmlspecialchars(t('admin.matrix.project_limit_reached_title', ['count' => (int)get_project_limit(), 'suffix' => get_project_limit() === 1 ? '' : 'e'])) ?>"><?= htmlspecialchars(t('admin.matrix.project_limit_reached_pill')) ?></span>
                         <?php else: ?>
-                            <button type="button" class="pg-btn" onclick="openNewProjectModal()">+ Neues Projekt</button>
+                            <button type="button" class="pg-btn" onclick="openNewProjectModal()"><?= htmlspecialchars(t('admin.matrix.new_project_button')) ?></button>
                         <?php endif; ?>
                     </div>
 
                     <?php if (($_GET['msg'] ?? '') === 'project_limit_reached'): ?>
                         <div class="pg-alert pg-alert-red">
-                            <div><strong>Projektlimit erreicht:</strong> Diese Instanz erlaubt maximal <?= (int)get_project_limit() ?> Projekt<?= get_project_limit() === 1 ? '' : 'e' ?>. Es kann kein weiteres Projekt angelegt werden.</div>
+                            <div><?= t('admin.matrix.project_limit_reached_alert', ['count' => (int)get_project_limit(), 'suffix' => get_project_limit() === 1 ? '' : 'e']) ?></div>
                         </div>
                     <?php endif; ?>
 
                     <?php if (($_GET['msg'] ?? '') === 'managed_cloud_blocked'): ?>
                         <div class="pg-alert pg-alert-red">
-                            <div>Neue Projekte bitte über dein Kundenportal anlegen.</div>
+                            <div><?= htmlspecialchars(t('admin.matrix.managed_cloud_blocked_alert')) ?></div>
                         </div>
                     <?php endif; ?>
 
                     <!-- Health KPI Cards -->
                     <div class="pg-kpi-grid">
                         <div class="pg-kpi">
-                            <div class="pg-kpi-label">Vollständigkeit<?= help_icon('Anteil der als Pflichtseite markierten Rechtstexte, die in der Primärsprache veröffentlicht sind. Optionale Seiten und andere Sprachen zählen nicht mit.') ?></div>
+                            <div class="pg-kpi-label"><?= htmlspecialchars(t('admin.matrix.kpi.completeness_label')) ?><?= help_icon(t('admin.matrix.kpi.completeness_help')) ?></div>
                             <div class="pg-kpi-val" style="color: <?= $complianceScore === 100 ? 'var(--green)' : 'var(--accent)' ?>;"><?= $complianceScore ?>%</div>
-                            <div class="pg-kpi-sub"><?= $publishedRequired ?> von <?= $totalRequired ?> Pflichtseiten live</div>
+                            <div class="pg-kpi-sub"><?= htmlspecialchars(t('admin.matrix.kpi.completeness_sub', ['published' => $publishedRequired, 'total' => $totalRequired])) ?></div>
                         </div>
                         <div class="pg-kpi">
-                            <div class="pg-kpi-label">Aktive Sprachen</div>
+                            <div class="pg-kpi-label"><?= htmlspecialchars(t('admin.matrix.kpi.languages_label')) ?></div>
                             <div class="pg-kpi-val"><?= count($activeLangs) ?></div>
                             <div class="pg-kpi-sub"><?= strtoupper(implode(', ', $activeLangs)) ?></div>
                         </div>
                         <div class="pg-kpi">
-                            <div class="pg-kpi-label">Übersetzungsabgleich<?= help_icon('Prüft automatisch, ob sich der Originaltext seit der letzten Übersetzung geändert hat, und markiert betroffene Sprachen als veraltet.') ?></div>
+                            <div class="pg-kpi-label"><?= htmlspecialchars(t('admin.matrix.kpi.sync_label')) ?><?= help_icon(t('admin.matrix.kpi.sync_help')) ?></div>
                             <div class="pg-kpi-val" style="color:var(--green);display:flex;align-items:center;gap:6px;font-size:20px;">
-                                <span style="width:8px;height:8px;border-radius:50%;background:#2fa06a;display:inline-block"></span>Aktiv
+                                <span style="width:8px;height:8px;border-radius:50%;background:#2fa06a;display:inline-block"></span><?= htmlspecialchars(t('admin.matrix.kpi.sync_active')) ?>
                             </div>
-                            <div class="pg-kpi-sub">Läuft automatisch im Hintergrund</div>
+                            <div class="pg-kpi-sub"><?= htmlspecialchars(t('admin.matrix.kpi.sync_sub')) ?></div>
                         </div>
                         <div class="pg-kpi">
-                            <div class="pg-kpi-label">Prüfstatus</div>
+                            <div class="pg-kpi-label"><?= htmlspecialchars(t('admin.matrix.kpi.audit_status_label')) ?></div>
                             <div class="pg-kpi-val" style="font-size:20px;color: <?= empty($auditWarnings) ? 'var(--green)' : '#b4650f' ?>;">
-                                <?= empty($auditWarnings) ? 'Aktuell' : count($auditWarnings) . ' Fällig' ?>
+                                <?= empty($auditWarnings) ? htmlspecialchars(t('admin.matrix.kpi.audit_status_current')) : htmlspecialchars(t('admin.matrix.kpi.audit_status_due', ['count' => count($auditWarnings)])) ?>
                             </div>
-                            <div class="pg-kpi-sub"><?= $auditIntervalMonths ?> Monate Prüfintervall</div>
+                            <div class="pg-kpi-sub"><?= htmlspecialchars(t('admin.matrix.kpi.audit_status_sub', ['months' => $auditIntervalMonths])) ?></div>
                         </div>
                     </div>
 
                     <?php if (!empty($auditWarnings)): ?>
                         <div class="pg-alert pg-alert-red">
-                            <div><strong>Prüfung fällig (älter als <?= $auditIntervalMonths ?> Monate):</strong>
+                            <div><?= t('admin.matrix.audit_due_alert', ['months' => $auditIntervalMonths]) ?>
                                 <ul>
                                     <?php foreach (array_slice($auditWarnings, 0, 3) as $aw): ?>
                                         <li><?= htmlspecialchars($aw) ?></li>
@@ -966,7 +979,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
 
                     <?php if (!empty($unfilledWarnings)): ?>
                         <div class="pg-alert pg-alert-amber">
-                            <div><strong>Fehlende Stammdaten in Texten:</strong> Folgende Platzhalter werden in veröffentlichten Rechtstexten verwendet, sind aber in den Einstellungen noch leer:
+                            <div><?= t('admin.matrix.unfilled_alert') ?>
                                 <ul>
                                     <?php foreach (array_slice($unfilledWarnings, 0, 3) as $w): ?>
                                         <li><?= htmlspecialchars($w) ?></li>
@@ -979,18 +992,18 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                     <!-- Matrix -->
                     <div class="pg-card">
                         <div style="padding:20px 22px 14px">
-                            <h2>Rechtstexte im Überblick</h2>
-                            <p class="pg-card-sub">Klicke auf einen Status, um die Seite in dieser Sprache zu bearbeiten. Über die Symbole rechts bearbeitest oder entfernst du den gesamten Rechtstext.</p>
+                            <h2><?= htmlspecialchars(t('admin.matrix.table.heading')) ?></h2>
+                            <p class="pg-card-sub"><?= htmlspecialchars(t('admin.matrix.table.subtitle')) ?></p>
                         </div>
                         <table class="pg-table">
                             <thead>
                                 <tr>
-                                    <th>Dokumententyp</th>
-                                    <th>Pflicht</th>
+                                    <th><?= htmlspecialchars(t('admin.matrix.table.col_doctype')) ?></th>
+                                    <th><?= htmlspecialchars(t('admin.matrix.table.col_required')) ?></th>
                                     <?php foreach ($activeLangs as $lang): ?>
                                         <th><?= strtoupper(htmlspecialchars($lang)) ?></th>
                                     <?php endforeach; ?>
-                                    <th style="text-align:right">Aktionen</th>
+                                    <th style="text-align:right"><?= htmlspecialchars(t('admin.matrix.table.col_actions')) ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1018,16 +1031,16 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                                         <td>
                                             <div style="font-weight:600;font-size:13.5px"><?= htmlspecialchars($type['title']) ?></div>
                                             <div style="display:flex;align-items:center;gap:6px;margin-top:2px;white-space:nowrap">
-                                                <a href="/<?= htmlspecialchars($type['slug']) ?>" target="_blank" style="font-size:11.5px;color:var(--text-faint);font-family:ui-monospace,monospace;" title="Direktlink in Hauptsprache">/<?= htmlspecialchars($type['slug']) ?></a>
-                                                <button type="button" class="pg-copy-btn" title="Link kopieren" onclick="copyToClipboard('<?= htmlspecialchars($primaryUrl) ?>', 'Direktlink kopiert!')"><?= svg_icon('link', '', 13) ?></button>
+                                                <a href="/<?= htmlspecialchars($type['slug']) ?>" target="_blank" style="font-size:11.5px;color:var(--text-faint);font-family:ui-monospace,monospace;" title="<?= htmlspecialchars(t('admin.matrix.table.primary_link_title')) ?>">/<?= htmlspecialchars($type['slug']) ?></a>
+                                                <button type="button" class="pg-copy-btn" title="<?= htmlspecialchars(t('admin.matrix.table.copy_link_title')) ?>" onclick="copyToClipboard('<?= htmlspecialchars($primaryUrl) ?>', '<?= htmlspecialchars(t('admin.matrix.table.copy_link_success'), ENT_QUOTES) ?>')"><?= svg_icon('link', '', 13) ?></button>
                                             </div>
                                         </td>
                                         <td>
-                                            <button type="button" style="background:none;border:none;cursor:pointer;padding:0;" id="toggle_btn_<?= $type['id'] ?>" onclick="ajaxToggleRequired(<?= $type['id'] ?>)" title="Klicken zum Umschalten">
+                                            <button type="button" style="background:none;border:none;cursor:pointer;padding:0;" id="toggle_btn_<?= $type['id'] ?>" onclick="ajaxToggleRequired(<?= $type['id'] ?>)" title="<?= htmlspecialchars(t('admin.matrix.table.toggle_title')) ?>">
                                                 <?php if ($type['is_required']): ?>
-                                                    <span class="pg-req-label" id="span_req_<?= $type['id'] ?>">Pflichtseite</span>
+                                                    <span class="pg-req-label" id="span_req_<?= $type['id'] ?>"><?= htmlspecialchars(t('admin.matrix.table.required_label')) ?></span>
                                                 <?php else: ?>
-                                                    <span class="pg-opt-label" id="span_req_<?= $type['id'] ?>">Optional</span>
+                                                    <span class="pg-opt-label" id="span_req_<?= $type['id'] ?>"><?= htmlspecialchars(t('admin.matrix.table.optional_label')) ?></span>
                                                 <?php endif; ?>
                                             </button>
                                         </td>
@@ -1047,27 +1060,27 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                                             <td>
                                                 <?php if ($trans && $trans['status'] === 'published'): ?>
                                                     <?php if ($isOutdated): ?>
-                                                        <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="pg-pill pg-pill-amber" title="Das Original wurde geändert!"><span class="pg-pill-dot"></span>Veraltet</a>
+                                                        <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="pg-pill pg-pill-amber" title="<?= htmlspecialchars(t('admin.matrix.table.outdated_title')) ?>"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.matrix.table.outdated_label')) ?></a>
                                                     <?php else: ?>
-                                                        <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="pg-pill pg-pill-green" title="<?= htmlspecialchars($trans['title']) ?> - Bearbeiten"><span class="pg-pill-dot"></span>Live</a>
+                                                        <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="pg-pill pg-pill-green" title="<?= htmlspecialchars(t('admin.matrix.table.edit_title', ['title' => $trans['title']])) ?>"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.matrix.table.live_label')) ?></a>
                                                     <?php endif; ?>
                                                 <?php elseif ($trans && $trans['status'] === 'draft'): ?>
-                                                    <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="pg-pill pg-pill-amber"><span class="pg-pill-dot"></span>Entwurf</a>
+                                                    <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="pg-pill pg-pill-amber"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.matrix.table.draft_label')) ?></a>
                                                 <?php else: ?>
-                                                    <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="pg-pill pg-pill-red">+ Erstellen</a>
+                                                    <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $lang ?>" class="pg-pill pg-pill-red"><?= htmlspecialchars(t('admin.matrix.table.create_label')) ?></a>
                                                 <?php endif; ?>
                                             </td>
                                         <?php endforeach; ?>
                                         <td style="text-align:right">
                                             <div style="display:flex;justify-content:flex-end;gap:4px">
-                                                <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= htmlspecialchars($primaryLang) ?>" class="pg-icon-btn" title="Bearbeiten">
+                                                <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= htmlspecialchars($primaryLang) ?>" class="pg-icon-btn" title="<?= htmlspecialchars(t('admin.matrix.table.edit_icon_title')) ?>">
                                                     <?= svg_icon('edit', '', 14) ?>
                                                 </a>
                                                 <?php if (!in_array($type['slug'], ['impressum', 'privacy'])): ?>
-                                                    <form method="post" onsubmit="return confirm('Diesen Rechtstext wirklich löschen?');" style="margin:0;">
+                                                    <form method="post" onsubmit="return confirm('<?= htmlspecialchars(t('admin.matrix.table.confirm_delete_doctype'), ENT_QUOTES) ?>');" style="margin:0;">
                                                         <input type="hidden" name="action" value="delete_doc_type">
                                                         <input type="hidden" name="doc_type_id" value="<?= $type['id'] ?>">
-                                                        <button type="submit" class="pg-icon-btn danger" title="Löschen">
+                                                        <button type="submit" class="pg-icon-btn danger" title="<?= htmlspecialchars(t('admin.matrix.table.delete_title')) ?>">
                                                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 4.5h9"/><path d="M6.2 4.5V3.2c0-.4.3-.7.7-.7h2.2c.4 0 .7.3.7.7v1.3"/><path d="M4.8 4.5 5.2 13c0 .4.3.7.7.7h4c.4 0 .7-.3.7-.7l.4-8.5"/><path d="M6.7 7.3v3.6"/><path d="M9.3 7.3v3.6"/></svg>
                                                         </button>
                                                     </form>
@@ -1082,70 +1095,79 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
 
                     <!-- Neuer Rechtstext hinzufügen -->
                     <div class="pg-card pg-card-pad" style="margin-bottom:0">
-                        <h2>Neuen Rechtstext hinzufügen</h2>
-                        <p class="pg-card-sub" style="margin-bottom:14px">Füge beliebig viele spezifische Rechtstexte hinzu (z. B. AGB B2B, Sponsoring, Lizenzvereinbarung).</p>
+                        <h2><?= htmlspecialchars(t('admin.matrix.add.heading')) ?></h2>
+                        <p class="pg-card-sub" style="margin-bottom:14px"><?= htmlspecialchars(t('admin.matrix.add.subtitle')) ?></p>
                         <form method="post">
                             <input type="hidden" name="action" value="create_doc_type">
                             <div class="grid-add">
-                                <input type="text" name="doc_title" placeholder="Titel (z. B. AGB für Geschäftskunden / B2B)" required>
-                                <input type="text" name="doc_slug" placeholder="Seitenadresse (z. B. agb-b2b)" required>
+                                <input type="text" name="doc_title" placeholder="<?= htmlspecialchars(t('admin.matrix.add.title_placeholder')) ?>" required>
+                                <input type="text" name="doc_slug" placeholder="<?= htmlspecialchars(t('admin.matrix.add.slug_placeholder')) ?>" required>
                                 <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-muted);white-space:nowrap;cursor:pointer;">
-                                    <input type="checkbox" name="is_required" value="1"> Pflichtseite
+                                    <input type="checkbox" name="is_required" value="1"> <?= htmlspecialchars(t('admin.matrix.add.required_label')) ?>
                                 </label>
-                                <button type="submit" class="pg-btn">+ Hinzufügen</button>
+                                <button type="submit" class="pg-btn"><?= htmlspecialchars(t('admin.matrix.add.submit_button')) ?></button>
                             </div>
                         </form>
                     </div>
                 </div>
 
-                <div class="pg-footer-note">Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.</div>
+                <div class="pg-footer-note"><?= htmlspecialchars(t('admin.common.footer_disclaimer')) ?></div>
             </div>
         </div>
 
         <!-- Modal: Neues Projekt anlegen -->
         <div id="newProjectModal" class="pg-modal-backdrop" onclick="if(event.target === this) closeNewProjectModal()">
             <div class="pg-modal">
-                <h2 style="font-size:19px;font-weight:800;margin:0 0 6px">Neues Projekt anlegen</h2>
-                <p style="font-size:13px;color:var(--text-muted);margin:0 0 20px">Füge eine weitere Web-App, Landingpage oder SaaS zu deiner Paragrafy-Instanz hinzu.</p>
+                <h2 style="font-size:19px;font-weight:800;margin:0 0 6px"><?= htmlspecialchars(t('admin.matrix.new_project_modal.heading')) ?></h2>
+                <p style="font-size:13px;color:var(--text-muted);margin:0 0 20px"><?= htmlspecialchars(t('admin.matrix.new_project_modal.desc')) ?></p>
 
                 <form method="post">
                     <input type="hidden" name="action" value="create_project">
 
-                    <label class="pg-label" style="margin-top:0">Projektname</label>
-                    <input type="text" name="new_project_name" placeholder="z. B. Beispiel App" required style="width:100%">
+                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.matrix.new_project_modal.name_label')) ?></label>
+                    <input type="text" name="new_project_name" placeholder="<?= htmlspecialchars(t('admin.matrix.new_project_modal.name_placeholder')) ?>" required style="width:100%">
 
-                    <label class="pg-label">Subdomain / Domain</label>
-                    <input type="text" name="new_project_domain" placeholder="z. B. legal.beispielapp.de" required style="width:100%">
+                    <label class="pg-label"><?= htmlspecialchars(t('admin.matrix.new_project_modal.domain_label')) ?></label>
+                    <input type="text" name="new_project_domain" placeholder="<?= htmlspecialchars(t('admin.matrix.new_project_modal.domain_placeholder')) ?>" required style="width:100%">
 
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
                         <div>
-                            <label class="pg-label">Primärsprache</label>
+                            <label class="pg-label"><?= htmlspecialchars(t('admin.matrix.new_project_modal.primary_lang_label')) ?></label>
                             <select name="new_primary_lang" style="width:100%">
-                                <option value="de" selected>Deutsch (DE)</option>
-                                <option value="en">Englisch (EN)</option>
-                                <option value="es">Spanisch (ES)</option>
-                                <option value="fr">Französisch (FR)</option>
+                                <option value="de" selected><?= htmlspecialchars(t('install.section2.lang_de')) ?></option>
+                                <option value="en"><?= htmlspecialchars(t('install.section2.lang_en')) ?></option>
+                                <option value="es"><?= htmlspecialchars(t('install.section2.lang_es')) ?></option>
+                                <option value="fr"><?= htmlspecialchars(t('install.section2.lang_fr')) ?></option>
                             </select>
                         </div>
                         <div>
-                            <label class="pg-label">Akzentfarbe</label>
+                            <label class="pg-label"><?= htmlspecialchars(t('admin.matrix.new_project_modal.color_label')) ?></label>
                             <input type="text" name="new_brand_color" value="#6366F1" style="width:100%;font-family:ui-monospace,monospace">
                         </div>
                     </div>
 
                     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:26px">
-                        <button type="button" class="pg-btn-secondary" onclick="closeNewProjectModal()">Abbrechen</button>
-                        <button type="submit" class="pg-btn">Projekt erstellen &rarr;</button>
+                        <button type="button" class="pg-btn-secondary" onclick="closeNewProjectModal()"><?= htmlspecialchars(t('admin.matrix.new_project_modal.cancel_button')) ?></button>
+                        <button type="submit" class="pg-btn"><?= t('admin.matrix.new_project_modal.submit_button') ?></button>
                     </div>
                 </form>
             </div>
         </div>
 
         <div id="toastNotification" class="pg-toast">
-            <?= svg_icon('check', '', 16) ?> <span id="toastMsg">Status aktualisiert</span>
+            <?= svg_icon('check', '', 16) ?> <span id="toastMsg"><?= htmlspecialchars(t('admin.matrix.toast.status_updated')) ?></span>
         </div>
 
         <script>
+            const i18n = {
+                copyFailed: <?= json_encode(t('admin.matrix.js.copy_failed')) ?>,
+                markedRequired: <?= json_encode(t('admin.matrix.js.marked_required')) ?>,
+                markedOptional: <?= json_encode(t('admin.matrix.js.marked_optional')) ?>,
+                requiredLabel: <?= json_encode(t('admin.matrix.table.required_label')) ?>,
+                optionalLabel: <?= json_encode(t('admin.matrix.table.optional_label')) ?>,
+                copySuccess: <?= json_encode(t('admin.matrix.js.copy_success')) ?>
+            };
+
             function openNewProjectModal() {
                 document.getElementById('newProjectModal').style.display = 'flex';
             }
@@ -1161,7 +1183,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                 setTimeout(() => { toast.classList.remove('show'); }, 2500);
             }
 
-            function copyToClipboard(text, successMsg = 'In Zwischenablage kopiert!') {
+            function copyToClipboard(text, successMsg = i18n.copySuccess) {
                 if (navigator.clipboard && window.isSecureContext) {
                     navigator.clipboard.writeText(text).then(() => {
                         showToast(successMsg);
@@ -1185,7 +1207,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                     document.execCommand('copy');
                     showToast(successMsg);
                 } catch (err) {
-                    alert('Kopieren fehlgeschlagen.');
+                    alert(i18n.copyFailed);
                 }
                 document.body.removeChild(textArea);
             }
@@ -1206,12 +1228,12 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                         const span = document.getElementById('span_req_' + id);
                         if (data.is_required === 1) {
                             span.className = 'pg-req-label';
-                            span.innerHTML = 'Pflichtseite';
-                            showToast('Als Pflichtseite markiert');
+                            span.innerHTML = i18n.requiredLabel;
+                            showToast(i18n.markedRequired);
                         } else {
                             span.className = 'pg-opt-label';
-                            span.innerHTML = 'Optional';
-                            showToast('Als optional markiert');
+                            span.innerHTML = i18n.optionalLabel;
+                            showToast(i18n.markedOptional);
                         }
                     }
                 } catch(e) {
@@ -1243,9 +1265,9 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
     $isManagedCloud = !empty(get_config()['managed_cloud']);
     ?>
     <!DOCTYPE html>
-    <html lang="de">
+    <html lang="<?= htmlspecialchars(current_locale()) ?>">
     <head>
-        <meta charset="utf-8"><title>Einstellungen - <?= htmlspecialchars($project['name']) ?></title>
+        <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.settings.page_title', ['project' => $project['name']])) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
@@ -1278,76 +1300,96 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
             <div class="pg-main">
                 <div class="pg-topbar">
-                    <div class="pg-crumb"><?= htmlspecialchars($project['name']) ?> <span style="margin:0 4px">/</span> <strong>Einstellungen</strong></div>
+                    <div class="pg-crumb"><?= htmlspecialchars($project['name']) ?> <span style="margin:0 4px">/</span> <strong><?= htmlspecialchars(t('admin.settings.crumb')) ?></strong></div>
                 </div>
 
                 <div class="pg-content" style="max-width:840px">
                     <div class="pg-card pg-card-pad">
-                        <h2>Darstellung</h2>
-                        <p class="pg-card-sub" style="margin-bottom:16px">Nur für dich in diesem Browser gespeichert — wirkt sich nicht auf andere Personen aus.</p>
+                        <h2><?= htmlspecialchars(t('admin.settings.appearance.heading')) ?></h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px"><?= htmlspecialchars(t('admin.settings.appearance.subtitle')) ?></p>
                         <div class="pg-theme-toggle" id="themeToggle">
-                            <button type="button" data-theme-choice="light">Hell</button>
-                            <button type="button" data-theme-choice="dark">Dunkel</button>
-                            <button type="button" data-theme-choice="auto">Auto</button>
+                            <button type="button" data-theme-choice="light"><?= htmlspecialchars(t('admin.settings.appearance.light')) ?></button>
+                            <button type="button" data-theme-choice="dark"><?= htmlspecialchars(t('admin.settings.appearance.dark')) ?></button>
+                            <button type="button" data-theme-choice="auto"><?= htmlspecialchars(t('admin.settings.appearance.auto')) ?></button>
                         </div>
                     </div>
 
+                    <?php if (!empty($_SESSION['paragrafy_user_id'])): ?>
+                    <div class="pg-card pg-card-pad">
+                        <h2><?= htmlspecialchars(t('admin.settings.locale.heading')) ?></h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px"><?= htmlspecialchars(t('admin.settings.locale.subtitle')) ?></p>
+                        <?php if (($_GET['msg'] ?? '') === 'locale_saved'): ?>
+                            <p style="font-size:12px;color:var(--green);margin:0 0 12px"><?= htmlspecialchars(t('admin.settings.locale.saved_msg')) ?></p>
+                        <?php endif; ?>
+                        <form method="post" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                            <input type="hidden" name="action" value="save_locale">
+                            <label class="pg-label" style="margin:0"><?= htmlspecialchars(t('admin.settings.locale.label')) ?></label>
+                            <select name="locale">
+                                <?php foreach (ui_locales() as $code => $meta): ?>
+                                    <option value="<?= htmlspecialchars($code) ?>" <?= current_locale() === $code ? 'selected' : '' ?>><?= htmlspecialchars(($meta['flag'] ?? '') . ' ' . ($meta['label'] ?? strtoupper($code))) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <button type="submit" class="pg-btn-secondary"><?= htmlspecialchars(t('admin.settings.locale.save_button')) ?></button>
+                        </form>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="pg-card pg-card-pad">
                         <?php if ($isManagedCloud): ?>
-                            <h2>Automatisierung</h2>
-                            <p class="pg-card-sub">Geplante Veröffentlichungen, Backups und Prüfberichte laufen bei Managed Cloud automatisch im Hintergrund — keine Einrichtung nötig.</p>
+                            <h2><?= htmlspecialchars(t('admin.settings.automation.cloud_heading')) ?></h2>
+                            <p class="pg-card-sub"><?= htmlspecialchars(t('admin.settings.automation.cloud_subtitle')) ?></p>
                         <?php else: ?>
-                            <h2>Automatisierung (Cron)</h2>
-                            <p class="pg-card-sub" style="margin-bottom:16px">Diese Adressen extern per Cron-Job (oder Uptime-Monitor) aufrufen, damit geplante Veröffentlichungen live gehen, Webhooks zugestellt und Backups angelegt werden. Alle vier sind mit einem geheimen Schlüssel geschützt — ohne korrektes <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">?secret=</code> antworten sie mit 403.</p>
+                            <h2><?= htmlspecialchars(t('admin.settings.automation.cron_heading')) ?></h2>
+                            <p class="pg-card-sub" style="margin-bottom:16px"><?= t('admin.settings.automation.cron_subtitle') ?></p>
 
                             <?php if (($_GET['msg'] ?? '') === 'cron_secret_regenerated'): ?>
-                                <p style="font-size:12px;color:var(--green);margin:0 0 12px">Neues Secret erzeugt — bitte die Cron-Jobs mit den Adressen unten aktualisieren.</p>
+                                <p style="font-size:12px;color:var(--green);margin:0 0 12px"><?= htmlspecialchars(t('admin.settings.automation.secret_regenerated')) ?></p>
                             <?php endif; ?>
 
                             <?php
                             $cronRows = [
-                                ['Geplante Veröffentlichungen', '/api/cron/publish', 'jede Minute', '* * * * *'],
-                                ['Webhook-Warteschlange', '/api/cron/webhooks', 'alle 5 Minuten', '*/5 * * * *'],
-                                ['Rollierendes Backup', '/api/cron/backup', 'täglich um 3 Uhr', '0 3 * * *'],
-                                ['Prüfbericht per E-Mail', '/api/cron/audit', 'täglich um 8 Uhr', '0 8 * * *'],
+                                [t('admin.settings.automation.row_publish'), '/api/cron/publish', t('admin.settings.automation.freq_every_minute'), '* * * * *'],
+                                [t('admin.settings.automation.row_webhooks'), '/api/cron/webhooks', t('admin.settings.automation.freq_every_5_min'), '*/5 * * * *'],
+                                [t('admin.settings.automation.row_backup'), '/api/cron/backup', t('admin.settings.automation.freq_daily_3am'), '0 3 * * *'],
+                                [t('admin.settings.automation.row_audit'), '/api/cron/audit', t('admin.settings.automation.freq_daily_8am'), '0 8 * * *'],
                             ];
                             ?>
-                            <p class="pg-card-sub" style="margin-bottom:12px">Jede Zeile ist eine fertige Crontab-Zeile mit empfohlenem Zeitplan — einfach kopieren und per <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">crontab -e</code> einfügen.</p>
+                            <p class="pg-card-sub" style="margin-bottom:12px"><?= t('admin.settings.automation.crontab_hint') ?></p>
                             <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
                                 <?php foreach ($cronRows as [$cronLabel, $cronPath, $cronFreq, $cronSchedule]): ?>
                                     <?php $cronLine = $cronSchedule . ' curl -fsS "' . $cronBase . $cronPath . '?secret=' . $cronSecret . '" > /dev/null'; ?>
                                     <div>
-                                        <label class="pg-label" style="margin-top:0"><?= htmlspecialchars($cronLabel) ?> <span style="color:var(--text-faint);font-weight:400">(empfohlen: <?= htmlspecialchars($cronFreq) ?>)</span></label>
+                                        <label class="pg-label" style="margin-top:0"><?= htmlspecialchars($cronLabel) ?> <span style="color:var(--text-faint);font-weight:400"><?= htmlspecialchars(t('admin.settings.automation.recommended_suffix', ['freq' => $cronFreq])) ?></span></label>
                                         <div style="display:flex;gap:6px">
                                             <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars($cronLine) ?>" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted)">
-                                            <button type="button" class="pg-icon-btn" title="Kopieren" onclick="copyToClipboard('<?= htmlspecialchars($cronLine, ENT_QUOTES) ?>')"><?= svg_icon('copy', '', 14) ?></button>
+                                            <button type="button" class="pg-icon-btn" title="<?= htmlspecialchars(t('admin.settings.automation.copy_title')) ?>" onclick="copyToClipboard('<?= htmlspecialchars($cronLine, ENT_QUOTES) ?>')"><?= svg_icon('copy', '', 14) ?></button>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
 
-                            <form method="post" onsubmit="return confirm('Neues Secret erzeugen? Die alten URLs funktionieren danach nicht mehr — bestehende Cron-Jobs müssen aktualisiert werden.');">
+                            <form method="post" onsubmit="return confirm('<?= htmlspecialchars(t('admin.settings.automation.confirm_regenerate'), ENT_QUOTES) ?>');">
                                 <input type="hidden" name="action" value="regenerate_cron_secret">
-                                <button type="submit" class="pg-btn-secondary">Secret neu generieren</button>
+                                <button type="submit" class="pg-btn-secondary"><?= htmlspecialchars(t('admin.settings.automation.regenerate_button')) ?></button>
                             </form>
                         <?php endif; ?>
                     </div>
 
                     <div class="pg-card pg-card-pad">
-                        <h2 style="margin-bottom:18px">Projekt &amp; API-Konfiguration</h2>
+                        <h2 style="margin-bottom:18px"><?= t('admin.settings.project.heading') ?></h2>
                         <form method="post">
                             <input type="hidden" name="action" value="save_project">
 
                             <div class="grid">
                                 <div>
-                                    <label class="pg-label" style="margin-top:0">Projekt-Name</label>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.project.name_label')) ?></label>
                                     <input type="text" name="name" value="<?= htmlspecialchars($project['name']) ?>" required style="width:100%">
                                 </div>
                                 <div>
-                                    <label class="pg-label" style="margin-top:0">Domain / Subdomain</label>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.project.domain_label')) ?></label>
                                     <?php if ($isManagedCloud): ?>
                                         <input type="text" value="<?= htmlspecialchars($project['domain']) ?>" disabled style="width:100%;opacity:.6;cursor:not-allowed">
-                                        <p class="pg-card-sub" style="margin-top:6px">Wird über dein Managed-Cloud-Kundenportal verwaltet, hier nicht änderbar.</p>
+                                        <p class="pg-card-sub" style="margin-top:6px"><?= htmlspecialchars(t('admin.settings.project.domain_managed_hint')) ?></p>
                                     <?php else: ?>
                                         <input type="text" name="domain" value="<?= htmlspecialchars($project['domain']) ?>" required style="width:100%">
                                     <?php endif; ?>
@@ -1356,33 +1398,33 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
                             <div class="grid">
                                 <div>
-                                    <label class="pg-label">Primärsprache</label>
+                                    <label class="pg-label"><?= htmlspecialchars(t('admin.settings.project.primary_lang_label')) ?></label>
                                     <input type="text" name="primary_lang" value="<?= htmlspecialchars($project['primary_lang']) ?>" required style="width:100%">
                                 </div>
                                 <div>
-                                    <label class="pg-label">Aktive Sprachen (kommagetrennt, z. B. de,en,es)</label>
+                                    <label class="pg-label"><?= htmlspecialchars(t('admin.settings.project.active_langs_label')) ?></label>
                                     <input type="text" name="active_languages" value="<?= htmlspecialchars($project['active_languages']) ?>" required style="width:100%">
                                 </div>
                             </div>
 
                             <div class="grid">
                                 <div>
-                                    <label class="pg-label">Akzentfarbe</label>
+                                    <label class="pg-label"><?= htmlspecialchars(t('admin.settings.project.brand_color_label')) ?></label>
                                     <div style="display:flex;gap:8px;align-items:center">
                                         <input type="color" id="adm_cp" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>" style="width:34px;height:34px;padding:0;border:1px solid var(--border-strong);border-radius:8px;cursor:pointer;flex-shrink:0" oninput="document.getElementById('adm_ct').value = this.value.toUpperCase();">
                                         <input type="text" id="adm_ct" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>" maxlength="7" style="flex:1;font-family:ui-monospace,monospace;text-transform:uppercase" oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('adm_cp').value = this.value;">
                                     </div>
                                 </div>
                                 <div>
-                                    <label class="pg-label">Logo-URL <span style="color:var(--text-faint);font-weight:400">(optional)</span></label>
+                                    <label class="pg-label"><?= htmlspecialchars(t('admin.settings.project.logo_url_label')) ?> <span style="color:var(--text-faint);font-weight:400"><?= htmlspecialchars(t('admin.settings.project.optional_hint')) ?></span></label>
                                     <input type="text" name="logo_url" value="<?= htmlspecialchars($project['logo_url'] ?? '') ?>" placeholder="/paragrafy.svg" style="width:100%">
                                 </div>
                             </div>
 
                             <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border-soft)">
-                                <label class="pg-label" style="margin-top:0">Prüfintervall (Monate)</label>
+                                <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.project.audit_interval_label')) ?></label>
                                 <input type="number" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>" min="1" max="36" required style="width:100px">
-                                <div class="pg-hint">Warnt im Dashboard nach X Monaten vor ungeprüften Texten.</div>
+                                <div class="pg-hint"><?= htmlspecialchars(t('admin.settings.project.audit_interval_hint')) ?></div>
                             </div>
 
                             <input type="hidden" name="cookie_banner_enabled" value="<?= !empty($project['cookie_banner_enabled']) ? '1' : '0' ?>">
@@ -1405,14 +1447,14 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="register_info" value="<?= htmlspecialchars($project['register_info'] ?? '') ?>">
 
                             <div style="margin-top:18px">
-                                <button type="submit" class="pg-btn"><?= svg_icon('disk', '', 16) ?> Speichern</button>
+                                <button type="submit" class="pg-btn"><?= svg_icon('disk', '', 16) ?> <?= htmlspecialchars(t('admin.settings.project.save_button')) ?></button>
                             </div>
                         </form>
                     </div>
 
                     <div class="pg-card pg-card-pad">
-                        <h2>Cookie-Banner (DSGVO)</h2>
-                        <p class="pg-card-sub" style="margin-bottom:16px">Blendet über <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">/consent.js</code> einen Consent-Banner auf deiner Website ein. Aktivieren allein reicht nicht — binde das Skript zusätzlich in deine Website ein (siehe README).</p>
+                        <h2><?= htmlspecialchars(t('admin.settings.cookie.heading')) ?></h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px"><?= t('admin.settings.cookie.subtitle') ?></p>
                         <form method="post">
                             <input type="hidden" name="action" value="save_project">
                             <input type="hidden" name="name" value="<?= htmlspecialchars($project['name']) ?>">
@@ -1441,21 +1483,21 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
                             <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;cursor:pointer">
                                 <input type="checkbox" name="cookie_banner_enabled" value="1" <?= !empty($project['cookie_banner_enabled']) ? 'checked' : '' ?>>
-                                DSGVO-Cookie-Banner aktivieren
+                                <?= htmlspecialchars(t('admin.settings.cookie.enable_label')) ?>
                             </label>
 
-                            <label class="pg-label">Banner-Text <span style="color:var(--text-faint);font-weight:400">(optional, sonst Standardtext)</span><?= help_icon('Dieser Text erscheint im Banner, das /consent.js auf deiner Website einblendet. Bindest du das Skript nicht ein, hat dieser Text keine Wirkung.') ?></label>
-                            <textarea name="cookie_banner_text" rows="2" style="width:100%" placeholder="Diese Website verwendet Cookies, um grundlegende Funktionen bereitzustellen und die Nutzung zu verbessern."><?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?></textarea>
+                            <label class="pg-label"><?= htmlspecialchars(t('admin.settings.cookie.banner_text_label')) ?> <span style="color:var(--text-faint);font-weight:400"><?= htmlspecialchars(t('admin.settings.cookie.banner_text_hint')) ?></span><?= help_icon(t('admin.settings.cookie.banner_text_help')) ?></label>
+                            <textarea name="cookie_banner_text" rows="2" style="width:100%" placeholder="<?= htmlspecialchars(t('public.consent.default_text')) ?>"><?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?></textarea>
 
                             <div style="margin-top:16px">
-                                <button type="submit" class="pg-btn"><?= svg_icon('disk', '', 16) ?> Speichern</button>
+                                <button type="submit" class="pg-btn"><?= svg_icon('disk', '', 16) ?> <?= htmlspecialchars(t('admin.settings.project.save_button')) ?></button>
                             </div>
                         </form>
                     </div>
 
                     <div class="pg-card pg-card-pad">
-                        <h2>E-Mail-Versand &amp; Prüf-Erinnerungen</h2>
-                        <p class="pg-card-sub" style="margin-bottom:16px">Damit verschickt Paragrafy Prüf-Erinnerungen und Testmails. Zugangsdaten bekommst du von deinem E-Mail-Anbieter (SMTP).</p>
+                        <h2><?= htmlspecialchars(t('admin.settings.email.heading')) ?></h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px"><?= htmlspecialchars(t('admin.settings.email.subtitle')) ?></p>
                         <form method="post">
                             <input type="hidden" name="action" value="save_project">
                             <input type="hidden" name="name" value="<?= htmlspecialchars($project['name']) ?>">
@@ -1479,17 +1521,17 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
                             <div class="grid">
                                 <div>
-                                    <label class="pg-label" style="margin-top:0">SMTP-Server</label>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.email.smtp_host_label')) ?></label>
                                     <input type="text" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>" placeholder="z. B. mail.deinefirma.de" style="width:100%">
                                 </div>
                                 <div>
-                                    <label class="pg-label" style="margin-top:0">Port &amp; Verschlüsselung</label>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.email.port_encryption_label')) ?></label>
                                     <div style="display:flex;gap:8px">
                                         <input type="number" name="smtp_port" value="<?= htmlspecialchars((string)($project['smtp_port'] ?? 587)) ?>" style="width:90px">
                                         <select name="smtp_secure" style="flex:1">
-                                            <option value="tls" <?= ($project['smtp_secure'] ?? 'tls') === 'tls' ? 'selected' : '' ?>>TLS (587)</option>
-                                            <option value="ssl" <?= ($project['smtp_secure'] ?? '') === 'ssl' ? 'selected' : '' ?>>SSL (465)</option>
-                                            <option value="none" <?= ($project['smtp_secure'] ?? '') === 'none' ? 'selected' : '' ?>>Keine (25)</option>
+                                            <option value="tls" <?= ($project['smtp_secure'] ?? 'tls') === 'tls' ? 'selected' : '' ?>><?= htmlspecialchars(t('admin.settings.email.tls_option')) ?></option>
+                                            <option value="ssl" <?= ($project['smtp_secure'] ?? '') === 'ssl' ? 'selected' : '' ?>><?= htmlspecialchars(t('admin.settings.email.ssl_option')) ?></option>
+                                            <option value="none" <?= ($project['smtp_secure'] ?? '') === 'none' ? 'selected' : '' ?>><?= htmlspecialchars(t('admin.settings.email.none_option')) ?></option>
                                         </select>
                                     </div>
                                 </div>
@@ -1497,38 +1539,38 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
                             <div class="grid">
                                 <div>
-                                    <label class="pg-label">Benutzername</label>
+                                    <label class="pg-label"><?= htmlspecialchars(t('admin.settings.email.username_label')) ?></label>
                                     <input type="text" name="smtp_user" value="<?= htmlspecialchars($project['smtp_user'] ?? '') ?>" placeholder="absender@deinedomain.de" style="width:100%">
                                 </div>
                                 <div>
-                                    <label class="pg-label">Passwort</label>
-                                    <input type="password" name="smtp_pass" value="<?= htmlspecialchars($project['smtp_pass'] ?? '') ?>" placeholder="Passwort eingeben" style="width:100%">
+                                    <label class="pg-label"><?= htmlspecialchars(t('admin.settings.email.password_label')) ?></label>
+                                    <input type="password" name="smtp_pass" value="<?= htmlspecialchars($project['smtp_pass'] ?? '') ?>" placeholder="<?= htmlspecialchars(t('admin.settings.email.password_placeholder')) ?>" style="width:100%">
                                 </div>
                             </div>
 
                             <div class="grid">
                                 <div>
-                                    <label class="pg-label">Absender-Adresse</label>
+                                    <label class="pg-label"><?= htmlspecialchars(t('admin.settings.email.sender_label')) ?></label>
                                     <input type="email" name="smtp_from" value="<?= htmlspecialchars($project['smtp_from'] ?? '') ?>" placeholder="legal@deinefirma.de" style="width:100%">
                                 </div>
                                 <div>
-                                    <label class="pg-label">Empfänger für Prüfberichte</label>
+                                    <label class="pg-label"><?= htmlspecialchars(t('admin.settings.email.recipient_label')) ?></label>
                                     <input type="email" name="audit_email_recipient" value="<?= htmlspecialchars($project['audit_email_recipient'] ?? '') ?>" placeholder="deine-mail@domain.de" style="width:100%">
                                 </div>
                             </div>
 
                             <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-                                <button type="submit" class="pg-btn-secondary"><?= svg_icon('disk', '', 14) ?> Speichern</button>
+                                <button type="submit" class="pg-btn-secondary"><?= svg_icon('disk', '', 14) ?> <?= htmlspecialchars(t('admin.settings.email.save_button')) ?></button>
                                 <?php if (!empty($project['smtp_host'])): ?>
-                                    <button type="button" class="btn-test" onclick="triggerTestMail()"><?= svg_icon('mail', '', 14) ?> Test-E-Mail jetzt senden</button>
+                                    <button type="button" class="btn-test" onclick="triggerTestMail()"><?= svg_icon('mail', '', 14) ?> <?= htmlspecialchars(t('admin.settings.email.send_test_button')) ?></button>
                                 <?php endif; ?>
                             </div>
                         </form>
                     </div>
 
                     <div class="pg-card pg-card-pad">
-                        <h2>Webhooks &amp; Übersetzung</h2>
-                        <p class="pg-card-sub" style="margin-bottom:16px">Ein Webhook benachrichtigt deine Haupt-App automatisch, sobald sich ein Rechtstext ändert — kein manuelles Nachpflegen nötig.</p>
+                        <h2><?= htmlspecialchars(t('admin.settings.webhooks.heading')) ?></h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px"><?= htmlspecialchars(t('admin.settings.webhooks.subtitle')) ?></p>
                         <form method="post">
                             <input type="hidden" name="action" value="save_project">
                             <input type="hidden" name="name" value="<?= htmlspecialchars($project['name']) ?>">
@@ -1554,34 +1596,34 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="phone" value="<?= htmlspecialchars($project['phone'] ?? '') ?>">
                             <input type="hidden" name="register_info" value="<?= htmlspecialchars($project['register_info'] ?? '') ?>">
 
-                            <label class="pg-label" style="margin-top:0">Webhook-URL (POST bei Textänderungen)<?= help_icon('Wird per POST mit JSON-Payload aufgerufen, sobald ein Rechtstext veröffentlicht oder eine geplante Änderung eingerichtet wird. Vollständige Payload-Struktur siehe WEBHOOKS.md.') ?></label>
+                            <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.webhooks.url_label')) ?><?= help_icon(t('admin.settings.webhooks.url_help')) ?></label>
                             <input type="text" name="webhook_url" value="<?= htmlspecialchars($project['webhook_url'] ?? '') ?>" placeholder="https://app.deinefirma.de/api/legal-webhook" style="width:100%;margin-bottom:14px">
 
-                            <label class="pg-label" style="margin-top:0">Webhook-Secret <span style="color:var(--text-faint);font-weight:400">(optional, für Signaturprüfung)</span><?= help_icon('Wird als HMAC-SHA256-Signatur im Header X-Paragrafy-Signature mitgeschickt, damit dein Server die Echtheit der Anfrage prüfen kann.') ?></label>
-                            <input type="text" name="webhook_secret" value="<?= htmlspecialchars($project['webhook_secret'] ?? '') ?>" placeholder="z. B. ein geheimer Schlüssel" style="width:100%;margin-bottom:14px">
+                            <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.webhooks.secret_label')) ?> <span style="color:var(--text-faint);font-weight:400"><?= htmlspecialchars(t('admin.settings.webhooks.secret_hint')) ?></span><?= help_icon(t('admin.settings.webhooks.secret_help')) ?></label>
+                            <input type="text" name="webhook_secret" value="<?= htmlspecialchars($project['webhook_secret'] ?? '') ?>" placeholder="<?= htmlspecialchars(t('admin.settings.webhooks.secret_placeholder')) ?>" style="width:100%;margin-bottom:14px">
 
                             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-                                <button type="submit" class="pg-btn-secondary"><?= svg_icon('disk', '', 14) ?> Speichern</button>
+                                <button type="submit" class="pg-btn-secondary"><?= svg_icon('disk', '', 14) ?> <?= htmlspecialchars(t('admin.settings.webhooks.save_button')) ?></button>
                                 <?php if (!empty($project['webhook_url'])): ?>
-                                    <button type="button" class="btn-test" onclick="triggerTestWebhook()"><?= svg_icon('lightning', '', 14) ?> Test-Webhook senden &amp; prüfen</button>
+                                    <button type="button" class="btn-test" onclick="triggerTestWebhook()"><?= svg_icon('lightning', '', 14) ?> <?= htmlspecialchars(t('admin.settings.webhooks.test_button')) ?></button>
                                 <?php endif; ?>
                             </div>
 
                             <div style="border-top:1px solid var(--border-soft);padding-top:16px">
-                                <label class="pg-label" style="margin-top:0">DeepL API-Key <span style="color:var(--text-faint);font-weight:400">— ermöglicht 1-Klick-Übersetzung im Editor</span></label>
+                                <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.webhooks.deepl_label')) ?> <span style="color:var(--text-faint);font-weight:400"><?= htmlspecialchars(t('admin.settings.webhooks.deepl_hint')) ?></span></label>
                                 <input type="text" name="deepl_api_key" value="<?= htmlspecialchars($project['deepl_api_key'] ?? '') ?>" placeholder="z. B. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx" style="width:100%">
                                 <?php if (!empty($envDeepl)): ?>
-                                    <div class="pg-hint" style="color:var(--green)">In .env.local hinterlegt (wird automatisch als Fallback genutzt).</div>
+                                    <div class="pg-hint" style="color:var(--green)"><?= htmlspecialchars(t('admin.settings.webhooks.deepl_env_hint')) ?></div>
                                 <?php else: ?>
-                                    <div class="pg-hint">Unterstützt Free- &amp; Pro-Keys (z. B. <code>...:fx</code>).</div>
+                                    <div class="pg-hint"><?= t('admin.settings.webhooks.deepl_keys_hint') ?></div>
                                 <?php endif; ?>
                             </div>
                         </form>
                     </div>
 
                     <div class="pg-card pg-card-pad">
-                        <h2>Unternehmensdaten</h2>
-                        <p class="pg-card-sub" style="margin-bottom:16px">Diese Angaben ersetzen automatisch Platzhalter wie <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">{{company_name}}</code> in allen deinen Rechtstexten.</p>
+                        <h2><?= htmlspecialchars(t('admin.settings.company.heading')) ?></h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px"><?= t('admin.settings.company.subtitle') ?></p>
                         <form method="post">
                             <input type="hidden" name="action" value="save_project">
                             <input type="hidden" name="name" value="<?= htmlspecialchars($project['name']) ?>">
@@ -1606,41 +1648,41 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
                             <div class="grid">
                                 <div>
-                                    <label class="pg-label" style="margin-top:0">Firmenname</label>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.company.name_label')) ?></label>
                                     <input type="text" name="company_name" value="<?= htmlspecialchars($project['company_name'] ?? '') ?>" style="width:100%">
                                 </div>
                                 <div>
-                                    <label class="pg-label" style="margin-top:0">Vertretungsberechtigte Person</label>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.company.representative_label')) ?></label>
                                     <input type="text" name="representative" value="<?= htmlspecialchars($project['representative'] ?? '') ?>" style="width:100%">
                                 </div>
                                 <div style="grid-column:1/-1">
-                                    <label class="pg-label" style="margin-top:0">Anschrift</label>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.company.address_label')) ?></label>
                                     <textarea name="address" rows="2" style="width:100%"><?= htmlspecialchars($project['address'] ?? '') ?></textarea>
                                 </div>
                                 <div>
-                                    <label class="pg-label" style="margin-top:0">E-Mail-Adresse</label>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.company.email_label')) ?></label>
                                     <input type="text" name="email" value="<?= htmlspecialchars($project['email'] ?? '') ?>" style="width:100%">
                                 </div>
                                 <div>
-                                    <label class="pg-label" style="margin-top:0">Telefonnummer</label>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.company.phone_label')) ?></label>
                                     <input type="text" name="phone" value="<?= htmlspecialchars($project['phone'] ?? '') ?>" style="width:100%">
                                 </div>
                                 <div style="grid-column:1/-1">
-                                    <label class="pg-label" style="margin-top:0">Register-Informationen</label>
+                                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.company.register_label')) ?></label>
                                     <input type="text" name="register_info" value="<?= htmlspecialchars($project['register_info'] ?? '') ?>" style="width:100%">
                                 </div>
                             </div>
 
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px">
-                                <button type="submit" class="pg-btn"><?= svg_icon('disk', '', 16) ?> Einstellungen speichern</button>
+                                <button type="submit" class="pg-btn"><?= svg_icon('disk', '', 16) ?> <?= htmlspecialchars(t('admin.settings.company.save_button')) ?></button>
 
                                 <?php if (count($projects) > 1): ?>
-                                    <button type="button" class="pg-btn-danger" onclick="document.getElementById('deleteProjectForm').submit()">Projekt löschen</button>
+                                    <button type="button" class="pg-btn-danger" onclick="document.getElementById('deleteProjectForm').submit()"><?= htmlspecialchars(t('admin.settings.company.delete_project_button')) ?></button>
                                 <?php endif; ?>
                             </div>
                         </form>
                         <?php if (count($projects) > 1): ?>
-                            <form id="deleteProjectForm" method="post" onsubmit="return confirm('Möchtest du dieses Projekt (<?= htmlspecialchars($project['name']) ?>) und alle zugehörigen Texte wirklich löschen?');" style="display:none">
+                            <form id="deleteProjectForm" method="post" onsubmit="return confirm('<?= htmlspecialchars(t('admin.settings.company.confirm_delete_project', ['project' => $project['name']]), ENT_QUOTES) ?>');" style="display:none">
                                 <input type="hidden" name="action" value="delete_project">
                                 <input type="hidden" name="delete_project_id" value="<?= $project['id'] ?>">
                             </form>
@@ -1649,41 +1691,41 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
                     <!-- Sicherung & Export -->
                     <div class="pg-card pg-card-pad">
-                        <h2>Sicherung &amp; Export</h2>
-                        <p class="pg-card-sub" style="margin-bottom:14px">Lade eine Sicherungskopie aller Daten herunter oder exportiere deine Rechtstexte als Textdateien.</p>
+                        <h2><?= htmlspecialchars(t('admin.settings.backup.heading')) ?></h2>
+                        <p class="pg-card-sub" style="margin-bottom:14px"><?= htmlspecialchars(t('admin.settings.backup.subtitle')) ?></p>
                         <div style="display:flex;gap:10px;flex-wrap:wrap">
-                            <a href="/admin?action=download_backup" class="pg-btn-secondary"><?= svg_icon('disk', '', 14) ?> Sicherungskopie herunterladen</a>
-                            <a href="/admin?action=export_markdown" class="pg-btn-secondary"><?= svg_icon('folder', '', 14) ?> Als Textdateien exportieren</a>
-                            <button type="button" class="pg-btn-secondary" onclick="triggerAuditReport()"><?= svg_icon('mail', '', 14) ?> Prüfbericht per E-Mail</button>
+                            <a href="/admin?action=download_backup" class="pg-btn-secondary"><?= svg_icon('disk', '', 14) ?> <?= htmlspecialchars(t('admin.settings.backup.download_button')) ?></a>
+                            <a href="/admin?action=export_markdown" class="pg-btn-secondary"><?= svg_icon('folder', '', 14) ?> <?= htmlspecialchars(t('admin.settings.backup.export_button')) ?></a>
+                            <button type="button" class="pg-btn-secondary" onclick="triggerAuditReport()"><?= svg_icon('mail', '', 14) ?> <?= htmlspecialchars(t('admin.settings.backup.audit_report_button')) ?></button>
                         </div>
 
                         <div style="border-top:1px solid var(--border-soft);margin-top:20px;padding-top:16px">
                             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
-                                <h2 style="margin:0;font-size:14px">Automatische Backups (7 Tage rollierend)<?= help_icon('Legt täglich eine Kopie der Datenbank in /backups an und löscht automatisch alles, was älter als 7 Tage ist. Dafür muss ein externer Cron-Job einmal täglich /api/cron/backup aufrufen — genau wie beim Prüfbericht per E-Mail.') ?></h2>
+                                <h2 style="margin:0;font-size:14px"><?= htmlspecialchars(t('admin.settings.backup.auto_heading')) ?><?= help_icon(t('admin.settings.backup.auto_help')) ?></h2>
                                 <form method="post" style="margin:0">
                                     <input type="hidden" name="action" value="run_backup_now">
-                                    <button type="submit" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px">Jetzt sichern</button>
+                                    <button type="submit" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px"><?= htmlspecialchars(t('admin.settings.backup.run_now_button')) ?></button>
                                 </form>
                             </div>
                             <?php if ($backupMsg === 'backup_created'): ?>
-                                <p style="font-size:12px;color:var(--green);margin:4px 0 10px">Backup wurde erstellt.</p>
+                                <p style="font-size:12px;color:var(--green);margin:4px 0 10px"><?= htmlspecialchars(t('admin.settings.backup.created_msg')) ?></p>
                             <?php elseif ($backupMsg === 'backup_failed'): ?>
-                                <p style="font-size:12px;color:var(--red);margin:4px 0 10px">Backup fehlgeschlagen.</p>
+                                <p style="font-size:12px;color:var(--red);margin:4px 0 10px"><?= htmlspecialchars(t('admin.settings.backup.failed_msg')) ?></p>
                             <?php endif; ?>
                             <?php if ($isManagedCloud): ?>
-                                <p class="pg-card-sub" style="margin:0 0 10px">Läuft bei Managed Cloud automatisch täglich — kein Cron-Job nötig.</p>
+                                <p class="pg-card-sub" style="margin:0 0 10px"><?= htmlspecialchars(t('admin.settings.backup.cloud_hint')) ?></p>
                             <?php else: ?>
-                                <p class="pg-card-sub" style="margin:0 0 10px">Ohne eingerichteten Cron-Job entstehen hier nur Backups, die du manuell auslöst.</p>
+                                <p class="pg-card-sub" style="margin:0 0 10px"><?= htmlspecialchars(t('admin.settings.backup.manual_hint')) ?></p>
                             <?php endif; ?>
 
                             <?php if (empty($backups)): ?>
-                                <div style="color:var(--text-faint);font-size:13px;font-style:italic">Noch keine automatischen Backups vorhanden.</div>
+                                <div style="color:var(--text-faint);font-size:13px;font-style:italic"><?= htmlspecialchars(t('admin.settings.backup.empty')) ?></div>
                             <?php else: ?>
                                 <table class="pg-table" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
                                     <thead>
                                         <tr>
-                                            <th>Erstellt</th>
-                                            <th>Größe</th>
+                                            <th><?= htmlspecialchars(t('admin.settings.backup.col_created')) ?></th>
+                                            <th><?= htmlspecialchars(t('admin.settings.backup.col_size')) ?></th>
                                             <th style="width:110px"></th>
                                         </tr>
                                     </thead>
@@ -1692,7 +1734,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                             <tr>
                                                 <td style="color:var(--text-muted)"><?= date('d.m.Y H:i', $b['created_at']) ?></td>
                                                 <td style="color:var(--text-muted)"><?= round($b['size'] / 1024 / 1024, 2) ?> MB</td>
-                                                <td><a href="/admin?action=download_backup_file&file=<?= urlencode($b['filename']) ?>" class="pg-btn-secondary" style="padding:4px 10px;font-size:12px">Download</a></td>
+                                                <td><a href="/admin?action=download_backup_file&file=<?= urlencode($b['filename']) ?>" class="pg-btn-secondary" style="padding:4px 10px;font-size:12px"><?= htmlspecialchars(t('admin.settings.backup.download_link')) ?></a></td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>
@@ -1704,20 +1746,20 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     <!-- Webhook-Warteschlange -->
                     <div class="pg-card pg-card-pad">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
-                            <h2 style="margin:0">Webhook-Warteschlange<?= help_icon('Veröffentlichungen werden nicht mehr direkt beim Speichern verschickt, sondern in einer Warteschlange abgelegt. Ein externer Cron-Job muss regelmäßig (z. B. alle 5 Minuten) /api/cron/webhooks aufrufen, damit sie zugestellt werden. Fehlgeschlagene Zustellungen werden bis zu 5-mal mit steigendem Abstand wiederholt.') ?></h2>
+                            <h2 style="margin:0"><?= htmlspecialchars(t('admin.settings.queue.heading')) ?><?= help_icon(t('admin.settings.queue.help')) ?></h2>
                             <form method="post" style="margin:0">
                                 <input type="hidden" name="action" value="run_webhook_queue_now">
-                                <button type="submit" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px">Jetzt abarbeiten</button>
+                                <button type="submit" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px"><?= htmlspecialchars(t('admin.settings.queue.run_now_button')) ?></button>
                             </form>
                         </div>
                         <?php if (($_GET['msg'] ?? '') === 'queue_processed'): ?>
-                            <p style="font-size:12px;color:var(--green);margin:4px 0 10px">Warteschlange verarbeitet.</p>
+                            <p style="font-size:12px;color:var(--green);margin:4px 0 10px"><?= htmlspecialchars(t('admin.settings.queue.processed_msg')) ?></p>
                         <?php endif; ?>
                         <div style="display:flex;gap:10px;flex-wrap:wrap">
-                            <span class="pg-pill pg-pill-amber"><span class="pg-pill-dot"></span><?= $queueSummary['pending'] ?> wartend</span>
-                            <span class="pg-pill pg-pill-green"><span class="pg-pill-dot"></span><?= $queueSummary['sent'] ?> zugestellt</span>
+                            <span class="pg-pill pg-pill-amber"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.settings.queue.pending', ['count' => $queueSummary['pending']])) ?></span>
+                            <span class="pg-pill pg-pill-green"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.settings.queue.sent', ['count' => $queueSummary['sent']])) ?></span>
                             <?php if ($queueSummary['failed'] > 0): ?>
-                                <span class="pg-pill pg-pill-red"><span class="pg-pill-dot"></span><?= $queueSummary['failed'] ?> endgültig fehlgeschlagen</span>
+                                <span class="pg-pill pg-pill-red"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.settings.queue.failed', ['count' => $queueSummary['failed']])) ?></span>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -1725,27 +1767,27 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     <!-- Webhook Protokoll & Delivery Logs -->
                     <div class="pg-card pg-card-pad" style="margin-bottom:0">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-                            <h2 style="margin:0">Webhook-Protokoll</h2>
+                            <h2 style="margin:0"><?= htmlspecialchars(t('admin.settings.log.heading')) ?></h2>
                             <?php if (!empty($logs)): ?>
                                 <form method="post" style="margin:0;">
                                     <input type="hidden" name="action" value="clear_webhook_logs">
-                                    <button type="submit" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px">Logs leeren</button>
+                                    <button type="submit" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px"><?= htmlspecialchars(t('admin.settings.log.clear_button')) ?></button>
                                 </form>
                             <?php endif; ?>
                         </div>
-                        <p class="pg-card-sub" style="margin-bottom:14px">Die letzten Zustellungen inklusive Status, Antwort und Latenz.</p>
+                        <p class="pg-card-sub" style="margin-bottom:14px"><?= htmlspecialchars(t('admin.settings.log.subtitle')) ?></p>
 
                         <?php if (empty($logs)): ?>
-                            <div style="color:var(--text-faint);font-size:13px;font-style:italic;padding:1rem 0;">Noch keine Webhook-Aktivitäten für dieses Projekt protokolliert. Klicke oben auf „Test-Webhook senden“, um einen ersten Eintrag zu erzeugen.</div>
+                            <div style="color:var(--text-faint);font-size:13px;font-style:italic;padding:1rem 0;"><?= htmlspecialchars(t('admin.settings.log.empty')) ?></div>
                         <?php else: ?>
                             <table class="log-table">
                                 <thead>
                                     <tr>
-                                        <th>Zeitpunkt</th>
-                                        <th>Event</th>
-                                        <th>Status</th>
-                                        <th>Latenz</th>
-                                        <th>Antwort</th>
+                                        <th><?= htmlspecialchars(t('admin.settings.log.col_time')) ?></th>
+                                        <th><?= htmlspecialchars(t('admin.settings.log.col_event')) ?></th>
+                                        <th><?= htmlspecialchars(t('admin.settings.log.col_status')) ?></th>
+                                        <th><?= htmlspecialchars(t('admin.settings.log.col_latency')) ?></th>
+                                        <th><?= htmlspecialchars(t('admin.settings.log.col_response')) ?></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1768,7 +1810,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                                         <?= htmlspecialchars($l['response_body']) ?>
                                                     </div>
                                                 <?php else: ?>
-                                                    <span style="color:var(--text-faint);font-style:italic;">(Leere Antwort)</span>
+                                                    <span style="color:var(--text-faint);font-style:italic;"><?= htmlspecialchars(t('admin.settings.log.empty_response')) ?></span>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
@@ -1779,15 +1821,30 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     </div>
                 </div>
 
-                <div class="pg-footer-note">Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.</div>
+                <div class="pg-footer-note"><?= htmlspecialchars(t('admin.common.footer_disclaimer')) ?></div>
             </div>
         </div>
 
         <div id="toastNotification" class="pg-toast">
-            <?= svg_icon('check', '', 16) ?> <span id="toastMsg">In Zwischenablage kopiert!</span>
+            <?= svg_icon('check', '', 16) ?> <span id="toastMsg"><?= htmlspecialchars(t('admin.settings.js.copy_success')) ?></span>
         </div>
 
         <script>
+            const i18n = {
+                copySuccess: <?= json_encode(t('admin.settings.js.copy_success')) ?>,
+                copyFailed: <?= json_encode(t('admin.matrix.js.copy_failed')) ?>,
+                auditReportSent: <?= json_encode(t('admin.settings.js.audit_report_sent')) ?>,
+                errorPrefix: <?= json_encode(t('admin.settings.js.error_prefix')) ?>,
+                auditReportFailed: <?= json_encode(t('admin.settings.js.audit_report_failed')) ?>,
+                webhookSuccessTemplate: <?= json_encode(t('admin.settings.js.webhook_success')) ?>,
+                webhookFailureTemplate: <?= json_encode(t('admin.settings.js.webhook_failure')) ?>,
+                emptyParen: <?= json_encode(t('admin.settings.js.empty_paren')) ?>,
+                unknownError: <?= json_encode(t('admin.settings.js.unknown_error')) ?>,
+                networkErrorPrefix: <?= json_encode(t('admin.settings.js.network_error_prefix')) ?>,
+                smtpTestSuccess: <?= json_encode(t('admin.settings.js.smtp_test_success')) ?>,
+                smtpTestFailed: <?= json_encode(t('admin.settings.js.smtp_test_failed')) ?>
+            };
+
             function showToast(msg) {
                 const toast = document.getElementById('toastNotification');
                 document.getElementById('toastMsg').innerText = msg;
@@ -1795,7 +1852,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                 setTimeout(() => { toast.classList.remove('show'); }, 2500);
             }
 
-            function copyToClipboard(text, successMsg = 'In Zwischenablage kopiert!') {
+            function copyToClipboard(text, successMsg = i18n.copySuccess) {
                 if (navigator.clipboard && window.isSecureContext) {
                     navigator.clipboard.writeText(text).then(() => {
                         showToast(successMsg);
@@ -1819,7 +1876,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     document.execCommand('copy');
                     showToast(successMsg);
                 } catch (err) {
-                    alert('Kopieren fehlgeschlagen.');
+                    alert(i18n.copyFailed);
                 }
                 document.body.removeChild(textArea);
             }
@@ -1855,12 +1912,12 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     const res = await fetch('/api/cron/audit');
                     const data = await res.json();
                     if (data.success) {
-                        alert(data.message || 'Prüfbericht per E-Mail gesendet!');
+                        alert(data.message || i18n.auditReportSent);
                     } else {
-                        alert('Fehler: ' + (data.error || 'Konnte Bericht nicht senden.'));
+                        alert(i18n.errorPrefix + (data.error || i18n.auditReportFailed));
                     }
                 } catch (e) {
-                    alert('Fehler: ' + e.message);
+                    alert(i18n.errorPrefix + e.message);
                 }
             }
 
@@ -1871,14 +1928,14 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     const res = await fetch(window.location.href, { method: 'POST', body: formData });
                     const data = await res.json();
                     if (data.success) {
-                        alert(`Webhook erfolgreich zugestellt!\nHTTP-Status: ${data.status_code}\nDauer: ${data.duration_ms} ms\nAntwort: ${data.response || '(leer)'}`);
+                        alert(i18n.webhookSuccessTemplate.replace(':status', data.status_code).replace(':duration', data.duration_ms).replace(':response', data.response || i18n.emptyParen));
                         location.reload();
                     } else {
-                        alert(`Fehler bei der Webhook-Zustellung:\nHTTP-Status: ${data.status_code}\nFehler: ${data.error || 'Unbekannt'}\nAntwort: ${data.response || '(leer)'}`);
+                        alert(i18n.webhookFailureTemplate.replace(':status', data.status_code).replace(':error', data.error || i18n.unknownError).replace(':response', data.response || i18n.emptyParen));
                         location.reload();
                     }
                 } catch (e) {
-                    alert('Netzwerkfehler: ' + e.message);
+                    alert(i18n.networkErrorPrefix + e.message);
                 }
             }
 
@@ -1889,12 +1946,12 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                     const res = await fetch(window.location.href, { method: 'POST', body: formData });
                     const data = await res.json();
                     if (data.success) {
-                        alert('Test-E-Mail erfolgreich via SMTP versendet!');
+                        alert(i18n.smtpTestSuccess);
                     } else {
-                        alert('Fehler: ' + (data.error || 'SMTP Versand fehlgeschlagen.'));
+                        alert(i18n.errorPrefix + (data.error || i18n.smtpTestFailed));
                     }
                 } catch (e) {
-                    alert('Netzwerkfehler: ' + e.message);
+                    alert(i18n.networkErrorPrefix + e.message);
                 }
             }
         </script>
@@ -1907,17 +1964,17 @@ function render_users_view(PDO $db, array $project, array $projects): void {
     $users = $db->query("SELECT * FROM users ORDER BY (status = 'active') DESC, name ASC")->fetchAll();
     $msg = $_GET['msg'] ?? '';
     $msgMap = [
-        'invited' => ['ok', 'Einladung erfolgreich per E-Mail versendet.'],
-        'invite_mail_failed' => ['err', 'Die Person wurde angelegt, aber der Versand der Einladungs-E-Mail ist fehlgeschlagen. Bitte SMTP-Einstellungen prüfen oder erneut senden.'],
-        'email_exists' => ['err', 'Für diese E-Mail-Adresse existiert bereits ein Zugang.'],
-        'invalid' => ['err', 'Bitte Name und eine gültige E-Mail-Adresse angeben.'],
-        'user_deleted' => ['ok', 'Zugang entfernt.'],
+        'invited' => ['ok', t('admin.users.msg.invited')],
+        'invite_mail_failed' => ['err', t('admin.users.msg.invite_mail_failed')],
+        'email_exists' => ['err', t('admin.users.msg.email_exists')],
+        'invalid' => ['err', t('admin.users.msg.invalid')],
+        'user_deleted' => ['ok', t('admin.users.msg.user_deleted')],
     ];
     ?>
     <!DOCTYPE html>
-    <html lang="de">
+    <html lang="<?= htmlspecialchars(current_locale()) ?>">
     <head>
-        <meta charset="utf-8"><title>Benutzer - <?= htmlspecialchars($project['name']) ?></title>
+        <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.users.page_title', ['project' => $project['name']])) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
@@ -1932,7 +1989,7 @@ function render_users_view(PDO $db, array $project, array $projects): void {
 
             <div class="pg-main">
                 <div class="pg-topbar">
-                    <div class="pg-crumb"><?= htmlspecialchars($project['name']) ?> <span style="margin:0 4px">/</span> <strong>Benutzer</strong></div>
+                    <div class="pg-crumb"><?= htmlspecialchars($project['name']) ?> <span style="margin:0 4px">/</span> <strong><?= htmlspecialchars(t('admin.users.crumb')) ?></strong></div>
                 </div>
 
                 <div class="pg-content" style="max-width:840px">
@@ -1944,34 +2001,34 @@ function render_users_view(PDO $db, array $project, array $projects): void {
 
                     <div class="pg-card pg-card-pad">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-                            <h2 style="margin:0">Benutzerverwaltung</h2>
-                            <button type="button" class="pg-btn" style="padding:8px 14px;font-size:12.5px" onclick="openInviteModal()">+ Person einladen</button>
+                            <h2 style="margin:0"><?= htmlspecialchars(t('admin.users.heading')) ?></h2>
+                            <button type="button" class="pg-btn" style="padding:8px 14px;font-size:12.5px" onclick="openInviteModal()"><?= htmlspecialchars(t('admin.users.invite_button')) ?></button>
                         </div>
-                        <p class="pg-card-sub" style="margin-bottom:16px">Jede eingeladene Person hat vollen Zugriff auf das gesamte Admin-Panel (alle Projekte) — es gibt keine Rollen oder Rechte einzustellen.</p>
+                        <p class="pg-card-sub" style="margin-bottom:16px"><?= htmlspecialchars(t('admin.users.subtitle')) ?></p>
 
                         <table class="pg-table users-table" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
                             <thead>
                                 <tr>
-                                    <th>Name</th>
-                                    <th>E-Mail</th>
-                                    <th>Status</th>
+                                    <th><?= htmlspecialchars(t('admin.users.col_name')) ?></th>
+                                    <th><?= htmlspecialchars(t('admin.users.col_email')) ?></th>
+                                    <th><?= htmlspecialchars(t('admin.users.col_status')) ?></th>
                                     <th style="width:90px"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($users)): ?>
-                                    <tr><td colspan="4" style="color:var(--text-faint);font-style:italic">Noch keine Personen eingeladen.</td></tr>
+                                    <tr><td colspan="4" style="color:var(--text-faint);font-style:italic"><?= htmlspecialchars(t('admin.users.empty')) ?></td></tr>
                                 <?php endif; ?>
                                 <?php foreach ($users as $u): ?>
                                     <?php $isSelf = (int)$u['id'] === (int)($_SESSION['paragrafy_user_id'] ?? 0); ?>
                                     <tr>
-                                        <td style="font-weight:600"><?= htmlspecialchars($u['name']) ?><?= $isSelf ? ' <span style="color:var(--text-faint);font-weight:500">(Du)</span>' : '' ?></td>
+                                        <td style="font-weight:600"><?= htmlspecialchars($u['name']) ?><?= $isSelf ? ' <span style="color:var(--text-faint);font-weight:500">' . htmlspecialchars(t('admin.users.you_suffix')) . '</span>' : '' ?></td>
                                         <td style="color:var(--text-muted)"><?= htmlspecialchars($u['email']) ?></td>
                                         <td>
                                             <?php if ($u['status'] === 'active'): ?>
-                                                <span class="pg-pill pg-pill-green"><span class="pg-pill-dot"></span>Aktiv</span>
+                                                <span class="pg-pill pg-pill-green"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.users.status_active')) ?></span>
                                             <?php else: ?>
-                                                <span class="pg-pill pg-pill-muted">Eingeladen</span>
+                                                <span class="pg-pill pg-pill-muted"><?= htmlspecialchars(t('admin.users.status_invited')) ?></span>
                                             <?php endif; ?>
                                         </td>
                                         <td>
@@ -1980,7 +2037,7 @@ function render_users_view(PDO $db, array $project, array $projects): void {
                                                     <form method="post" style="margin:0">
                                                         <input type="hidden" name="action" value="resend_invite">
                                                         <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                                                        <button type="submit" class="pg-icon-btn" title="Einladung erneut senden">
+                                                        <button type="submit" class="pg-icon-btn" title="<?= htmlspecialchars(t('admin.users.resend_invite_title')) ?>">
                                                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 1 1 1.8 4.3"/><path d="M2 12v-3h3"/></svg>
                                                         </button>
                                                     </form>
@@ -1988,10 +2045,10 @@ function render_users_view(PDO $db, array $project, array $projects): void {
                                                 <?php if ($isSelf): ?>
                                                     <span style="color:var(--text-faintest);padding:6px 8px">&mdash;</span>
                                                 <?php else: ?>
-                                                    <form method="post" onsubmit="return confirm('Zugang für <?= htmlspecialchars($u['name']) ?> wirklich entfernen?');" style="margin:0">
+                                                    <form method="post" onsubmit="return confirm('<?= htmlspecialchars(t('admin.users.confirm_delete', ['name' => $u['name']]), ENT_QUOTES) ?>');" style="margin:0">
                                                         <input type="hidden" name="action" value="delete_user">
                                                         <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                                                        <button type="submit" class="pg-icon-btn danger" title="Entfernen">
+                                                        <button type="submit" class="pg-icon-btn danger" title="<?= htmlspecialchars(t('admin.users.delete_title')) ?>">
                                                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 4.5h9"/><path d="M6.2 4.5V3.2c0-.4.3-.7.7-.7h2.2c.4 0 .7.3.7.7v1.3"/><path d="M4.8 4.5 5.2 13c0 .4.3.7.7.7h4c.4 0 .7-.3.7-.7l.4-8.5"/><path d="M6.7 7.3v3.6"/><path d="M9.3 7.3v3.6"/></svg>
                                                         </button>
                                                     </form>
@@ -2005,28 +2062,28 @@ function render_users_view(PDO $db, array $project, array $projects): void {
                     </div>
                 </div>
 
-                <div class="pg-footer-note">Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.</div>
+                <div class="pg-footer-note"><?= htmlspecialchars(t('admin.common.footer_disclaimer')) ?></div>
             </div>
         </div>
 
         <!-- Modal: Person einladen -->
         <div id="inviteModal" class="pg-modal-backdrop" onclick="if(event.target === this) closeInviteModal()">
             <div class="pg-modal">
-                <h2 style="font-size:19px;font-weight:800;margin:0 0 6px">Person einladen</h2>
-                <p style="font-size:13px;color:var(--text-muted);margin:0 0 20px">Die Person erhält eine E-Mail mit einem Link, um ihr eigenes Passwort festzulegen.</p>
+                <h2 style="font-size:19px;font-weight:800;margin:0 0 6px"><?= htmlspecialchars(t('admin.users.modal.heading')) ?></h2>
+                <p style="font-size:13px;color:var(--text-muted);margin:0 0 20px"><?= htmlspecialchars(t('admin.users.modal.desc')) ?></p>
 
                 <form method="post">
                     <input type="hidden" name="action" value="invite_user">
 
-                    <label class="pg-label" style="margin-top:0">Name</label>
-                    <input type="text" name="invite_name" placeholder="z. B. Lena Fischer" required style="width:100%">
+                    <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.users.modal.name_label')) ?></label>
+                    <input type="text" name="invite_name" placeholder="<?= htmlspecialchars(t('admin.users.modal.name_placeholder')) ?>" required style="width:100%">
 
-                    <label class="pg-label">E-Mail</label>
-                    <input type="email" name="invite_email" placeholder="z. B. lena@firma.de" required style="width:100%">
+                    <label class="pg-label"><?= htmlspecialchars(t('admin.users.modal.email_label')) ?></label>
+                    <input type="email" name="invite_email" placeholder="<?= htmlspecialchars(t('admin.users.modal.email_placeholder')) ?>" required style="width:100%">
 
                     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:26px">
-                        <button type="button" class="pg-btn-secondary" onclick="closeInviteModal()">Abbrechen</button>
-                        <button type="submit" class="pg-btn">Einladung senden &rarr;</button>
+                        <button type="button" class="pg-btn-secondary" onclick="closeInviteModal()"><?= htmlspecialchars(t('admin.users.modal.cancel_button')) ?></button>
+                        <button type="submit" class="pg-btn"><?= t('admin.users.modal.submit_button') ?></button>
                     </div>
                 </form>
             </div>
@@ -2051,9 +2108,9 @@ function render_audit_view(PDO $db, array $project, array $projects): void {
     $entries = $stmt->fetchAll();
     ?>
     <!DOCTYPE html>
-    <html lang="de">
+    <html lang="<?= htmlspecialchars(current_locale()) ?>">
     <head>
-        <meta charset="utf-8"><title>Protokoll - <?= htmlspecialchars($project['name']) ?></title>
+        <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.audit.page_title', ['project' => $project['name']])) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
@@ -2065,28 +2122,28 @@ function render_audit_view(PDO $db, array $project, array $projects): void {
 
             <div class="pg-main">
                 <div class="pg-topbar">
-                    <div class="pg-crumb"><?= htmlspecialchars($project['name']) ?> <span style="margin:0 4px">/</span> <strong>Protokoll</strong></div>
+                    <div class="pg-crumb"><?= htmlspecialchars($project['name']) ?> <span style="margin:0 4px">/</span> <strong><?= htmlspecialchars(t('admin.audit.crumb')) ?></strong></div>
                 </div>
 
                 <div class="pg-content" style="max-width:840px">
                     <div class="pg-card pg-card-pad" style="margin-bottom:0">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-                            <h2 style="margin:0">Änderungsprotokoll</h2>
+                            <h2 style="margin:0"><?= htmlspecialchars(t('admin.audit.heading')) ?></h2>
                             <?php if (!empty($entries)): ?>
-                                <a href="/admin?project_id=<?= $project['id'] ?>&action=export_audit_csv" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px"><?= svg_icon('folder', '', 13) ?> Als CSV herunterladen</a>
+                                <a href="/admin?project_id=<?= $project['id'] ?>&action=export_audit_csv" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px"><?= svg_icon('folder', '', 13) ?> <?= htmlspecialchars(t('admin.audit.export_csv')) ?></a>
                             <?php endif; ?>
                         </div>
-                        <p class="pg-card-sub" style="margin:5px 0 16px">Wer hat wann was geändert — Projekteinstellungen, Rechtstexte und Benutzerverwaltung. Zeigt die letzten 200 Einträge.</p>
+                        <p class="pg-card-sub" style="margin:5px 0 16px"><?= htmlspecialchars(t('admin.audit.subtitle')) ?></p>
 
                         <?php if (empty($entries)): ?>
-                            <div style="color:var(--text-faint);font-size:13px;font-style:italic;padding:1rem 0;">Noch keine Einträge vorhanden.</div>
+                            <div style="color:var(--text-faint);font-size:13px;font-style:italic;padding:1rem 0;"><?= htmlspecialchars(t('admin.audit.empty')) ?></div>
                         <?php else: ?>
                             <table class="pg-table" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
                                 <thead>
                                     <tr>
-                                        <th>Zeitpunkt</th>
-                                        <th>Benutzer</th>
-                                        <th>Aktion</th>
+                                        <th><?= htmlspecialchars(t('admin.audit.col_time')) ?></th>
+                                        <th><?= htmlspecialchars(t('admin.audit.col_user')) ?></th>
+                                        <th><?= htmlspecialchars(t('admin.audit.col_action')) ?></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2103,7 +2160,7 @@ function render_audit_view(PDO $db, array $project, array $projects): void {
                     </div>
                 </div>
 
-                <div class="pg-footer-note">Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.</div>
+                <div class="pg-footer-note"><?= htmlspecialchars(t('admin.common.footer_disclaimer')) ?></div>
             </div>
         </div>
     </body>

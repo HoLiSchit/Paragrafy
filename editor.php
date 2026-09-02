@@ -24,7 +24,7 @@ $stmt->execute([$docId]);
 $doc = $stmt->fetch();
 
 if (!$doc) {
-    echo "Dokument nicht gefunden.";
+    echo htmlspecialchars(t('editor.error.doc_not_found'));
     exit;
 }
 
@@ -47,7 +47,7 @@ if ($targetLang === $defaultRefLang) {
 }
 $sourceLang = strtolower($_GET['ref_lang'] ?? $defaultRefLang);
 
-$sourceTrans = $allTranslations[$sourceLang] ?? ['title' => $doc['type_title'], 'content' => 'Noch kein Text in dieser Sprache vorhanden.'];
+$sourceTrans = $allTranslations[$sourceLang] ?? ['title' => $doc['type_title'], 'content' => t('editor.no_text_placeholder')];
 $currentSourceHash = md5($sourceTrans['content'] ?? '');
 
 // DeepL AJAX Bidirektionaler Übersetzungs-Endpunkt
@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'preview_url' => 'https://' . $doc['domain'] . '/' . $targetLang . '/' . $currentSlugForPreview . '/preview',
                 'preview_api_url' => 'https://' . $doc['domain'] . '/api/' . $targetLang . '/' . $currentSlugForPreview . '/preview'
             ]);
-            log_audit((int)$doc['project_id'], $doc['project_name'], "„$title\" (" . strtoupper($targetLang) . ") geplant für " . date('d.m.Y H:i', strtotime($scheduledAt)));
+            log_audit((int)$doc['project_id'], $doc['project_name'], t('editor.audit.scheduled_for', ['title' => $title, 'lang' => strtoupper($targetLang), 'date' => date('d.m.Y H:i', strtotime($scheduledAt))]));
         } else {
             $prevContent = $oldRow ? $oldRow['content'] : $content;
             $stmt = $db->prepare("
@@ -155,8 +155,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'updated_at' => date('c')
                 ]);
             }
-            $statusLabel = $status === 'published' ? 'veröffentlicht' : 'als Entwurf gespeichert';
-            log_audit((int)$doc['project_id'], $doc['project_name'], "„$title\" (" . strtoupper($targetLang) . ") $statusLabel");
+            $statusLabel = $status === 'published' ? t('editor.audit.status_published') : t('editor.audit.status_draft');
+            log_audit((int)$doc['project_id'], $doc['project_name'], t('editor.audit.saved', ['title' => $title, 'lang' => strtoupper($targetLang), 'status' => $statusLabel]));
         }
 
         header("Location: /admin?project_id=" . ((int)$_POST['project_id']) . "&msg=saved");
@@ -174,7 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtOld->execute([$docId, $targetLang]);
             $oldRow = $stmtOld->fetch();
             $prevContent = $oldRow ? $oldRow['content'] : $version['content'];
-            $noteRestored = 'Wiederhergestellt aus Version vom ' . date('d.m.Y H:i', strtotime($version['created_at']));
+            $noteRestored = t('editor.restored_note', ['date' => date('d.m.Y H:i', strtotime($version['created_at']))]);
 
             $stmt = $db->prepare("
                 INSERT INTO translations (document_id, lang, title, slug, content, previous_content, status, change_note, source_hash, scheduled_at, scheduled_title, scheduled_slug, scheduled_content, scheduled_note, updated_at)
@@ -197,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'effective_date' => date('c'),
                 'updated_at' => date('c')
             ]);
-            log_audit((int)$doc['project_id'], $doc['project_name'], "„" . $version['title'] . "\" (" . strtoupper($targetLang) . ") $noteRestored");
+            log_audit((int)$doc['project_id'], $doc['project_name'], t('editor.audit.restored', ['title' => $version['title'], 'lang' => strtoupper($targetLang), 'note' => $noteRestored]));
         }
 
         header("Location: /admin/edit?doc_id=$docId&lang=$targetLang&msg=restored");
@@ -236,10 +236,10 @@ $stmtVersions->execute([$docId, $targetLang]);
 $versions = $stmtVersions->fetchAll();
 ?>
 <!DOCTYPE html>
-<html lang="de">
+<html lang="<?= htmlspecialchars(current_locale()) ?>">
 <head>
     <meta charset="utf-8">
-    <title>Editor: <?= htmlspecialchars($doc['type_title']) ?> (<?= strtoupper($targetLang) ?>)</title>
+    <title><?= htmlspecialchars(t('editor.page_title', ['doc' => $doc['type_title'], 'lang' => strtoupper($targetLang)])) ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
     <?= theme_head_tags() ?>
@@ -300,15 +300,15 @@ $versions = $stmtVersions->fetchAll();
 </head>
 <body>
     <div class="pg-topbar">
-        <div class="pg-crumb"><?= htmlspecialchars($doc['project_name']) ?> <span style="margin:0 4px">/</span> <strong>Editor: <?= htmlspecialchars($doc['type_title']) ?></strong></div>
-        <a href="/admin?project_id=<?= $doc['project_id'] ?>" style="margin-left:auto;font-size:13px;font-weight:600">&larr; Zurück zum Dashboard</a>
+        <div class="pg-crumb"><?= htmlspecialchars($doc['project_name']) ?> <span style="margin:0 4px">/</span> <strong><?= htmlspecialchars(t('editor.crumb_prefix', ['doc' => $doc['type_title']])) ?></strong></div>
+        <a href="/admin?project_id=<?= $doc['project_id'] ?>" style="margin-left:auto;font-size:13px;font-weight:600"><?= t('editor.back_to_dashboard') ?></a>
     </div>
 
     <?php if (($_GET['msg'] ?? '') === 'restored'): ?>
     <div style="max-width:1440px;margin:24px auto 0;padding:0 28px">
         <div class="scheduled-strip" style="border-radius:8px">
             <?= svg_icon('check', '', 16) ?>
-            <span>Version wiederhergestellt und veröffentlicht.</span>
+            <span><?= htmlspecialchars(t('editor.msg.restored')) ?></span>
         </div>
     </div>
     <?php endif; ?>
@@ -318,15 +318,15 @@ $versions = $stmtVersions->fetchAll();
         <?php if ($hasScheduled): ?>
             <div class="scheduled-strip" style="border-radius:8px">
                 <?= svg_icon('calendar', '', 16) ?>
-                <span><strong>Zeitgesteuert geplant:</strong> Diese Version geht automatisch am <strong><?= date('d.m.Y \u\m H:i', strtotime($targetTrans['scheduled_at'])) ?> Uhr</strong> live. Bis dahin bleibt der aktuelle Stand öffentlich.</span>
-                <a href="https://<?= htmlspecialchars($doc['domain']) ?>/<?= htmlspecialchars($targetLang) ?>/<?= htmlspecialchars($targetTrans['slug']) ?>/preview" target="_blank" style="margin-left:auto;font-weight:700;white-space:nowrap">Vorschau ansehen &rarr;</a>
+                <span><?= t('editor.scheduled_notice', ['date' => date('d.m.Y \u\m H:i', strtotime($targetTrans['scheduled_at']))]) ?></span>
+                <a href="https://<?= htmlspecialchars($doc['domain']) ?>/<?= htmlspecialchars($targetLang) ?>/<?= htmlspecialchars($targetTrans['slug']) ?>/preview" target="_blank" style="margin-left:auto;font-weight:700;white-space:nowrap"><?= t('editor.preview_link') ?></a>
             </div>
         <?php endif; ?>
 
         <?php if ($isOutdated): ?>
             <div class="warning-strip" style="border-radius:8px">
                 <?= svg_icon('warning', '', 16) ?>
-                <span><strong>Hinweis:</strong> Der Quelltext wurde seit der letzten Übersetzung geändert. Bitte gleiche den Zieltext an oder nutze DeepL.</span>
+                <span><?= t('editor.outdated_notice') ?></span>
             </div>
         <?php endif; ?>
     </div>
@@ -337,11 +337,11 @@ $versions = $stmtVersions->fetchAll();
             <?php $alMeta = lang_meta($al); ?>
             <a href="/admin/edit?doc_id=<?= $docId ?>&lang=<?= $al ?>&showRef=<?= $showRef ? '1' : '0' ?>" class="lang-tab <?= $al === $targetLang ? 'active' : '' ?>"><?= $alMeta['flag'] ? $alMeta['flag'] . ' ' : '' ?><?= htmlspecialchars($alMeta['label']) ?></a>
         <?php endforeach; ?>
-        <a href="/admin/settings?project_id=<?= $doc['project_id'] ?>" class="lang-tab-add">+ Sprache hinzufügen</a>
+        <a href="/admin/settings?project_id=<?= $doc['project_id'] ?>" class="lang-tab-add"><?= htmlspecialchars(t('editor.add_language')) ?></a>
         <?php if (count($activeLangs) > 1): ?>
             <label class="compare-toggle">
                 <input type="checkbox" <?= $showRef ? 'checked' : '' ?> onchange="location.href='/admin/edit?doc_id=<?= $docId ?>&lang=<?= $targetLang ?>&ref_lang=<?= $sourceLang ?>&showRef=' + (this.checked ? '1' : '0')">
-                Andere Sprache zum Vergleich anzeigen
+                <?= htmlspecialchars(t('editor.compare_toggle')) ?>
             </label>
         <?php endif; ?>
     </div>
@@ -352,31 +352,31 @@ $versions = $stmtVersions->fetchAll();
             <div class="pane pane-source">
                 <div class="pane-header">
                     <h3>
-                        <span>Referenz:</span>
+                        <span><?= htmlspecialchars(t('editor.reference_label')) ?></span>
                         <select class="ref-select" onchange="location.href='/admin/edit?doc_id=<?= $docId ?>&lang=<?= $targetLang ?>&showRef=1&ref_lang=' + this.value">
                             <?php foreach ($activeLangs as $al): ?>
                                 <?php if ($al !== $targetLang): ?>
                                     <option value="<?= $al ?>" <?= $al === $sourceLang ? 'selected' : '' ?>>
-                                        <?= strtoupper($al) ?> <?= isset($allTranslations[$al]) ? '(vorhanden)' : '(leer)' ?>
+                                        <?= strtoupper($al) ?> <?= isset($allTranslations[$al]) ? htmlspecialchars(t('editor.translation_present')) : htmlspecialchars(t('editor.translation_empty')) ?>
                                     </option>
                                 <?php endif; ?>
                             <?php endforeach; ?>
                         </select>
                     </h3>
-                    <button type="button" class="btn-diff" id="diffBtn" onclick="toggleDiffViewer()"><?= svg_icon('eye', '', 14) ?> Unterschiede anzeigen</button>
+                    <button type="button" class="btn-diff" id="diffBtn" onclick="toggleDiffViewer()"><?= svg_icon('eye', '', 14) ?> <?= htmlspecialchars(t('editor.show_differences')) ?></button>
                 </div>
 
-                <label>Referenz-Titel (<?= strtoupper(htmlspecialchars($sourceLang)) ?>):</label>
+                <label><?= htmlspecialchars(t('editor.reference_title_label', ['lang' => strtoupper($sourceLang)])) ?></label>
                 <input type="text" value="<?= htmlspecialchars($sourceTrans['title']) ?>" readonly disabled style="width:100%">
 
-                <label>Referenz-Inhalt:</label>
+                <label><?= htmlspecialchars(t('editor.reference_content_label')) ?></label>
                 <div class="source-box" id="sourceContentBox"><?= $sourceTrans['content'] ?></div>
                 <div class="diff-box" id="diffViewerBox"></div>
 
                 <div class="stat-footer">
-                    <span id="sourceWordCount">0 Wörter</span>
+                    <span id="sourceWordCount">0 <?= htmlspecialchars(t('editor.js.words_label')) ?></span>
                     <label style="display:inline-flex; align-items:center; gap:0.3rem; margin:0; cursor:pointer;">
-                        <input type="checkbox" id="syncScrollCheck" checked style="width:14px; height:14px;"> Gemeinsam scrollen
+                        <input type="checkbox" id="syncScrollCheck" checked style="width:14px; height:14px;"> <?= htmlspecialchars(t('editor.sync_scroll')) ?>
                     </label>
                 </div>
             </div>
@@ -393,19 +393,19 @@ $versions = $stmtVersions->fetchAll();
                     <textarea name="content" id="finalContentInput" style="display:none;"><?= htmlspecialchars($displayContent) ?></textarea>
 
                     <div class="pane-header">
-                        <h3>Wird bearbeitet &middot; <?= strtoupper(htmlspecialchars($targetLang)) ?></h3>
+                        <h3><?= t('editor.editing_label', ['lang' => strtoupper(htmlspecialchars($targetLang))]) ?></h3>
                         <div style="display:flex;gap:6px;flex-wrap:wrap">
-                            <button type="button" class="btn-diff" onclick="openVersionsModal()"><?= svg_icon('clock', '', 13) ?> Verlauf (<?= count($versions) ?>)</button>
+                            <button type="button" class="btn-diff" onclick="openVersionsModal()"><?= svg_icon('clock', '', 13) ?> <?= htmlspecialchars(t('editor.history_label', ['count' => count($versions)], count($versions))) ?></button>
                             <?php if ($targetLang !== $sourceLang): ?>
                                 <button type="button" class="btn-deepl" id="deeplBtn" onclick="translateWithDeepL()">
-                                    Mit DeepL übersetzen (<?= strtoupper($sourceLang) ?> &rarr; <?= strtoupper($targetLang) ?>)
+                                    <?= htmlspecialchars(t('editor.deepl_button', ['src' => strtoupper($sourceLang), 'tgt' => strtoupper($targetLang)])) ?>
                                 </button>
                             <?php endif; ?>
                         </div>
                     </div>
-                    
+
                     <div class="tokens">
-                        <strong>Platzhalter einfügen:</strong><br>
+                        <strong><?= htmlspecialchars(t('editor.insert_placeholder_label')) ?></strong><br>
                         <button type="button" class="token-btn" onclick="insertToken('{{company_name}}')">{{company_name}}</button>
                         <button type="button" class="token-btn" onclick="insertToken('{{address}}')">{{address}}</button>
                         <button type="button" class="token-btn" onclick="insertToken('{{email}}')">{{email}}</button>
@@ -413,56 +413,56 @@ $versions = $stmtVersions->fetchAll();
                         <button type="button" class="token-btn" onclick="insertToken('{{register_info}}')">{{register_info}}</button>
                     </div>
 
-                    <label>Titel des Dokuments:</label>
+                    <label><?= htmlspecialchars(t('editor.doc_title_label')) ?></label>
                     <input type="text" id="targetTitle" name="title" value="<?= htmlspecialchars($displayTitle) ?>" required style="width:100%">
 
-                    <label>Seitenadresse (/<?= htmlspecialchars($targetLang) ?>/adresse):<?= help_icon('Bestimmt die öffentliche Adresse dieses Rechtstexts, z. B. /' . htmlspecialchars($targetLang) . '/agb-b2c. Änderungen brechen bestehende Links zu dieser Seite.') ?></label>
+                    <label><?= htmlspecialchars(t('editor.slug_label', ['lang' => htmlspecialchars($targetLang)])) ?><?= help_icon(t('editor.slug_help', ['lang' => htmlspecialchars($targetLang)])) ?></label>
                     <input type="text" name="slug" value="<?= htmlspecialchars($displaySlug) ?>" required style="width:100%">
 
-                    <label>Inhalt (Visueller Editor):</label>
-                    
+                    <label><?= htmlspecialchars(t('editor.content_label')) ?></label>
+
                     <div class="wysiwyg-toolbar">
-                        <button type="button" class="tool-btn" onclick="execCmd('bold')" title="Fett"><strong>B</strong></button>
-                        <button type="button" class="tool-btn" onclick="execCmd('italic')" title="Kursiv"><em>I</em></button>
-                        <button type="button" class="tool-btn" onclick="execCmd('underline')" title="Unterstrichen"><u>U</u></button>
-                        <button type="button" class="tool-btn" onclick="execFormat('h2')" title="Überschrift 2">H2</button>
-                        <button type="button" class="tool-btn" onclick="execFormat('h3')" title="Überschrift 3">H3</button>
-                        <button type="button" class="tool-btn" onclick="execFormat('p')" title="Absatz">P</button>
-                        <button type="button" class="tool-btn wide" onclick="execCmd('insertUnorderedList')" title="Aufzählung">&bull; Liste</button>
-                        <button type="button" class="tool-btn wide" onclick="execCmd('insertOrderedList')" title="Nummerierung">1. Liste</button>
-                        <button type="button" class="tool-btn wide" onclick="createLink()" title="Link einfügen"><?= svg_icon('link', '', 14) ?> Link</button>
-                        <button type="button" class="tool-btn wide" onclick="execCmd('removeFormat')" title="Formatierung entfernen">&#9003; Clear</button>
+                        <button type="button" class="tool-btn" onclick="execCmd('bold')" title="<?= htmlspecialchars(t('editor.toolbar.bold_title')) ?>"><strong>B</strong></button>
+                        <button type="button" class="tool-btn" onclick="execCmd('italic')" title="<?= htmlspecialchars(t('editor.toolbar.italic_title')) ?>"><em>I</em></button>
+                        <button type="button" class="tool-btn" onclick="execCmd('underline')" title="<?= htmlspecialchars(t('editor.toolbar.underline_title')) ?>"><u>U</u></button>
+                        <button type="button" class="tool-btn" onclick="execFormat('h2')" title="<?= htmlspecialchars(t('editor.toolbar.h2_title')) ?>">H2</button>
+                        <button type="button" class="tool-btn" onclick="execFormat('h3')" title="<?= htmlspecialchars(t('editor.toolbar.h3_title')) ?>">H3</button>
+                        <button type="button" class="tool-btn" onclick="execFormat('p')" title="<?= htmlspecialchars(t('editor.toolbar.paragraph_title')) ?>">P</button>
+                        <button type="button" class="tool-btn wide" onclick="execCmd('insertUnorderedList')" title="<?= htmlspecialchars(t('editor.toolbar.bullet_title')) ?>"><?= t('editor.toolbar.bullet_list_label') ?></button>
+                        <button type="button" class="tool-btn wide" onclick="execCmd('insertOrderedList')" title="<?= htmlspecialchars(t('editor.toolbar.numbered_title')) ?>"><?= t('editor.toolbar.numbered_list_label') ?></button>
+                        <button type="button" class="tool-btn wide" onclick="createLink()" title="<?= htmlspecialchars(t('editor.toolbar.link_title')) ?>"><?= svg_icon('link', '', 14) ?> <?= htmlspecialchars(t('editor.toolbar.link_label')) ?></button>
+                        <button type="button" class="tool-btn wide" onclick="execCmd('removeFormat')" title="<?= htmlspecialchars(t('editor.toolbar.clear_title')) ?>"><?= t('editor.toolbar.clear_label') ?></button>
                         <div style="flex:1;"></div>
-                        <button type="button" class="tool-btn wide" id="toggleCodeBtn" onclick="toggleCodeView()" title="HTML-Quellcode bearbeiten">&lt;/&gt; HTML-Code</button>
+                        <button type="button" class="tool-btn wide" id="toggleCodeBtn" onclick="toggleCodeView()" title="<?= htmlspecialchars(t('editor.toolbar.html_title')) ?>"><?= t('editor.toolbar.html_code_label') ?></button>
                     </div>
 
                     <div id="visualEditor" class="editor-box" contenteditable="true" oninput="updateWordCounts()"><?= $displayContent ?></div>
                     <textarea id="rawCodeEditor" class="code-textarea" oninput="updateWordCounts()"><?= htmlspecialchars($displayContent) ?></textarea>
 
                     <div class="stat-footer">
-                        <span id="targetWordCount">0 Wörter &bull; 0 Zeichen</span>
-                        <span>Shortcut: <strong>Cmd+S</strong> / <strong>Strg+S</strong></span>
+                        <span id="targetWordCount">0 <?= htmlspecialchars(t('editor.js.words_label')) ?> &bull; 0 <?= htmlspecialchars(t('editor.js.chars_label')) ?></span>
+                        <span><?= t('editor.shortcut_hint') ?></span>
                     </div>
 
-                    <label>Änderungsnotiz (für Changelog &amp; Webhooks):<?= help_icon('Wird im Versionsverlauf angezeigt und als change_note im Webhook-Payload mitgeschickt — keine Auswirkung auf die öffentliche Seite.') ?></label>
-                    <input type="text" name="change_note" value="<?= htmlspecialchars($displayNote) ?>" placeholder="z. B. Aktualisierung der Zahlungsbedingungen zum 31.08." style="width:100%">
+                    <label><?= t('editor.change_note_label') ?><?= help_icon(t('editor.change_note_help')) ?></label>
+                    <input type="text" name="change_note" value="<?= htmlspecialchars($displayNote) ?>" placeholder="<?= htmlspecialchars(t('editor.change_note_placeholder')) ?>" style="width:100%">
 
                     <!-- Zeitgesteuerte Veröffentlichung Einstellungen -->
                     <div id="scheduleBox" class="schedule-box" style="<?= $hasScheduled ? 'display:block;' : '' ?>">
-                        <label style="margin-top:0;">Live-Schaltungszeitpunkt festlegen:</label>
+                        <label style="margin-top:0;"><?= htmlspecialchars(t('editor.schedule_label')) ?></label>
                         <input type="datetime-local" id="scheduledInput" name="scheduled_at" value="<?= $hasScheduled ? date('Y-m-d\TH:i', strtotime($targetTrans['scheduled_at'])) : '' ?>" style="width:100%">
-                        <div class="pg-hint">Sendet einen Webhook mit Vorankündigung und geht zum Stichtag automatisch live.</div>
+                        <div class="pg-hint"><?= htmlspecialchars(t('editor.schedule_hint')) ?></div>
                     </div>
 
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; flex-wrap:wrap; gap:1rem;">
                         <select id="statusSelect" name="status" style="width:auto;" onchange="handleStatusChange(this.value)">
-                            <option value="published" <?= (!$hasScheduled && $targetTrans['status'] === 'published') ? 'selected' : '' ?>>Sofort veröffentlichen (Live)</option>
-                            <option value="scheduled" <?= $hasScheduled ? 'selected' : '' ?>>Zeitgesteuert planen (Live ab Datum)</option>
-                            <option value="draft" <?= (!$hasScheduled && $targetTrans['status'] === 'draft') ? 'selected' : '' ?>>Entwurf (ausgeblendet)</option>
+                            <option value="published" <?= (!$hasScheduled && $targetTrans['status'] === 'published') ? 'selected' : '' ?>><?= htmlspecialchars(t('editor.status_publish_now')) ?></option>
+                            <option value="scheduled" <?= $hasScheduled ? 'selected' : '' ?>><?= htmlspecialchars(t('editor.status_schedule')) ?></option>
+                            <option value="draft" <?= (!$hasScheduled && $targetTrans['status'] === 'draft') ? 'selected' : '' ?>><?= htmlspecialchars(t('editor.status_draft')) ?></option>
                         </select>
                         <div style="display:flex;align-items:center;gap:12px">
-                            <span id="dirtyIndicator" style="display:none;font-size:12px;font-weight:600;color:var(--text-faint)">Ungespeicherte Änderungen</span>
-                            <button type="submit" class="btn-save"><?= svg_icon('disk', '', 16) ?> Speichern & Bestätigen</button>
+                            <span id="dirtyIndicator" style="display:none;font-size:12px;font-weight:600;color:var(--text-faint)"><?= htmlspecialchars(t('editor.unsaved_changes')) ?></span>
+                            <button type="submit" class="btn-save"><?= svg_icon('disk', '', 16) ?> <?= htmlspecialchars(t('editor.save_button')) ?></button>
                         </div>
                     </div>
                 </form>
@@ -470,33 +470,33 @@ $versions = $stmtVersions->fetchAll();
         </div>
     </div>
 
-    <div class="pg-footer-note">Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.</div>
+    <div class="pg-footer-note"><?= htmlspecialchars(t('admin.common.footer_disclaimer')) ?></div>
 
     <textarea id="currentTargetRaw" style="display:none;"><?= htmlspecialchars($targetTrans['content'] ?? '') ?></textarea>
 
     <!-- Modal: Versionsverlauf -->
     <div id="versionsModal" class="pg-modal-backdrop" onclick="if(event.target === this) closeVersionsModal()">
         <div class="pg-modal" style="width:640px;max-height:80vh;display:flex;flex-direction:column">
-            <h2 style="font-size:19px;font-weight:800;margin:0 0 6px">Versionsverlauf &middot; <?= strtoupper(htmlspecialchars($targetLang)) ?></h2>
-            <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px">Jede Veröffentlichung legt eine neue Version an. Stelle eine frühere Fassung wieder her oder vergleiche sie mit dem aktuellen Stand.</p>
+            <h2 style="font-size:19px;font-weight:800;margin:0 0 6px"><?= t('editor.versions_modal_title', ['lang' => strtoupper(htmlspecialchars($targetLang))]) ?></h2>
+            <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px"><?= htmlspecialchars(t('editor.versions_modal_desc')) ?></p>
 
             <div style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px">
                 <?php if (empty($versions)): ?>
-                    <div style="color:var(--text-faint);font-size:13px;font-style:italic">Noch keine gespeicherten Versionen für diese Sprache.</div>
+                    <div style="color:var(--text-faint);font-size:13px;font-style:italic"><?= htmlspecialchars(t('editor.no_versions')) ?></div>
                 <?php endif; ?>
                 <?php foreach ($versions as $v): ?>
                     <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px">
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
                             <div>
-                                <div style="font-size:13px;font-weight:600"><?= date('d.m.Y H:i', strtotime($v['created_at'])) ?> Uhr &middot; <span style="color:var(--text-muted);font-weight:500"><?= htmlspecialchars($v['user_name']) ?></span></div>
+                                <div style="font-size:13px;font-weight:600"><?= t('editor.version_date_user', ['date' => date('d.m.Y H:i', strtotime($v['created_at']))]) ?> <span style="color:var(--text-muted);font-weight:500"><?= htmlspecialchars($v['user_name']) ?></span></div>
                                 <?php if (!empty($v['change_note'])): ?><div style="font-size:12px;color:var(--text-faint);margin-top:2px"><?= htmlspecialchars($v['change_note']) ?></div><?php endif; ?>
                             </div>
                             <div style="display:flex;gap:6px;flex-shrink:0">
-                                <button type="button" class="pg-btn-secondary" style="padding:5px 10px;font-size:11.5px" onclick="toggleVersionDiff(<?= $v['id'] ?>)">Unterschiede</button>
-                                <form method="post" onsubmit="return confirm('Diese Version wiederherstellen? Der aktuelle Stand wird dabei als neue Version gesichert.');" style="margin:0">
+                                <button type="button" class="pg-btn-secondary" style="padding:5px 10px;font-size:11.5px" onclick="toggleVersionDiff(<?= $v['id'] ?>)"><?= htmlspecialchars(t('editor.diff_button')) ?></button>
+                                <form method="post" onsubmit="return confirm('<?= htmlspecialchars(t('editor.confirm_restore'), ENT_QUOTES) ?>');" style="margin:0">
                                     <input type="hidden" name="action" value="restore_version">
                                     <input type="hidden" name="version_id" value="<?= $v['id'] ?>">
-                                    <button type="submit" class="pg-btn-secondary" style="padding:5px 10px;font-size:11.5px">Wiederherstellen</button>
+                                    <button type="submit" class="pg-btn-secondary" style="padding:5px 10px;font-size:11.5px"><?= htmlspecialchars(t('editor.restore_button')) ?></button>
                                 </form>
                             </div>
                         </div>
@@ -507,7 +507,7 @@ $versions = $stmtVersions->fetchAll();
             </div>
 
             <div style="display:flex;justify-content:flex-end;margin-top:16px">
-                <button type="button" class="pg-btn-secondary" onclick="closeVersionsModal()">Schließen</button>
+                <button type="button" class="pg-btn-secondary" onclick="closeVersionsModal()"><?= htmlspecialchars(t('editor.close_button')) ?></button>
             </div>
         </div>
     </div>
@@ -518,6 +518,18 @@ $versions = $stmtVersions->fetchAll();
         let formDirty = false;
         const currentSourceLang = "<?= $sourceLang ?>";
         const currentTargetLang = "<?= $targetLang ?>";
+        const i18n = {
+            urlPrompt: <?= json_encode(t('editor.js.url_prompt')) ?>,
+            visualEditorLabel: <?= json_encode(t('editor.toolbar.visual_editor_label')) ?>,
+            htmlCodeLabel: <?= json_encode(t('editor.toolbar.html_code_label')) ?>,
+            wordsLabel: <?= json_encode(t('editor.js.words_label')) ?>,
+            charsLabel: <?= json_encode(t('editor.js.chars_label')) ?>,
+            noChanges: <?= json_encode(t('editor.js.no_changes')) ?>,
+            translating: <?= json_encode(t('editor.js.translating')) ?>,
+            deeplError: <?= json_encode(t('editor.js.deepl_error')) ?>,
+            networkErrorPrefix: <?= json_encode(t('editor.js.network_error_prefix')) ?>,
+            deeplButtonTemplate: <?= json_encode(t('editor.deepl_button', ['src' => '%SRC%', 'tgt' => '%TGT%'])) ?>
+        };
 
         document.addEventListener('DOMContentLoaded', () => {
             updateWordCounts();
@@ -574,7 +586,7 @@ $versions = $stmtVersions->fetchAll();
         }
 
         function createLink() {
-            const url = prompt('URL eingeben:', 'https://');
+            const url = prompt(i18n.urlPrompt, 'https://');
             if (url) {
                 execCmd('createLink', url);
             }
@@ -606,13 +618,13 @@ $versions = $stmtVersions->fetchAll();
                 visual.style.display = 'none';
                 code.style.display = 'block';
                 btn.classList.add('active');
-                btn.innerText = 'Visueller Editor';
+                btn.innerText = i18n.visualEditorLabel;
             } else {
                 visual.innerHTML = code.value;
                 code.style.display = 'none';
                 visual.style.display = 'block';
                 btn.classList.remove('active');
-                btn.innerText = '</> HTML-Code';
+                btn.innerText = i18n.htmlCodeLabel.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
             }
             updateWordCounts();
         }
@@ -655,13 +667,13 @@ $versions = $stmtVersions->fetchAll();
             if (srcBox) {
                 const srcText = srcBox.innerText.trim();
                 const srcWords = srcText ? srcText.split(/\\s+/).length : 0;
-                document.getElementById('sourceWordCount').innerText = `${srcWords} Wörter`;
+                document.getElementById('sourceWordCount').innerText = `${srcWords} ${i18n.wordsLabel}`;
             }
 
             const targetText = isCodeMode ? document.getElementById('rawCodeEditor').value : document.getElementById('visualEditor').innerText;
             const targetWords = targetText.trim() ? targetText.trim().split(/\\s+/).length : 0;
             const targetChars = targetText.length;
-            document.getElementById('targetWordCount').innerText = `${targetWords} Wörter • ${targetChars} Zeichen`;
+            document.getElementById('targetWordCount').innerText = `${targetWords} ${i18n.wordsLabel} • ${targetChars} ${i18n.charsLabel}`;
         }
 
         function setupSynchronousScroll() {
@@ -707,7 +719,7 @@ $versions = $stmtVersions->fetchAll();
 
         function computeSimpleDiff(oldStr, newStr) {
             if (oldStr === newStr) {
-                return '<div style="color:#64748b; font-style:italic; padding:1rem 0;">Keine inhaltlichen Änderungen gegenüber der Vorversion.</div>' + newStr;
+                return `<div style="color:#64748b; font-style:italic; padding:1rem 0;">${i18n.noChanges}</div>` + newStr;
             }
             const oldWords = oldStr.split(/(\\s+|<[^>]+>)/).filter(Boolean);
             const newWords = newStr.split(/(\\s+|<[^>]+>)/).filter(Boolean);
@@ -737,7 +749,7 @@ $versions = $stmtVersions->fetchAll();
             const sourceTitle = document.getElementById('sourceTitle').value;
 
             btn.disabled = true;
-            btn.innerHTML = '<span>Übersetze...</span>';
+            btn.innerHTML = `<span>${i18n.translating}</span>`;
 
             const formData = new FormData();
             formData.append('action', 'deepl_translate');
@@ -750,7 +762,7 @@ $versions = $stmtVersions->fetchAll();
                 const res = await fetch(window.location.href, { method: 'POST', body: formData });
                 const data = await res.json();
                 if (!data.success) {
-                    alert(data.error || 'Fehler bei der DeepL Übersetzung.');
+                    alert(data.error || i18n.deeplError);
                 } else {
                     document.getElementById('visualEditor').innerHTML = data.content;
                     document.getElementById('rawCodeEditor').value = data.content;
@@ -760,10 +772,10 @@ $versions = $stmtVersions->fetchAll();
                     updateWordCounts();
                 }
             } catch (err) {
-                alert('Netzwerkfehler bei der DeepL-Anfrage: ' + err.message);
+                alert(i18n.networkErrorPrefix + err.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = `Mit DeepL übersetzen (${currentSourceLang.toUpperCase()} &rarr; ${currentTargetLang.toUpperCase()})`;
+                btn.innerHTML = i18n.deeplButtonTemplate.replace('%SRC%', currentSourceLang.toUpperCase()).replace('%TGT%', currentTargetLang.toUpperCase());
             }
         }
     </script>

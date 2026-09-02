@@ -76,7 +76,7 @@ if ($uri === '/consent.js') {
 
 if (!$project) {
     http_response_code(404);
-    echo "<h1>404 - Kein Projekt hinterlegt</h1><p>Für die Domain <code>" . htmlspecialchars($host) . "</code> ist kein Legal-Projekt eingerichtet. Bitte im <a href='/admin'>Admin-Panel</a> anlegen.</p>";
+    echo "<h1>" . htmlspecialchars(t('public.error.no_project_title')) . "</h1><p>" . t('public.error.no_project_desc', ['domain' => htmlspecialchars($host)]) . "</p>";
     exit;
 }
 
@@ -184,7 +184,15 @@ function get_i18n_strings(string $lang): array {
             'not_found_title' => 'Dokument nicht gefunden',
             'not_found_desc' => 'Der angeforderte Rechtstext existiert nicht oder wurde noch nicht freigegeben.',
             'back_to_overview' => 'Zurück zur Übersicht',
-            'copy_anchor' => 'Direktlink kopieren'
+            'copy_anchor' => 'Direktlink kopieren',
+            'preview_suffix' => ' (Vorschau)',
+            'print_title' => 'Drucken oder als PDF speichern',
+            'preview_banner_text' => 'Vorschau: Dies ist die geplante Neufassung. Sie geht am %s Uhr live. Bis dahin gilt weiterhin die aktuelle Fassung.',
+            'preview_banner_link' => 'Aktuelle Fassung ansehen &rarr;',
+            'upcoming_banner_text' => 'Geplante Neufassung verfügbar: Diese Bestimmungen werden zum %s aktualisiert.',
+            'upcoming_banner_link' => 'Vorab ansehen &rarr;',
+            'powered_by_toc' => 'Bereitgestellt mit Paragrafy',
+            'powered_by_footer' => 'Bereitgestellt über Paragrafy'
         ],
         'en' => [
             'toc' => 'Table of Contents',
@@ -197,7 +205,15 @@ function get_i18n_strings(string $lang): array {
             'not_found_title' => 'Document not found',
             'not_found_desc' => 'The requested legal document does not exist or has not been published yet.',
             'back_to_overview' => 'Back to Overview',
-            'copy_anchor' => 'Copy section link'
+            'copy_anchor' => 'Copy section link',
+            'preview_suffix' => ' (Preview)',
+            'print_title' => 'Print or save as PDF',
+            'preview_banner_text' => 'Preview: this is the scheduled new version. It goes live at %s. Until then, the current version remains in effect.',
+            'preview_banner_link' => 'View current version &rarr;',
+            'upcoming_banner_text' => 'Upcoming revision available: these terms will be updated on %s.',
+            'upcoming_banner_link' => 'Preview now &rarr;',
+            'powered_by_toc' => 'Powered by Paragrafy',
+            'powered_by_footer' => 'Powered by Paragrafy'
         ],
         'es' => [
             'toc' => 'Índice de contenidos',
@@ -210,7 +226,15 @@ function get_i18n_strings(string $lang): array {
             'not_found_title' => 'Documento no encontrado',
             'not_found_desc' => 'El documento legal solicitado no existe o aún no ha sido publicado.',
             'back_to_overview' => 'Volver a la vista general',
-            'copy_anchor' => 'Copiar enlace'
+            'copy_anchor' => 'Copiar enlace',
+            'preview_suffix' => ' (Vista previa)',
+            'print_title' => 'Imprimir o guardar como PDF',
+            'preview_banner_text' => 'Vista previa: esta es la nueva versión programada. Estará activa a partir del %s. Hasta entonces, sigue vigente la versión actual.',
+            'preview_banner_link' => 'Ver versión actual &rarr;',
+            'upcoming_banner_text' => 'Nueva versión programada disponible: estas condiciones se actualizarán el %s.',
+            'upcoming_banner_link' => 'Ver vista previa &rarr;',
+            'powered_by_toc' => 'Desarrollado con Paragrafy',
+            'powered_by_footer' => 'Desarrollado con Paragrafy'
         ],
         'fr' => [
             'toc' => 'Table des matières',
@@ -223,7 +247,15 @@ function get_i18n_strings(string $lang): array {
             'not_found_title' => 'Document non trouvé',
             'not_found_desc' => 'Le document juridique demandé n\'existe pas ou n\'a pas encore été publié.',
             'back_to_overview' => 'Retour à la vue d\'ensemble',
-            'copy_anchor' => 'Copier le lien'
+            'copy_anchor' => 'Copier le lien',
+            'preview_suffix' => ' (Aperçu)',
+            'print_title' => 'Imprimer ou enregistrer en PDF',
+            'preview_banner_text' => 'Aperçu : voici la nouvelle version prévue. Elle entrera en vigueur le %s. D\'ici là, la version actuelle reste applicable.',
+            'preview_banner_link' => 'Voir la version actuelle &rarr;',
+            'upcoming_banner_text' => 'Nouvelle version prévue : ces dispositions seront mises à jour le %s.',
+            'upcoming_banner_link' => 'Aperçu anticipé &rarr;',
+            'powered_by_toc' => 'Propulsé par Paragrafy',
+            'powered_by_footer' => 'Propulsé par Paragrafy'
         ],
         'it' => [
             'toc' => 'Indice dei contenuti',
@@ -236,7 +268,15 @@ function get_i18n_strings(string $lang): array {
             'not_found_title' => 'Documento non trovato',
             'not_found_desc' => 'Il documento legale richiesto non esiste o non è ancora stato pubblicato.',
             'back_to_overview' => 'Torna alla panoramica',
-            'copy_anchor' => 'Copia link'
+            'copy_anchor' => 'Copia link',
+            'preview_suffix' => ' (Anteprima)',
+            'print_title' => 'Stampa o salva come PDF',
+            'preview_banner_text' => 'Anteprima: questa è la nuova versione pianificata. Sarà attiva dal %s. Fino ad allora resta valida la versione attuale.',
+            'preview_banner_link' => 'Vedi versione attuale &rarr;',
+            'upcoming_banner_text' => 'Nuova versione pianificata disponibile: queste disposizioni saranno aggiornate il %s.',
+            'upcoming_banner_link' => 'Anteprima anticipata &rarr;',
+            'powered_by_toc' => 'Offerto da Paragrafy',
+            'powered_by_footer' => 'Offerto da Paragrafy'
         ],
         'nl' => [
             'toc' => 'Inhoudsopgave',
@@ -249,7 +289,15 @@ function get_i18n_strings(string $lang): array {
             'not_found_title' => 'Document niet gevonden',
             'not_found_desc' => 'Het opgevraagde juridische document bestaat niet of is nog niet gepubliceerd.',
             'back_to_overview' => 'Terug naar het overzicht',
-            'copy_anchor' => 'Kopieer link'
+            'copy_anchor' => 'Kopieer link',
+            'preview_suffix' => ' (Voorbeeld)',
+            'print_title' => 'Afdrukken of opslaan als PDF',
+            'preview_banner_text' => 'Voorbeeld: dit is de geplande nieuwe versie. Deze gaat live op %s. Tot die tijd blijft de huidige versie geldig.',
+            'preview_banner_link' => 'Huidige versie bekijken &rarr;',
+            'upcoming_banner_text' => 'Geplande wijziging beschikbaar: deze bepalingen worden bijgewerkt op %s.',
+            'upcoming_banner_link' => 'Vooraf bekijken &rarr;',
+            'powered_by_toc' => 'Mogelijk gemaakt door Paragrafy',
+            'powered_by_footer' => 'Mogelijk gemaakt door Paragrafy'
         ]
     ];
     return $dict[$lang] ?? $dict['en'];
@@ -343,7 +391,7 @@ function render_public_document(array $project, array $trans, string $content, a
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <?php if ($isPreview): ?><meta name="robots" content="noindex, nofollow"><?php endif; ?>
-        <title><?= htmlspecialchars($trans['title']) ?><?= $isPreview ? ' (Vorschau)' : '' ?> - <?= htmlspecialchars($project['name']) ?></title>
+        <title><?= htmlspecialchars($trans['title']) ?><?= $isPreview ? htmlspecialchars($i18n['preview_suffix']) : '' ?> - <?= htmlspecialchars($project['name']) ?></title>
         <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars($logoUrl) ?>">
         <?= theme_head_tags() ?>
         <?= theme_base_css($project['brand_color'] ?: '#6366F1', false) ?>
@@ -380,7 +428,7 @@ function render_public_document(array $project, array $trans, string $content, a
 
             .content { font-size: 14.5px; color: var(--text); }
             .content h1, .content h2, .content h3 { scroll-margin-top: 2rem; position: relative; }
-            .content h1 { font-size: 26px; font-weight: 800; margin-top: 2.25rem; margin-bottom: 0.75rem; }
+            .content h1 { font-size: 26px; font-weight: 800; margin-top: 2.25rem; margin-bottom: 0.75rem; color: var(--text); }
             .content h2 { font-size: 22px; font-weight: 700; margin-top: 2.25rem; margin-bottom: 0.75rem; }
             .content h3 { font-size: 16px; font-weight: 700; margin-top: 1.75rem; margin-bottom: 0.5rem; }
             .content a { text-decoration: underline; }
@@ -418,7 +466,7 @@ function render_public_document(array $project, array $trans, string $content, a
                                 </a>
                             <?php endforeach; ?>
                         </div>
-                        <button onclick="window.print()" class="btn-action" title="Drucken oder als PDF speichern">
+                        <button onclick="window.print()" class="btn-action" title="<?= htmlspecialchars($i18n['print_title']) ?>">
                             <?= svg_icon('print', '', 14) ?> <?= htmlspecialchars($i18n['print']) ?>
                         </button>
                     </div>
@@ -426,13 +474,13 @@ function render_public_document(array $project, array $trans, string $content, a
 
                 <?php if ($isPreview): ?>
                     <div class="preview-banner">
-                        <span><strong>Vorschau:</strong> Dies ist die geplante Neufassung. Sie geht am <strong style="color:#fff"><?= date('d.m.Y \u\m H:i', strtotime($trans['scheduled_at'])) ?></strong> Uhr live. Bis dahin gilt weiterhin die aktuelle Fassung.</span>
-                        <a href="/<?= htmlspecialchars($currentLang) ?>/<?= htmlspecialchars($liveSlug) ?>" class="btn-preview">Aktuelle Fassung ansehen &rarr;</a>
+                        <span><?= sprintf($i18n['preview_banner_text'], '<strong style="color:#fff">' . date('d.m.Y \u\m H:i', strtotime($trans['scheduled_at'])) . '</strong>') ?></span>
+                        <a href="/<?= htmlspecialchars($currentLang) ?>/<?= htmlspecialchars($liveSlug) ?>" class="btn-preview"><?= $i18n['preview_banner_link'] ?></a>
                     </div>
                 <?php elseif ($hasUpcoming): ?>
                     <div class="preview-banner">
-                        <span>Geplante Neufassung verfügbar: Diese Bestimmungen werden zum <strong style="color:#fff"><?= date('d.m.Y', strtotime($trans['scheduled_at'])) ?></strong> aktualisiert.</span>
-                        <a href="/<?= htmlspecialchars($currentLang) ?>/<?= htmlspecialchars($trans['slug']) ?>/preview" class="btn-preview">Vorab ansehen &rarr;</a>
+                        <span><?= sprintf($i18n['upcoming_banner_text'], '<strong style="color:#fff">' . date('d.m.Y', strtotime($trans['scheduled_at'])) . '</strong>') ?></span>
+                        <a href="/<?= htmlspecialchars($currentLang) ?>/<?= htmlspecialchars($trans['slug']) ?>/preview" class="btn-preview"><?= $i18n['upcoming_banner_link'] ?></a>
                     </div>
                 <?php endif; ?>
 
@@ -462,12 +510,13 @@ function render_public_document(array $project, array $trans, string $content, a
             <aside class="toc-sidebar">
                 <div class="toc-title"><?= htmlspecialchars($i18n['toc']) ?></div>
                 <ul class="toc-list" id="tocList" style="list-style:none;padding:0;margin:0"></ul>
-                <div class="toc-brand"><img src="<?= htmlspecialchars($logoUrl) ?>" alt=""> Bereitgestellt mit Paragrafy</div>
+                <div class="toc-brand"><img src="<?= htmlspecialchars($logoUrl) ?>" alt=""> <?= htmlspecialchars($i18n['powered_by_toc']) ?></div>
             </aside>
         </div>
 
         <footer>
-            &copy; <?= date('Y') ?> <?= htmlspecialchars($project['company_name'] ?: $project['name']) ?> &bull; Bereitgestellt über Paragrafy
+            &copy; <?= date('Y') ?> <?= htmlspecialchars($project['company_name'] ?: $project['name']) ?> &bull; <?= htmlspecialchars($i18n['powered_by_footer']) ?>
+            <?= render_locale_switcher() ?>
         </footer>
 
         <script>
@@ -598,11 +647,34 @@ function render_public_overview(array $project, PDO $db, string $lang): void {
                 <?php endforeach; ?>
             </ul>
             <p style="font-size:11px;color:var(--text-faintest);line-height:1.5;text-align:center;margin:22px 0 0"><?= htmlspecialchars($i18n['overview_title']) ?></p>
-            <div class="toc-brand"><img src="<?= htmlspecialchars($logoUrl) ?>" alt=""> Bereitgestellt mit Paragrafy</div>
+            <div class="toc-brand"><img src="<?= htmlspecialchars($logoUrl) ?>" alt=""> <?= htmlspecialchars($i18n['powered_by_toc']) ?></div>
+            <?= render_locale_switcher() ?>
         </div>
     </body>
     </html>
     <?php
+}
+
+/**
+ * Small language switcher for admin-facing UI chrome on public pages
+ * (distinct from the document content-language switcher above, which is
+ * driven by lang_meta()/active_languages). Links to the current URL with
+ * ?locale=xx appended, using the labels/flags from ui_locales().
+ */
+function render_locale_switcher(): string {
+    $locales = ui_locales();
+    $current = current_locale();
+    $qs = $_GET ?? [];
+    $links = [];
+    foreach ($locales as $code => $meta) {
+        $qs['locale'] = $code;
+        $href = htmlspecialchars('?' . http_build_query($qs));
+        $label = htmlspecialchars(($meta['flag'] ?? '') . ' ' . ($meta['label'] ?? strtoupper($code)));
+        $active = $code === $current ? ' style="font-weight:700;text-decoration:underline"' : '';
+        $links[] = '<a href="' . $href . '"' . $active . '>' . $label . '</a>';
+    }
+    if (empty($links)) return '';
+    return '<div style="margin-top:8px;font-size:11px;display:flex;gap:8px;justify-content:center;opacity:0.8"><span>' . htmlspecialchars(t('public.locale_switch_label')) . ':</span> ' . implode(' ', $links) . '</div>';
 }
 
 function render_public_404(array $project, string $lang): void {
@@ -620,6 +692,7 @@ function render_public_404(array $project, string $lang): void {
         <h2 style="font-size:20px;font-weight:800;"><?= htmlspecialchars($i18n['not_found_title']) ?></h2>
         <p style="color:var(--text-muted)"><?= htmlspecialchars($i18n['not_found_desc']) ?></p>
         <p><a href="/<?= htmlspecialchars($lang) ?>" style="font-weight:700;">&larr; <?= htmlspecialchars($i18n['back_to_overview']) ?></a></p>
+        <?= render_locale_switcher() ?>
     </body></html>
     <?php
 }
@@ -629,8 +702,16 @@ function render_public_404(array $project, string $lang): void {
  * and open a modal sheet loading the document via the public JSON API.
  */
 function render_embed_js(): void {
+    $i18nJs = json_encode([
+        'loading' => t('public.embed.loading_title'),
+        'close' => t('public.embed.close_label'),
+        'loadingBody' => t('public.embed.loading_body'),
+        'error' => t('public.embed.error_title'),
+        'errorBody' => t('public.embed.error_body'),
+    ], JSON_UNESCAPED_UNICODE);
     ?>
 (function () {
+    var i18n = <?= $i18nJs ?>;
     var scriptEl = document.currentScript;
     if (!scriptEl) {
         var scripts = document.getElementsByTagName('script');
@@ -665,9 +746,9 @@ function render_embed_js(): void {
         backdrop.className = 'paragrafy-embed-backdrop';
         backdrop.innerHTML =
             '<div class="paragrafy-embed-sheet" role="dialog" aria-modal="true">' +
-                '<div class="paragrafy-embed-header"><h2>Wird geladen&hellip;</h2>' +
-                '<button type="button" class="paragrafy-embed-close" aria-label="Schlie&szlig;en">&times;</button></div>' +
-                '<div class="paragrafy-embed-body"><div class="paragrafy-embed-loading">L&auml;dt&hellip;</div></div>' +
+                '<div class="paragrafy-embed-header"><h2>' + i18n.loading + '</h2>' +
+                '<button type="button" class="paragrafy-embed-close" aria-label="' + i18n.close + '">&times;</button></div>' +
+                '<div class="paragrafy-embed-body"><div class="paragrafy-embed-loading">' + i18n.loadingBody + '</div></div>' +
             '</div>';
         document.body.appendChild(backdrop);
 
@@ -690,9 +771,9 @@ function render_embed_js(): void {
                 backdrop.querySelector('.paragrafy-embed-body').innerHTML = data.html || '';
             })
             .catch(function () {
-                backdrop.querySelector('.paragrafy-embed-header h2').textContent = 'Fehler';
+                backdrop.querySelector('.paragrafy-embed-header h2').textContent = i18n.error;
                 backdrop.querySelector('.paragrafy-embed-body').innerHTML =
-                    '<div class="paragrafy-embed-error">Dokument konnte nicht geladen werden.</div>';
+                    '<div class="paragrafy-embed-error">' + i18n.errorBody + '</div>';
             });
     }
 
@@ -732,12 +813,18 @@ function render_embed_js(): void {
 function render_consent_js(?array $project): void {
     $brand = $project['brand_color'] ?? '#6366F1';
     $primaryLang = $project['primary_lang'] ?? 'de';
-    $bannerText = trim($project['cookie_banner_text'] ?? '') ?: 'Diese Website verwendet Cookies, um grundlegende Funktionen bereitzustellen und die Nutzung zu verbessern.';
+    $bannerText = trim($project['cookie_banner_text'] ?? '') ?: t('public.consent.default_text');
     $privacyUrl = '/' . $primaryLang . '/datenschutz';
 
     $brandJs = json_encode($brand, JSON_UNESCAPED_UNICODE);
     $textJs = json_encode($bannerText, JSON_UNESCAPED_UNICODE);
     $privacyUrlJs = json_encode($privacyUrl, JSON_UNESCAPED_UNICODE);
+    $i18nJs = json_encode([
+        'learnMore' => t('public.consent.learn_more'),
+        'decline' => t('public.consent.decline'),
+        'accept' => t('public.consent.accept'),
+        'ariaLabel' => t('public.consent.aria_label'),
+    ], JSON_UNESCAPED_UNICODE);
     ?>
 (function () {
     var CONSENT_KEY = 'paragrafy_consent';
@@ -746,6 +833,7 @@ function render_consent_js(?array $project): void {
     var brand = <?= $brandJs ?>;
     var text = <?= $textJs ?>;
     var privacyUrl = <?= $privacyUrlJs ?>;
+    var i18n = <?= $i18nJs ?>;
 
     var style = document.createElement('style');
     style.textContent =
@@ -760,7 +848,7 @@ function render_consent_js(?array $project): void {
     var bar = document.createElement('div');
     bar.className = 'paragrafy-consent-bar';
     bar.setAttribute('role', 'dialog');
-    bar.setAttribute('aria-label', 'Cookie-Hinweis');
+    bar.setAttribute('aria-label', i18n.ariaLabel);
 
     var textEl = document.createElement('div');
     textEl.textContent = text + ' ';
@@ -768,7 +856,7 @@ function render_consent_js(?array $project): void {
     link.href = privacyUrl;
     link.target = '_blank';
     link.rel = 'noopener';
-    link.textContent = 'Mehr erfahren';
+    link.textContent = i18n.learnMore;
     textEl.appendChild(link);
 
     var actions = document.createElement('div');
@@ -776,11 +864,11 @@ function render_consent_js(?array $project): void {
     var declineBtn = document.createElement('button');
     declineBtn.type = 'button';
     declineBtn.className = 'paragrafy-consent-decline';
-    declineBtn.textContent = 'Nur notwendige';
+    declineBtn.textContent = i18n.decline;
     var acceptBtn = document.createElement('button');
     acceptBtn.type = 'button';
     acceptBtn.className = 'paragrafy-consent-accept';
-    acceptBtn.textContent = 'Akzeptieren';
+    acceptBtn.textContent = i18n.accept;
 
     actions.appendChild(declineBtn);
     actions.appendChild(acceptBtn);

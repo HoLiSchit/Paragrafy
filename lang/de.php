@@ -1,0 +1,602 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * German (baseline) UI language file.
+ *
+ * This is the canonical reference key set for all UI-facing strings.
+ * Every other lang/*.php file must contain the same keys (see
+ * bin/check-translations.php). Keys are dot-namespaced by area:
+ *   public.*         index.php (public router/viewer/API)
+ *   admin.common.*   shared admin chrome (nav, buttons, topbar)
+ *   admin.login.*    admin login screen
+ *   admin.matrix.*   admin dashboard / document matrix view
+ *   admin.settings.* admin settings view
+ *   admin.users.*    admin user management view
+ *   admin.audit.*    admin audit log view
+ *   editor.*         editor.php
+ *   install.*        install.php (setup wizard)
+ *
+ * Plural variants use a ".plural" suffix on the base key (see t() in db.php).
+ */
+
+return [
+    // ---------------------------------------------------------------
+    // install.php - Setup wizard
+    // ---------------------------------------------------------------
+    'install.error.password_too_short' => 'Das Admin-Passwort muss mindestens 6 Zeichen lang sein.',
+    'install.error.missing_fields' => 'Bitte Projektnamen und Domain angeben.',
+    'install.error.install_failed' => 'Fehler bei der Installation: :message',
+
+    'install.page_title' => 'Paragrafy Setup & Installation',
+    'install.heading' => 'Paragrafy Setup',
+    'install.subtitle' => 'Zentrale Verwaltung für rechtliche Pflichttexte, Mehrsprachigkeit & Headless API.',
+
+    'install.section1.title' => '1. Administrator-Zugang',
+    'install.section1.password_label' => 'Admin-Passwort:',
+    'install.section1.password_placeholder' => 'Sicheres Passwort für das /admin Dashboard',
+
+    'install.section2.title' => '2. Projekt, Branding & DeepL',
+    'install.section2.project_name_label' => 'Projektname:',
+    'install.section2.project_name_placeholder' => 'z. B. Meine App',
+    'install.section2.domain_label' => 'Subdomain / Domain:',
+    'install.section2.primary_lang_label' => 'Primärsprache:',
+    'install.section2.lang_de' => 'Deutsch (DE)',
+    'install.section2.lang_en' => 'Englisch (EN)',
+    'install.section2.brand_color_label' => 'Akzentfarbe (HEX):',
+    'install.section2.deepl_label' => 'DeepL API-Key (optional, für 1-Klick-Übersetzungen):',
+    'install.section2.deepl_placeholder' => 'z. B. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx',
+    'install.section2.active_langs_label' => 'Aktivierte Sprachen für Übersetzungen:',
+    'install.section2.lang_de_base' => 'Deutsch (DE - Basis)',
+    'install.section2.lang_es' => 'Spanisch (ES)',
+    'install.section2.lang_fr' => 'Französisch (FR)',
+
+    'install.section3.title' => '3. Erforderliche Rechtstexte & Vorlagen',
+    'install.section3.help' => 'Wähle die Basis-Dokumente aus oder erstelle beliebig viele eigene:',
+    'install.section3.custom_label' => 'Eigene zusätzliche Rechtstexte definieren:',
+    'install.section3.add_btn' => '+ Weiteren Rechtstext hinzufügen',
+
+    'install.section4.title' => '4. Unternehmensangaben (Platzhalter)',
+    'install.section4.company_label' => 'Firmenname / Inhaber:',
+    'install.section4.company_placeholder' => 'z. B. Max Mustermann Webentwicklung',
+    'install.section4.representative_label' => 'Vertretungsberechtigte Person:',
+    'install.section4.representative_placeholder' => 'z. B. Max Mustermann',
+    'install.section4.address_label' => 'Vollständige Anschrift:',
+    'install.section4.email_label' => 'Kontakt-E-Mail:',
+    'install.section4.email_placeholder' => 'kontakt@deinedomain.de',
+    'install.section4.phone_label' => 'Telefonnummer (optional):',
+    'install.section4.phone_placeholder' => '+49 123 456789',
+    'install.section4.register_label' => 'Registergericht & Nummer (falls vorhanden):',
+    'install.section4.register_placeholder' => 'Amtsgericht Musterstadt, HRB 12345',
+
+    'install.submit_btn' => 'Paragrafy initialisieren & Dashboard öffnen &rarr;',
+    'install.custom_title_placeholder' => 'Titel (z.B. AGB B2B)',
+    'install.custom_slug_placeholder' => 'URL-Slug (z.B. agb-b2b)',
+    'install.custom_required_label' => 'Pflichtseite',
+
+    // ---------------------------------------------------------------
+    // admin.common.* - shared admin chrome (nav, buttons, footer)
+    // ---------------------------------------------------------------
+    'admin.common.footer_disclaimer' => 'Paragrafy ist ein rein technisches Verwaltungswerkzeug (CMS/API) für Rechtstexte. Es stellt keine Rechtsberatung dar und übernimmt keine Haftung für Richtigkeit, Vollständigkeit oder Aktualität der eingepflegten Inhalte.',
+    'admin.common.locale_label' => 'Sprache',
+    'admin.common.nav.dashboard' => 'Dashboard',
+    'admin.common.nav.users' => 'Benutzer',
+    'admin.common.nav.audit' => 'Protokoll',
+    'admin.common.nav.settings' => 'Einstellungen',
+    'admin.common.sidebar.managed_cloud' => 'Managed Cloud &middot; v:version',
+    'admin.common.sidebar.self_hosted' => 'Self-Hosted &middot; v:version',
+    'admin.common.sidebar.hosted_by_cloud' => 'Gehostet &amp; verwaltet von Paragrafy Cloud.',
+    'admin.common.sidebar.open_source' => 'Open Source &amp; unter deiner Kontrolle.',
+    'admin.common.sidebar.whats_new' => 'Was ist neu? &rarr;',
+    'admin.common.sidebar.back_to_portal' => '&larr; Zurück zum Kundenportal',
+    'admin.common.sidebar.view_public_site' => 'Öffentliche Seite ansehen',
+    'admin.common.sidebar.logout_title' => 'Abmelden',
+
+    // ---------------------------------------------------------------
+    // editor.php - Document editor UI
+    // ---------------------------------------------------------------
+    'editor.error.doc_not_found' => 'Dokument nicht gefunden.',
+    'editor.no_text_placeholder' => 'Noch kein Text in dieser Sprache vorhanden.',
+
+    'editor.audit.status_published' => 'veröffentlicht',
+    'editor.audit.status_draft' => 'als Entwurf gespeichert',
+    'editor.audit.saved' => '„:title" (:lang) :status',
+    'editor.audit.scheduled_for' => '„:title" (:lang) geplant für :date',
+    'editor.audit.restored' => '„:title" (:lang) :note',
+    'editor.restored_note' => 'Wiederhergestellt aus Version vom :date',
+
+    'editor.page_title' => 'Editor: :doc (:lang)',
+    'editor.crumb_prefix' => 'Editor: :doc',
+    'editor.back_to_dashboard' => '&larr; Zurück zum Dashboard',
+    'editor.msg.restored' => 'Version wiederhergestellt und veröffentlicht.',
+
+    'editor.scheduled_notice' => '<strong>Zeitgesteuert geplant:</strong> Diese Version geht automatisch am <strong>:date Uhr</strong> live. Bis dahin bleibt der aktuelle Stand öffentlich.',
+    'editor.preview_link' => 'Vorschau ansehen &rarr;',
+    'editor.outdated_notice' => '<strong>Hinweis:</strong> Der Quelltext wurde seit der letzten Übersetzung geändert. Bitte gleiche den Zieltext an oder nutze DeepL.',
+
+    'editor.add_language' => '+ Sprache hinzufügen',
+    'editor.compare_toggle' => 'Andere Sprache zum Vergleich anzeigen',
+    'editor.reference_label' => 'Referenz:',
+    'editor.translation_present' => '(vorhanden)',
+    'editor.translation_empty' => '(leer)',
+    'editor.show_differences' => 'Unterschiede anzeigen',
+    'editor.reference_title_label' => 'Referenz-Titel (:lang):',
+    'editor.reference_content_label' => 'Referenz-Inhalt:',
+    'editor.sync_scroll' => 'Gemeinsam scrollen',
+
+    'editor.editing_label' => 'Wird bearbeitet &middot; :lang',
+    'editor.history_label' => 'Verlauf (:count)',
+    'editor.deepl_button' => 'Mit DeepL übersetzen (:src &rarr; :tgt)',
+    'editor.insert_placeholder_label' => 'Platzhalter einfügen:',
+    'editor.doc_title_label' => 'Titel des Dokuments:',
+    'editor.slug_label' => 'Seitenadresse (/:lang/adresse):',
+    'editor.slug_help' => 'Bestimmt die öffentliche Adresse dieses Rechtstexts, z. B. /:lang/agb-b2c. Änderungen brechen bestehende Links zu dieser Seite.',
+    'editor.content_label' => 'Inhalt (Visueller Editor):',
+
+    'editor.toolbar.bold_title' => 'Fett',
+    'editor.toolbar.italic_title' => 'Kursiv',
+    'editor.toolbar.underline_title' => 'Unterstrichen',
+    'editor.toolbar.h2_title' => 'Überschrift 2',
+    'editor.toolbar.h3_title' => 'Überschrift 3',
+    'editor.toolbar.paragraph_title' => 'Absatz',
+    'editor.toolbar.bullet_title' => 'Aufzählung',
+    'editor.toolbar.bullet_list_label' => '&bull; Liste',
+    'editor.toolbar.numbered_title' => 'Nummerierung',
+    'editor.toolbar.numbered_list_label' => '1. Liste',
+    'editor.toolbar.link_title' => 'Link einfügen',
+    'editor.toolbar.link_label' => 'Link',
+    'editor.toolbar.clear_title' => 'Formatierung entfernen',
+    'editor.toolbar.clear_label' => '&#9003; Clear',
+    'editor.toolbar.html_title' => 'HTML-Quellcode bearbeiten',
+    'editor.toolbar.html_code_label' => '&lt;/&gt; HTML-Code',
+    'editor.toolbar.visual_editor_label' => 'Visueller Editor',
+
+    'editor.shortcut_hint' => 'Shortcut: <strong>Cmd+S</strong> / <strong>Strg+S</strong>',
+    'editor.change_note_label' => 'Änderungsnotiz (für Changelog &amp; Webhooks):',
+    'editor.change_note_help' => 'Wird im Versionsverlauf angezeigt und als change_note im Webhook-Payload mitgeschickt — keine Auswirkung auf die öffentliche Seite.',
+    'editor.change_note_placeholder' => 'z. B. Aktualisierung der Zahlungsbedingungen zum 31.08.',
+
+    'editor.schedule_label' => 'Live-Schaltungszeitpunkt festlegen:',
+    'editor.schedule_hint' => 'Sendet einen Webhook mit Vorankündigung und geht zum Stichtag automatisch live.',
+    'editor.status_publish_now' => 'Sofort veröffentlichen (Live)',
+    'editor.status_schedule' => 'Zeitgesteuert planen (Live ab Datum)',
+    'editor.status_draft' => 'Entwurf (ausgeblendet)',
+    'editor.unsaved_changes' => 'Ungespeicherte Änderungen',
+    'editor.save_button' => 'Speichern & Bestätigen',
+
+    'editor.versions_modal_title' => 'Versionsverlauf &middot; :lang',
+    'editor.versions_modal_desc' => 'Jede Veröffentlichung legt eine neue Version an. Stelle eine frühere Fassung wieder her oder vergleiche sie mit dem aktuellen Stand.',
+    'editor.no_versions' => 'Noch keine gespeicherten Versionen für diese Sprache.',
+    'editor.version_date_user' => ':date Uhr &middot;',
+    'editor.diff_button' => 'Unterschiede',
+    'editor.confirm_restore' => 'Diese Version wiederherstellen? Der aktuelle Stand wird dabei als neue Version gesichert.',
+    'editor.restore_button' => 'Wiederherstellen',
+    'editor.close_button' => 'Schließen',
+
+    'editor.js.url_prompt' => 'URL eingeben:',
+    'editor.js.words_label' => 'Wörter',
+    'editor.js.chars_label' => 'Zeichen',
+    'editor.js.no_changes' => 'Keine inhaltlichen Änderungen gegenüber der Vorversion.',
+    'editor.js.translating' => 'Übersetze...',
+    'editor.js.deepl_error' => 'Fehler bei der DeepL Übersetzung.',
+    'editor.js.network_error_prefix' => 'Netzwerkfehler bei der DeepL-Anfrage: ',
+
+    // ---------------------------------------------------------------
+    // public.* - index.php (public router, embed widget, consent banner)
+    //
+    // Note: the visitor-facing legal-document viewer itself (page chrome for
+    // rendered documents, table of contents, overview list, 404 page) uses
+    // its own long-standing per-document-language dictionary in
+    // get_i18n_strings() inside index.php, which already covers 6 content
+    // languages (de/en/es/fr/it/nl) keyed by the document's own language —
+    // a different axis than the 2-language admin UI locale here. That
+    // dictionary was intentionally left as-is / extended in place rather
+    // than routed through t(), to avoid regressing content-language
+    // coverage down to just de/en. Only truly admin/operator-facing or
+    // language-agnostic public strings are namespaced here.
+    // ---------------------------------------------------------------
+    'public.error.no_project_title' => '404 - Kein Projekt hinterlegt',
+    'public.error.no_project_desc' => 'Für die Domain <code>:domain</code> ist kein Legal-Projekt eingerichtet. Bitte im <a href=\'/admin\'>Admin-Panel</a> anlegen.',
+
+    'public.locale_switch_label' => 'Sprache',
+
+    'public.embed.loading_title' => 'Wird geladen&hellip;',
+    'public.embed.close_label' => 'Schlie&szlig;en',
+    'public.embed.loading_body' => 'L&auml;dt&hellip;',
+    'public.embed.error_title' => 'Fehler',
+    'public.embed.error_body' => 'Dokument konnte nicht geladen werden.',
+
+    'public.consent.default_text' => 'Diese Website verwendet Cookies, um grundlegende Funktionen bereitzustellen und die Nutzung zu verbessern.',
+    'public.consent.learn_more' => 'Mehr erfahren',
+    'public.consent.decline' => 'Nur notwendige',
+    'public.consent.accept' => 'Akzeptieren',
+    'public.consent.aria_label' => 'Cookie-Hinweis',
+
+    // ---------------------------------------------------------------
+    // admin.login.* - admin login screen
+    // ---------------------------------------------------------------
+    'admin.login.rate_limited' => 'Zu viele fehlgeschlagene Versuche. Bitte warte :minutes Minute(n) und versuche es erneut.',
+    'admin.login.invalid_credentials' => 'Falsche Zugangsdaten.',
+    'admin.login.page_title' => 'Paragrafy Admin Login',
+    'admin.login.heading' => 'Paragrafy Admin',
+    'admin.login.email_label' => 'E-Mail',
+    'admin.login.email_hint' => '(persönlicher Zugang, sonst leer lassen)',
+    'admin.login.email_placeholder' => 'name@firma.de',
+    'admin.login.password_label' => 'Passwort',
+    'admin.login.password_placeholder' => 'Passwort eingeben',
+    'admin.login.submit_button' => 'Anmelden &rarr;',
+    'admin.login.forgot_password' => 'Passwort vergessen?',
+
+    'admin.login.invite_mail_subject' => 'Einladung zu Paragrafy',
+    'admin.login.invite_mail_heading' => 'Einladung zu Paragrafy',
+    'admin.login.invite_mail_greeting' => 'Hallo :name,',
+    'admin.login.invite_mail_body' => 'du wurdest eingeladen, dem Paragrafy Admin-Panel beizutreten. Jede eingeladene Person hat vollen Zugriff auf alle Projekte — es gibt keine Rollen oder Rechte einzustellen.',
+    'admin.login.invite_mail_button' => 'Zugang aktivieren',
+    'admin.login.invite_mail_link_hint' => 'Oder kopiere diesen Link in deinen Browser:',
+
+    'admin.login.password_too_short' => 'Das Passwort muss mindestens 8 Zeichen lang sein.',
+    'admin.login.passwords_mismatch' => 'Die Passwörter stimmen nicht überein.',
+
+    'admin.login.accept_invite.page_title' => 'Zugang aktivieren - Paragrafy',
+    'admin.login.accept_invite.heading' => 'Zugang aktivieren',
+    'admin.login.accept_invite.invalid_token' => 'Dieser Einladungslink ist ungültig oder wurde bereits verwendet. Bitte wende dich an eine andere Person mit Zugriff auf das Admin-Panel, um erneut eingeladen zu werden.',
+    'admin.login.accept_invite.welcome' => 'Willkommen, :name. Lege ein Passwort für :email fest.',
+    'admin.login.accept_invite.password_label' => 'Passwort (mind. 8 Zeichen)',
+    'admin.login.accept_invite.password_confirm_label' => 'Passwort bestätigen',
+    'admin.login.accept_invite.submit_button' => 'Zugang aktivieren &rarr;',
+
+    'admin.login.forgot.mail_subject' => 'Paragrafy: Passwort zurücksetzen',
+    'admin.login.forgot.mail_heading' => 'Passwort zurücksetzen',
+    'admin.login.forgot.mail_greeting' => 'Hallo :name,',
+    'admin.login.forgot.mail_body' => 'klicke auf den folgenden Link, um ein neues Passwort für dein Paragrafy-Konto festzulegen:',
+    'admin.login.forgot.mail_button' => 'Neues Passwort festlegen',
+    'admin.login.forgot.mail_ignore_hint' => 'Falls du das nicht angefordert hast, kannst du diese E-Mail ignorieren.',
+    'admin.login.forgot.page_title' => 'Passwort vergessen - Paragrafy',
+    'admin.login.forgot.heading' => 'Passwort vergessen',
+    'admin.login.forgot.sent_notice' => 'Falls zu dieser E-Mail-Adresse ein aktiver Zugang existiert, haben wir gerade einen Link zum Zurücksetzen verschickt. Bitte prüfe dein Postfach.',
+    'admin.login.forgot.back_to_login' => '&larr; Zurück zum Login',
+    'admin.login.forgot.intro' => 'Gib deine E-Mail-Adresse ein. Wenn ein aktiver Zugang existiert, schicken wir dir einen Link zum Zurücksetzen.',
+    'admin.login.forgot.email_label' => 'E-Mail',
+    'admin.login.forgot.submit_button' => 'Link anfordern &rarr;',
+
+    'admin.login.reset.audit_note' => 'Passwort zurückgesetzt: :name',
+    'admin.login.reset.page_title' => 'Neues Passwort - Paragrafy',
+    'admin.login.reset.heading' => 'Neues Passwort',
+    'admin.login.reset.invalid_link' => 'Dieser Link ist ungültig oder abgelaufen. Fordere über „Passwort vergessen" einen neuen Link an.',
+    'admin.login.reset.request_new_link' => '&larr; Neuen Link anfordern',
+    'admin.login.reset.intro' => 'Lege ein neues Passwort für :email fest.',
+    'admin.login.reset.password_label' => 'Neues Passwort (mind. 8 Zeichen)',
+    'admin.login.reset.password_confirm_label' => 'Passwort bestätigen',
+    'admin.login.reset.submit_button' => 'Passwort speichern &rarr;',
+
+    // ---------------------------------------------------------------
+    // admin.audit.* - audit log view
+    // ---------------------------------------------------------------
+    'admin.audit.page_title' => 'Protokoll - :project',
+    'admin.audit.crumb' => 'Protokoll',
+    'admin.audit.heading' => 'Änderungsprotokoll',
+    'admin.audit.export_csv' => 'Als CSV herunterladen',
+    'admin.audit.subtitle' => 'Wer hat wann was geändert — Projekteinstellungen, Rechtstexte und Benutzerverwaltung. Zeigt die letzten 200 Einträge.',
+    'admin.audit.empty' => 'Noch keine Einträge vorhanden.',
+    'admin.audit.col_time' => 'Zeitpunkt',
+    'admin.audit.col_user' => 'Benutzer',
+    'admin.audit.col_action' => 'Aktion',
+
+    // ---------------------------------------------------------------
+    // admin.users.* - user management view
+    // ---------------------------------------------------------------
+    'admin.users.msg.invited' => 'Einladung erfolgreich per E-Mail versendet.',
+    'admin.users.msg.invite_mail_failed' => 'Die Person wurde angelegt, aber der Versand der Einladungs-E-Mail ist fehlgeschlagen. Bitte SMTP-Einstellungen prüfen oder erneut senden.',
+    'admin.users.msg.email_exists' => 'Für diese E-Mail-Adresse existiert bereits ein Zugang.',
+    'admin.users.msg.invalid' => 'Bitte Name und eine gültige E-Mail-Adresse angeben.',
+    'admin.users.msg.user_deleted' => 'Zugang entfernt.',
+
+    'admin.users.page_title' => 'Benutzer - :project',
+    'admin.users.crumb' => 'Benutzer',
+    'admin.users.heading' => 'Benutzerverwaltung',
+    'admin.users.invite_button' => '+ Person einladen',
+    'admin.users.subtitle' => 'Jede eingeladene Person hat vollen Zugriff auf das gesamte Admin-Panel (alle Projekte) — es gibt keine Rollen oder Rechte einzustellen.',
+    'admin.users.col_name' => 'Name',
+    'admin.users.col_email' => 'E-Mail',
+    'admin.users.col_status' => 'Status',
+    'admin.users.empty' => 'Noch keine Personen eingeladen.',
+    'admin.users.you_suffix' => '(Du)',
+    'admin.users.status_active' => 'Aktiv',
+    'admin.users.status_invited' => 'Eingeladen',
+    'admin.users.resend_invite_title' => 'Einladung erneut senden',
+    'admin.users.delete_title' => 'Entfernen',
+    'admin.users.confirm_delete' => 'Zugang für :name wirklich entfernen?',
+
+    'admin.users.modal.heading' => 'Person einladen',
+    'admin.users.modal.desc' => 'Die Person erhält eine E-Mail mit einem Link, um ihr eigenes Passwort festzulegen.',
+    'admin.users.modal.name_label' => 'Name',
+    'admin.users.modal.name_placeholder' => 'z. B. Lena Fischer',
+    'admin.users.modal.email_label' => 'E-Mail',
+    'admin.users.modal.email_placeholder' => 'z. B. lena@firma.de',
+    'admin.users.modal.cancel_button' => 'Abbrechen',
+    'admin.users.modal.submit_button' => 'Einladung senden &rarr;',
+
+    'admin.audit.col_project' => 'Projekt',
+    'admin.common.backup_not_found' => 'Backup nicht gefunden.',
+
+    'admin.common.audit.backup_triggered' => 'Backup manuell ausgelöst',
+    'admin.common.audit.backup_failed' => 'Backup fehlgeschlagen: :error',
+    'admin.common.audit.cron_secret_regenerated' => 'Cron-Secret neu generiert',
+    'admin.common.audit.project_created' => 'Projekt erstellt',
+    'admin.common.audit.project_deleted' => 'Projekt gelöscht',
+    'admin.common.audit.settings_updated' => 'Einstellungen aktualisiert',
+
+    'admin.matrix.audit.doctype_created' => 'Rechtstext-Typ „:title" angelegt',
+    'admin.matrix.audit.doctype_deleted' => 'Rechtstext-Typ „:title" gelöscht',
+    'admin.matrix.export.md_stand' => '> Stand: :date',
+    'admin.matrix.export.txt_document' => 'DOKUMENT: :title (:lang) - /:lang/:slug',
+    'admin.matrix.export.txt_stand' => 'STAND: :date',
+
+    'admin.users.audit.invited' => 'Person eingeladen: :name (:email)',
+    'admin.users.audit.deleted' => 'Zugang entfernt: :name',
+
+    'admin.settings.webhook_test_message' => 'Paragrafy Webhook Test erfolgreich ausgelöst',
+    'admin.settings.smtp_test_missing_recipient' => 'Bitte zuerst eine Empfänger-E-Mail angeben.',
+    'admin.settings.smtp_test_subject' => '[Paragrafy] SMTP Test-E-Mail',
+    'admin.settings.smtp_test_heading' => 'Paragrafy SMTP-Test',
+    'admin.settings.smtp_test_body' => 'Deine E-Mail-Serverkonfiguration für <strong>:project</strong> funktioniert einwandfrei!',
+
+    // ---------------------------------------------------------------
+    // admin.matrix.* - dashboard / document matrix view
+    // ---------------------------------------------------------------
+    'admin.matrix.unfilled_warning_line' => ':title (:lang): :placeholders',
+    'admin.matrix.audit_warning_line' => ':title (:lang) seit :days Tagen ungeprüft',
+    'admin.matrix.page_title' => 'Paragrafy - :project',
+    'admin.matrix.crumb' => 'Dashboard',
+    'admin.matrix.domain_label' => 'Domain:',
+    'admin.matrix.api_label' => 'Technische Schnittstelle:',
+    'admin.matrix.cloud_new_project_link' => 'Weitere Projekte über dein Kundenportal anlegen &rarr;',
+    'admin.matrix.project_limit_reached_pill' => 'Projektlimit erreicht',
+    'admin.matrix.project_limit_reached_title' => 'Diese Instanz erlaubt maximal :count Projekt:suffix.',
+    'admin.matrix.new_project_button' => '+ Neues Projekt',
+    'admin.matrix.project_limit_reached_alert' => '<strong>Projektlimit erreicht:</strong> Diese Instanz erlaubt maximal :count Projekt:suffix. Es kann kein weiteres Projekt angelegt werden.',
+    'admin.matrix.managed_cloud_blocked_alert' => 'Neue Projekte bitte über dein Kundenportal anlegen.',
+
+    'admin.matrix.kpi.completeness_label' => 'Vollständigkeit',
+    'admin.matrix.kpi.completeness_help' => 'Anteil der als Pflichtseite markierten Rechtstexte, die in der Primärsprache veröffentlicht sind. Optionale Seiten und andere Sprachen zählen nicht mit.',
+    'admin.matrix.kpi.completeness_sub' => ':published von :total Pflichtseiten live',
+    'admin.matrix.kpi.languages_label' => 'Aktive Sprachen',
+    'admin.matrix.kpi.sync_label' => 'Übersetzungsabgleich',
+    'admin.matrix.kpi.sync_help' => 'Prüft automatisch, ob sich der Originaltext seit der letzten Übersetzung geändert hat, und markiert betroffene Sprachen als veraltet.',
+    'admin.matrix.kpi.sync_active' => 'Aktiv',
+    'admin.matrix.kpi.sync_sub' => 'Läuft automatisch im Hintergrund',
+    'admin.matrix.kpi.audit_status_label' => 'Prüfstatus',
+    'admin.matrix.kpi.audit_status_current' => 'Aktuell',
+    'admin.matrix.kpi.audit_status_due' => ':count Fällig',
+    'admin.matrix.kpi.audit_status_sub' => ':months Monate Prüfintervall',
+
+    'admin.matrix.audit_due_alert' => '<strong>Prüfung fällig (älter als :months Monate):</strong>',
+    'admin.matrix.unfilled_alert' => '<strong>Fehlende Stammdaten in Texten:</strong> Folgende Platzhalter werden in veröffentlichten Rechtstexten verwendet, sind aber in den Einstellungen noch leer:',
+
+    'admin.matrix.table.heading' => 'Rechtstexte im Überblick',
+    'admin.matrix.table.subtitle' => 'Klicke auf einen Status, um die Seite in dieser Sprache zu bearbeiten. Über die Symbole rechts bearbeitest oder entfernst du den gesamten Rechtstext.',
+    'admin.matrix.table.col_doctype' => 'Dokumententyp',
+    'admin.matrix.table.col_required' => 'Pflicht',
+    'admin.matrix.table.col_actions' => 'Aktionen',
+    'admin.matrix.table.primary_link_title' => 'Direktlink in Hauptsprache',
+    'admin.matrix.table.copy_link_title' => 'Link kopieren',
+    'admin.matrix.table.copy_link_success' => 'Direktlink kopiert!',
+    'admin.matrix.table.toggle_title' => 'Klicken zum Umschalten',
+    'admin.matrix.table.required_label' => 'Pflichtseite',
+    'admin.matrix.table.optional_label' => 'Optional',
+    'admin.matrix.table.outdated_title' => 'Das Original wurde geändert!',
+    'admin.matrix.table.outdated_label' => 'Veraltet',
+    'admin.matrix.table.edit_title' => ':title - Bearbeiten',
+    'admin.matrix.table.live_label' => 'Live',
+    'admin.matrix.table.draft_label' => 'Entwurf',
+    'admin.matrix.table.create_label' => '+ Erstellen',
+    'admin.matrix.table.edit_icon_title' => 'Bearbeiten',
+    'admin.matrix.table.confirm_delete_doctype' => 'Diesen Rechtstext wirklich löschen?',
+    'admin.matrix.table.delete_title' => 'Löschen',
+
+    'admin.matrix.add.heading' => 'Neuen Rechtstext hinzufügen',
+    'admin.matrix.add.subtitle' => 'Füge beliebig viele spezifische Rechtstexte hinzu (z. B. AGB B2B, Sponsoring, Lizenzvereinbarung).',
+    'admin.matrix.add.title_placeholder' => 'Titel (z. B. AGB für Geschäftskunden / B2B)',
+    'admin.matrix.add.slug_placeholder' => 'Seitenadresse (z. B. agb-b2b)',
+    'admin.matrix.add.required_label' => 'Pflichtseite',
+    'admin.matrix.add.submit_button' => '+ Hinzufügen',
+
+    'admin.matrix.new_project_modal.heading' => 'Neues Projekt anlegen',
+    'admin.matrix.new_project_modal.desc' => 'Füge eine weitere Web-App, Landingpage oder SaaS zu deiner Paragrafy-Instanz hinzu.',
+    'admin.matrix.new_project_modal.name_label' => 'Projektname',
+    'admin.matrix.new_project_modal.name_placeholder' => 'z. B. Beispiel App',
+    'admin.matrix.new_project_modal.domain_label' => 'Subdomain / Domain',
+    'admin.matrix.new_project_modal.domain_placeholder' => 'z. B. legal.beispielapp.de',
+    'admin.matrix.new_project_modal.primary_lang_label' => 'Primärsprache',
+    'admin.matrix.new_project_modal.color_label' => 'Akzentfarbe',
+    'admin.matrix.new_project_modal.cancel_button' => 'Abbrechen',
+    'admin.matrix.new_project_modal.submit_button' => 'Projekt erstellen &rarr;',
+
+    'admin.matrix.toast.status_updated' => 'Status aktualisiert',
+    'admin.matrix.js.copy_success' => 'In Zwischenablage kopiert!',
+    'admin.matrix.js.copy_failed' => 'Kopieren fehlgeschlagen.',
+    'admin.matrix.js.marked_required' => 'Als Pflichtseite markiert',
+    'admin.matrix.js.marked_optional' => 'Als optional markiert',
+
+    // ---------------------------------------------------------------
+    // admin.settings.* - settings view
+    // ---------------------------------------------------------------
+    'admin.settings.page_title' => 'Einstellungen - :project',
+    'admin.settings.crumb' => 'Einstellungen',
+
+    'admin.settings.appearance.heading' => 'Darstellung',
+    'admin.settings.appearance.subtitle' => 'Nur für dich in diesem Browser gespeichert — wirkt sich nicht auf andere Personen aus.',
+    'admin.settings.appearance.light' => 'Hell',
+    'admin.settings.appearance.dark' => 'Dunkel',
+    'admin.settings.appearance.auto' => 'Auto',
+
+    'admin.settings.locale.heading' => 'Sprache des Admin-Panels',
+    'admin.settings.locale.subtitle' => 'Legt die Anzeigesprache dieses Dashboards für dein Konto fest.',
+    'admin.settings.locale.label' => 'Sprache',
+    'admin.settings.locale.save_button' => 'Speichern',
+    'admin.settings.locale.saved_msg' => 'Sprache aktualisiert.',
+
+    'admin.settings.automation.cloud_heading' => 'Automatisierung',
+    'admin.settings.automation.cloud_subtitle' => 'Geplante Veröffentlichungen, Backups und Prüfberichte laufen bei Managed Cloud automatisch im Hintergrund — keine Einrichtung nötig.',
+    'admin.settings.automation.cron_heading' => 'Automatisierung (Cron)',
+    'admin.settings.automation.cron_subtitle' => 'Diese Adressen extern per Cron-Job (oder Uptime-Monitor) aufrufen, damit geplante Veröffentlichungen live gehen, Webhooks zugestellt und Backups angelegt werden. Alle vier sind mit einem geheimen Schlüssel geschützt — ohne korrektes <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">?secret=</code> antworten sie mit 403.',
+    'admin.settings.automation.secret_regenerated' => 'Neues Secret erzeugt — bitte die Cron-Jobs mit den Adressen unten aktualisieren.',
+    'admin.settings.automation.row_publish' => 'Geplante Veröffentlichungen',
+    'admin.settings.automation.row_webhooks' => 'Webhook-Warteschlange',
+    'admin.settings.automation.row_backup' => 'Rollierendes Backup',
+    'admin.settings.automation.row_audit' => 'Prüfbericht per E-Mail',
+    'admin.settings.automation.freq_every_minute' => 'jede Minute',
+    'admin.settings.automation.freq_every_5_min' => 'alle 5 Minuten',
+    'admin.settings.automation.freq_daily_3am' => 'täglich um 3 Uhr',
+    'admin.settings.automation.freq_daily_8am' => 'täglich um 8 Uhr',
+    'admin.settings.automation.recommended_suffix' => '(empfohlen: :freq)',
+    'admin.settings.automation.copy_title' => 'Kopieren',
+    'admin.settings.automation.crontab_hint' => 'Jede Zeile ist eine fertige Crontab-Zeile mit empfohlenem Zeitplan — einfach kopieren und per <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">crontab -e</code> einfügen.',
+    'admin.settings.automation.confirm_regenerate' => 'Neues Secret erzeugen? Die alten URLs funktionieren danach nicht mehr — bestehende Cron-Jobs müssen aktualisiert werden.',
+    'admin.settings.automation.regenerate_button' => 'Secret neu generieren',
+
+    'admin.settings.project.heading' => 'Projekt &amp; API-Konfiguration',
+    'admin.settings.project.name_label' => 'Projekt-Name',
+    'admin.settings.project.domain_label' => 'Domain / Subdomain',
+    'admin.settings.project.domain_managed_hint' => 'Wird über dein Managed-Cloud-Kundenportal verwaltet, hier nicht änderbar.',
+    'admin.settings.project.primary_lang_label' => 'Primärsprache',
+    'admin.settings.project.active_langs_label' => 'Aktive Sprachen (kommagetrennt, z. B. de,en,es)',
+    'admin.settings.project.brand_color_label' => 'Akzentfarbe',
+    'admin.settings.project.logo_url_label' => 'Logo-URL',
+    'admin.settings.project.optional_hint' => '(optional)',
+    'admin.settings.project.audit_interval_label' => 'Prüfintervall (Monate)',
+    'admin.settings.project.audit_interval_hint' => 'Warnt im Dashboard nach X Monaten vor ungeprüften Texten.',
+    'admin.settings.project.save_button' => 'Speichern',
+
+    'admin.settings.cookie.heading' => 'Cookie-Banner (DSGVO)',
+    'admin.settings.cookie.subtitle' => 'Blendet über <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">/consent.js</code> einen Consent-Banner auf deiner Website ein. Aktivieren allein reicht nicht — binde das Skript zusätzlich in deine Website ein (siehe README).',
+    'admin.settings.cookie.enable_label' => 'DSGVO-Cookie-Banner aktivieren',
+    'admin.settings.cookie.banner_text_label' => 'Banner-Text',
+    'admin.settings.cookie.banner_text_hint' => '(optional, sonst Standardtext)',
+    'admin.settings.cookie.banner_text_help' => 'Dieser Text erscheint im Banner, das /consent.js auf deiner Website einblendet. Bindest du das Skript nicht ein, hat dieser Text keine Wirkung.',
+    'admin.settings.cookie.save_button' => 'Speichern',
+
+    'admin.settings.email.heading' => 'E-Mail-Versand &amp; Prüf-Erinnerungen',
+    'admin.settings.email.subtitle' => 'Damit verschickt Paragrafy Prüf-Erinnerungen und Testmails. Zugangsdaten bekommst du von deinem E-Mail-Anbieter (SMTP).',
+    'admin.settings.email.smtp_host_label' => 'SMTP-Server',
+    'admin.settings.email.port_encryption_label' => 'Port &amp; Verschlüsselung',
+    'admin.settings.email.tls_option' => 'TLS (587)',
+    'admin.settings.email.ssl_option' => 'SSL (465)',
+    'admin.settings.email.none_option' => 'Keine (25)',
+    'admin.settings.email.username_label' => 'Benutzername',
+    'admin.settings.email.password_label' => 'Passwort',
+    'admin.settings.email.password_placeholder' => 'Passwort eingeben',
+    'admin.settings.email.sender_label' => 'Absender-Adresse',
+    'admin.settings.email.recipient_label' => 'Empfänger für Prüfberichte',
+    'admin.settings.email.save_button' => 'Speichern',
+    'admin.settings.email.send_test_button' => 'Test-E-Mail jetzt senden',
+
+    'admin.settings.webhooks.heading' => 'Webhooks &amp; Übersetzung',
+    'admin.settings.webhooks.subtitle' => 'Ein Webhook benachrichtigt deine Haupt-App automatisch, sobald sich ein Rechtstext ändert — kein manuelles Nachpflegen nötig.',
+    'admin.settings.webhooks.url_label' => 'Webhook-URL (POST bei Textänderungen)',
+    'admin.settings.webhooks.url_help' => 'Wird per POST mit JSON-Payload aufgerufen, sobald ein Rechtstext veröffentlicht oder eine geplante Änderung eingerichtet wird. Vollständige Payload-Struktur siehe WEBHOOKS.md.',
+    'admin.settings.webhooks.secret_label' => 'Webhook-Secret',
+    'admin.settings.webhooks.secret_hint' => '(optional, für Signaturprüfung)',
+    'admin.settings.webhooks.secret_help' => 'Wird als HMAC-SHA256-Signatur im Header X-Paragrafy-Signature mitgeschickt, damit dein Server die Echtheit der Anfrage prüfen kann.',
+    'admin.settings.webhooks.secret_placeholder' => 'z. B. ein geheimer Schlüssel',
+    'admin.settings.webhooks.save_button' => 'Speichern',
+    'admin.settings.webhooks.test_button' => 'Test-Webhook senden &amp; prüfen',
+    'admin.settings.webhooks.deepl_label' => 'DeepL API-Key',
+    'admin.settings.webhooks.deepl_hint' => '— ermöglicht 1-Klick-Übersetzung im Editor',
+    'admin.settings.webhooks.deepl_env_hint' => 'In .env.local hinterlegt (wird automatisch als Fallback genutzt).',
+    'admin.settings.webhooks.deepl_keys_hint' => 'Unterstützt Free- &amp; Pro-Keys (z. B. <code>...:fx</code>).',
+
+    'admin.settings.company.heading' => 'Unternehmensdaten',
+    'admin.settings.company.subtitle' => 'Diese Angaben ersetzen automatisch Platzhalter wie <code style="background:var(--border-soft);padding:1px 5px;border-radius:4px">{{company_name}}</code> in allen deinen Rechtstexten.',
+    'admin.settings.company.name_label' => 'Firmenname',
+    'admin.settings.company.representative_label' => 'Vertretungsberechtigte Person',
+    'admin.settings.company.address_label' => 'Anschrift',
+    'admin.settings.company.email_label' => 'E-Mail-Adresse',
+    'admin.settings.company.phone_label' => 'Telefonnummer',
+    'admin.settings.company.register_label' => 'Register-Informationen',
+    'admin.settings.company.save_button' => 'Einstellungen speichern',
+    'admin.settings.company.delete_project_button' => 'Projekt löschen',
+    'admin.settings.company.confirm_delete_project' => 'Möchtest du dieses Projekt (:project) und alle zugehörigen Texte wirklich löschen?',
+
+    'admin.settings.backup.heading' => 'Sicherung &amp; Export',
+    'admin.settings.backup.subtitle' => 'Lade eine Sicherungskopie aller Daten herunter oder exportiere deine Rechtstexte als Textdateien.',
+    'admin.settings.backup.download_button' => 'Sicherungskopie herunterladen',
+    'admin.settings.backup.export_button' => 'Als Textdateien exportieren',
+    'admin.settings.backup.audit_report_button' => 'Prüfbericht per E-Mail',
+    'admin.settings.backup.auto_heading' => 'Automatische Backups (7 Tage rollierend)',
+    'admin.settings.backup.auto_help' => 'Legt täglich eine Kopie der Datenbank in /backups an und löscht automatisch alles, was älter als 7 Tage ist. Dafür muss ein externer Cron-Job einmal täglich /api/cron/backup aufrufen — genau wie beim Prüfbericht per E-Mail.',
+    'admin.settings.backup.run_now_button' => 'Jetzt sichern',
+    'admin.settings.backup.created_msg' => 'Backup wurde erstellt.',
+    'admin.settings.backup.failed_msg' => 'Backup fehlgeschlagen.',
+    'admin.settings.backup.cloud_hint' => 'Läuft bei Managed Cloud automatisch täglich — kein Cron-Job nötig.',
+    'admin.settings.backup.manual_hint' => 'Ohne eingerichteten Cron-Job entstehen hier nur Backups, die du manuell auslöst.',
+    'admin.settings.backup.empty' => 'Noch keine automatischen Backups vorhanden.',
+    'admin.settings.backup.col_created' => 'Erstellt',
+    'admin.settings.backup.col_size' => 'Größe',
+    'admin.settings.backup.download_link' => 'Download',
+
+    'admin.settings.queue.heading' => 'Webhook-Warteschlange',
+    'admin.settings.queue.help' => 'Veröffentlichungen werden nicht mehr direkt beim Speichern verschickt, sondern in einer Warteschlange abgelegt. Ein externer Cron-Job muss regelmäßig (z. B. alle 5 Minuten) /api/cron/webhooks aufrufen, damit sie zugestellt werden. Fehlgeschlagene Zustellungen werden bis zu 5-mal mit steigendem Abstand wiederholt.',
+    'admin.settings.queue.run_now_button' => 'Jetzt abarbeiten',
+    'admin.settings.queue.processed_msg' => 'Warteschlange verarbeitet.',
+    'admin.settings.queue.pending' => ':count wartend',
+    'admin.settings.queue.sent' => ':count zugestellt',
+    'admin.settings.queue.failed' => ':count endgültig fehlgeschlagen',
+
+    'admin.settings.log.heading' => 'Webhook-Protokoll',
+    'admin.settings.log.clear_button' => 'Logs leeren',
+    'admin.settings.log.subtitle' => 'Die letzten Zustellungen inklusive Status, Antwort und Latenz.',
+    'admin.settings.log.empty' => 'Noch keine Webhook-Aktivitäten für dieses Projekt protokolliert. Klicke oben auf „Test-Webhook senden", um einen ersten Eintrag zu erzeugen.',
+    'admin.settings.log.col_time' => 'Zeitpunkt',
+    'admin.settings.log.col_event' => 'Event',
+    'admin.settings.log.col_status' => 'Status',
+    'admin.settings.log.col_latency' => 'Latenz',
+    'admin.settings.log.col_response' => 'Antwort',
+    'admin.settings.log.empty_response' => '(Leere Antwort)',
+
+    'admin.settings.js.copy_success' => 'In Zwischenablage kopiert!',
+    'admin.settings.js.audit_report_sent' => 'Prüfbericht per E-Mail gesendet!',
+    'admin.settings.js.error_prefix' => 'Fehler: ',
+    'admin.settings.js.audit_report_failed' => 'Konnte Bericht nicht senden.',
+    'admin.settings.js.webhook_success' => 'Webhook erfolgreich zugestellt!\nHTTP-Status: :status\nDauer: :duration ms\nAntwort: :response',
+    'admin.settings.js.webhook_failure' => 'Fehler bei der Webhook-Zustellung:\nHTTP-Status: :status\nFehler: :error\nAntwort: :response',
+    'admin.settings.js.empty_paren' => '(leer)',
+    'admin.settings.js.unknown_error' => 'Unbekannt',
+    'admin.settings.js.network_error_prefix' => 'Netzwerkfehler: ',
+    'admin.settings.js.smtp_test_success' => 'Test-E-Mail erfolgreich via SMTP versendet!',
+    'admin.settings.js.smtp_test_failed' => 'SMTP Versand fehlgeschlagen.',
+
+    // ---------------------------------------------------------------
+    // db.php - error strings that reach an end user (browser/API response)
+    // ---------------------------------------------------------------
+    'db.cron.invalid_secret' => 'Ungültiges oder fehlendes Secret. ?secret=<dein-cron-secret> anhängen (siehe Einstellungen).',
+
+    'db.smtp.mail_function_failed' => 'mail() Funktion fehlgeschlagen. Bitte SMTP-Server konfigurieren.',
+    'db.smtp.connection_failed' => 'Verbindung zu :host::port fehlgeschlagen: :error (:errno)',
+    'db.smtp.starttls_failed' => 'STARTTLS fehlgeschlagen: :response',
+    'db.smtp.auth_failed' => 'SMTP Authentifizierung fehlgeschlagen: :response',
+    'db.smtp.recipient_rejected' => 'Empfänger abgelehnt: :response',
+    'db.smtp.send_failed' => 'E-Mail Senden fehlgeschlagen: :response',
+
+    'db.webhook.no_url_configured' => 'Keine gültige Webhook-URL konfiguriert.',
+    'db.webhook.no_url_configured_queue' => 'Keine gültige Webhook-URL mehr konfiguriert.',
+    'db.webhook.curl_unavailable' => 'cURL PHP-Erweiterung nicht verfügbar',
+    'db.webhook.http_status_received' => 'HTTP-Status :status erhalten',
+
+    'db.deepl.no_api_key' => 'Kein DeepL API-Key hinterlegt.',
+    'db.deepl.curl_missing' => 'cURL PHP-Erweiterung (php-curl) ist auf dem Server nicht aktiv.',
+    'db.deepl.curl_error' => 'cURL Fehler: :error',
+    'db.deepl.api_error' => 'DeepL API Fehler: :message',
+
+    'db.backup.no_database' => 'Keine Datenbank gefunden.',
+    'db.backup.dir_creation_failed' => 'Backup-Ordner konnte nicht angelegt werden.',
+    'db.backup.copy_failed' => 'Kopieren der Datenbank fehlgeschlagen.',
+
+    'db.audit.no_recipient' => 'Keine Audit-Empfänger E-Mail hinterlegt.',
+    'db.audit.all_current' => 'Alle Rechtstexte sind aktuell. Keine E-Mail erforderlich.',
+    'db.scheduled_publish_note' => 'Geplante Veröffentlichung',
+    'db.audit.overdue_item' => '<li><strong>:title</strong> (:lang) - Zuletzt geprüft vor :days Tagen (Stand: :date)</li>',
+    'db.audit.mail_heading' => 'Paragrafy Compliance-Audit: Prüfung fällig',
+    'db.audit.mail_intro' => 'Für dein Projekt <strong>:project</strong> (:domain) sind folgende Rechtstexte seit mehr als :months Monaten ungeprüft:',
+    'db.audit.mail_subject' => '[Paragrafy] Audit-Erinnerung: :count Rechtstexte prüfen',
+];
