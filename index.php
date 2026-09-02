@@ -814,7 +814,31 @@ function render_consent_js(?array $project): void {
     $brand = $project['brand_color'] ?? '#6366F1';
     $primaryLang = $project['primary_lang'] ?? 'de';
     $bannerText = trim($project['cookie_banner_text'] ?? '') ?: t('public.consent.default_text');
-    $privacyUrl = '/' . $primaryLang . '/datenschutz';
+
+    // consent.js runs embedded on the CLIENT's website, so the privacy link
+    // must be an absolute URL back to this Paragrafy instance -- a relative
+    // path like "/de/datenschutz" would resolve against the embedding site
+    // instead and 404 (or hit an unrelated page) there.
+    $scheme = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')) ? 'https' : 'http';
+    $selfHost = get_current_host();
+    $privacySlug = 'datenschutz';
+    if ($project) {
+        $db = get_db();
+        $stmt = $db->prepare("
+            SELECT t.slug, dt.slug AS default_slug
+            FROM translations t
+            JOIN documents d ON t.document_id = d.id
+            JOIN doc_types dt ON d.doc_type_id = dt.id
+            WHERE d.project_id = ? AND t.lang = ? AND dt.slug = 'datenschutz' AND t.status = 'published'
+            LIMIT 1
+        ");
+        $stmt->execute([$project['id'], $primaryLang]);
+        $privacyDoc = $stmt->fetch();
+        if ($privacyDoc) {
+            $privacySlug = $privacyDoc['slug'] ?: $privacyDoc['default_slug'];
+        }
+    }
+    $privacyUrl = $scheme . '://' . $selfHost . '/' . $primaryLang . '/' . $privacySlug;
 
     $brandJs = json_encode($brand, JSON_UNESCAPED_UNICODE);
     $textJs = json_encode($bannerText, JSON_UNESCAPED_UNICODE);
