@@ -1,6 +1,6 @@
 <?php
 /**
- * Paragrafy v1.6.1 - Admin Command Center, Multi-Project Manager, Compliance Engine & Webhook Logger
+ * Paragrafy - Admin Command Center, Multi-Project Manager, Compliance Engine & Webhook Logger
  */
 declare(strict_types=1);
 

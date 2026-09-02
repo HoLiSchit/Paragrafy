@@ -1,10 +1,12 @@
 <?php
 /**
- * Paragrafy v1.6.2 - Database, Helper, Scheduled Publishing, SMTP & Full-Spec Webhook Logger Core
+ * Paragrafy - Database, Helper, Scheduled Publishing, SMTP & Full-Spec Webhook Logger Core
  */
 declare(strict_types=1);
 
-define('PARAGRAFY_VERSION', '1.6.2');
+// CalVer: JAHR.MONAT.BUILD - BUILD zaehlt Releases innerhalb des Monats hoch (startet bei 1).
+// Siehe CHANGELOG.md fuer die Aenderungen je Version.
+define('PARAGRAFY_VERSION', '2026.9.1');
 define('PARAGRAFY_DIR', __DIR__);
 // Where persistent data (DB, config, backups, .env) lives. Defaults to the
 // code directory (bare-metal installs); set PARAGRAFY_DATA_DIR to point this
@@ -1335,6 +1337,7 @@ function render_sidebar(string $active, array $project, array $projects): string
                 <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em"><?php if ($isManagedCloud): ?>Managed Cloud &middot; v<?= PARAGRAFY_VERSION ?><?php else: ?>Self-Hosted &middot; v<?= PARAGRAFY_VERSION ?><?php endif; ?></span>
             </div>
             <p style="font-size:12px;color:var(--text-faint);margin:0;line-height:1.5"><?php if ($isManagedCloud): ?>Gehostet &amp; verwaltet von Paragrafy Cloud.<?php else: ?>Open Source &amp; unter deiner Kontrolle.<?php endif; ?></p>
+            <a href="/CHANGELOG.md" target="_blank" style="display:inline-block;margin-top:6px;font-size:11px;font-weight:600;color:var(--text-faint);text-decoration:none">Was ist neu? &rarr;</a>
         </div>
 
         <?php if ($isManagedCloud): ?>

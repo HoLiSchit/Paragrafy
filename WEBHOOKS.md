@@ -13,7 +13,7 @@ Jeder von Paragrafy versendete Webhook wird als `POST`-Request mit folgendem Hea
 | Header | Beschreibung | Beispiel |
 | :--- | :--- | :--- |
 | `Content-Type` | MIME-Type des Payloads | `application/json` |
-| `User-Agent` | Client-Identifikator | `Paragrafy-Webhook/1.6.2` |
+| `User-Agent` | Client-Identifikator | `Paragrafy-Webhook/2026.9.1` |
 | `X-Paragrafy-Event` | Event-Typ | `legal_text.updated` / `legal_text.scheduled` |
 | `X-Paragrafy-Signature` | HMAC-SHA256 Signatur des rohen Body-Strings | `a3f8e... (hex)` *(nur wenn Secret gesetzt)* |
 

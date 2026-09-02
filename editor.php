@@ -1,6 +1,6 @@
 <?php
 /**
- * Paragrafy v1.6.2 - Side-by-Side WYSIWYG & Translation Editor with Scheduled Publishing
+ * Paragrafy - Side-by-Side WYSIWYG & Translation Editor with Scheduled Publishing
  */
 declare(strict_types=1);
 
@@ -460,7 +460,10 @@ $versions = $stmtVersions->fetchAll();
                             <option value="scheduled" <?= $hasScheduled ? 'selected' : '' ?>>Zeitgesteuert planen (Live ab Datum)</option>
                             <option value="draft" <?= (!$hasScheduled && $targetTrans['status'] === 'draft') ? 'selected' : '' ?>>Entwurf (ausgeblendet)</option>
                         </select>
-                        <button type="submit" class="btn-save"><?= svg_icon('disk', '', 16) ?> Speichern & Bestätigen</button>
+                        <div style="display:flex;align-items:center;gap:12px">
+                            <span id="dirtyIndicator" style="display:none;font-size:12px;font-weight:600;color:var(--text-faint)">Ungespeicherte Änderungen</span>
+                            <button type="submit" class="btn-save"><?= svg_icon('disk', '', 16) ?> Speichern & Bestätigen</button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -512,12 +515,26 @@ $versions = $stmtVersions->fetchAll();
     <script>
         let isCodeMode = false;
         let isDiffActive = false;
+        let formDirty = false;
         const currentSourceLang = "<?= $sourceLang ?>";
         const currentTargetLang = "<?= $targetLang ?>";
 
         document.addEventListener('DOMContentLoaded', () => {
             updateWordCounts();
             setupSynchronousScroll();
+            const form = document.getElementById('editForm');
+            const markDirty = () => {
+                formDirty = true;
+                document.getElementById('dirtyIndicator').style.display = 'inline';
+            };
+            form.addEventListener('input', markDirty);
+            form.addEventListener('change', markDirty);
+        });
+
+        window.addEventListener('beforeunload', (e) => {
+            if (!formDirty) return;
+            e.preventDefault();
+            e.returnValue = '';
         });
 
         function handleStatusChange(val) {
@@ -629,6 +646,8 @@ $versions = $stmtVersions->fetchAll();
             } else {
                 hidden.value = visual.innerHTML;
             }
+            formDirty = false;
+            document.getElementById('dirtyIndicator').style.display = 'none';
         }
 
         function updateWordCounts() {

@@ -1,6 +1,6 @@
 <?php
 /**
- * Paragrafy v1.5.0 - Interactive Setup & Installation Wizard
+ * Paragrafy - Interactive Setup & Installation Wizard
  */
 declare(strict_types=1);
 

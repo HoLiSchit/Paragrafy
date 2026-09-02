@@ -1,6 +1,6 @@
 <?php
 /**
- * Paragrafy v1.5.1 - Public Router, Document Viewer, Embed Drawer, JSON API & Cron Audit
+ * Paragrafy - Public Router, Document Viewer, Embed Drawer, JSON API & Cron Audit
  */
 declare(strict_types=1);
 

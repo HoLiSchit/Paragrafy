@@ -2,6 +2,8 @@
 
 Paragrafy ist ein leichtgewichtiges, selbstgehostetes Content-Management-System und Headless-Backend zur zentralen Verwaltung, Übersetzung und Bereitstellung rechtlicher Pflichttexte (Impressum, Datenschutz, AGB, Cookie-Richtlinien etc.) für mehrere Web- und App-Projekte auf Basis von **PHP** und **SQLite**.
 
+Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`, z. B. `2026.9.1`) statt SemVer — so ist auf einen Blick erkennbar, wie aktuell eine Instanz ist. Änderungen je Version stehen in [CHANGELOG.md](CHANGELOG.md).
+
 ---
 
 ## 🚀 Kernfunktionen
