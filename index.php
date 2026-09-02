@@ -396,7 +396,7 @@ function render_public_document(array $project, array $trans, string $content, a
             .toc-link:hover { color: var(--text); }
             .toc-link.active { color: var(--accent); font-weight: 600; border-left-color: var(--accent); }
             .toc-brand { display: flex; align-items: center; gap: 6px; margin-top: 28px; font-size: 12px; color: var(--text-faint); font-weight: 500; }
-            .toc-brand span { width: 15px; height: 15px; border-radius: 4px; background: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 9px; color: #fff; }
+            .toc-brand img { width: 15px; height: 15px; border-radius: 4px; display: block; }
 
             footer { text-align: center; padding-bottom: 2rem; font-size: 12px; color: var(--text-faint); }
             @media print { .header-actions, .toc-sidebar, .search-box, .anchor-link, .hero a, .preview-banner, footer { display: none; } .hero { background: #fff; padding: 0; } h1, .brand-name { color: #000; } .wrapper { display: block; padding: 0; } body { background: #fff; color: #000; } }
@@ -462,7 +462,7 @@ function render_public_document(array $project, array $trans, string $content, a
             <aside class="toc-sidebar">
                 <div class="toc-title"><?= htmlspecialchars($i18n['toc']) ?></div>
                 <ul class="toc-list" id="tocList" style="list-style:none;padding:0;margin:0"></ul>
-                <div class="toc-brand"><span>§</span> Bereitgestellt mit Paragrafy</div>
+                <div class="toc-brand"><img src="<?= htmlspecialchars($logoUrl) ?>" alt=""> Bereitgestellt mit Paragrafy</div>
             </aside>
         </div>
 
@@ -575,7 +575,7 @@ function render_public_overview(array $project, PDO $db, string $lang): void {
             li a:hover { border-color: var(--accent); }
             li a span:last-child { color: var(--text-faint); }
             .toc-brand { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 14px; font-size: 12px; color: var(--text-faint); font-weight: 500; }
-            .toc-brand span.badge { width: 15px; height: 15px; border-radius: 4px; background: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 9px; color: #fff; }
+            .toc-brand img { width: 15px; height: 15px; border-radius: 4px; display: block; }
         </style>
     </head>
     <body>
@@ -598,7 +598,7 @@ function render_public_overview(array $project, PDO $db, string $lang): void {
                 <?php endforeach; ?>
             </ul>
             <p style="font-size:11px;color:var(--text-faintest);line-height:1.5;text-align:center;margin:22px 0 0"><?= htmlspecialchars($i18n['overview_title']) ?></p>
-            <div class="toc-brand"><span class="badge">§</span> Bereitgestellt mit Paragrafy</div>
+            <div class="toc-brand"><img src="<?= htmlspecialchars($logoUrl) ?>" alt=""> Bereitgestellt mit Paragrafy</div>
         </div>
     </body>
     </html>
