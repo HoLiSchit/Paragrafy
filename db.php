@@ -274,7 +274,7 @@ function init_database_schema(PDO $pdo): void {
             name TEXT NOT NULL,
             primary_lang TEXT DEFAULT 'de',
             active_languages TEXT DEFAULT 'de,en',
-            brand_color TEXT DEFAULT '#e11d48',
+            brand_color TEXT DEFAULT '#6366F1',
             logo_url TEXT DEFAULT '',
             deepl_api_key TEXT DEFAULT '',
             webhook_url TEXT DEFAULT '',
@@ -1102,7 +1102,7 @@ function run_audit_check(array $project, PDO $db): array {
     $html = "<h2>Paragrafy Compliance-Audit: Prüfung fällig</h2>";
     $html .= "<p>Für dein Projekt <strong>" . htmlspecialchars($project['name']) . "</strong> (" . htmlspecialchars($project['domain']) . ") sind folgende Rechtstexte seit mehr als $auditMonths Monaten ungeprüft:</p>";
     $html .= "<ul>" . implode('', $overdue) . "</ul>";
-    $html .= "<p><a href='https://" . htmlspecialchars($project['domain']) . "/admin' style='background:#e11d48;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Zum Admin-Dashboard</a></p>";
+    $html .= "<p><a href='https://" . htmlspecialchars($project['domain']) . "/admin' style='background:#6366F1;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Zum Admin-Dashboard</a></p>";
 
     return send_smtp_mail($project, $recipient, "[Paragrafy] Audit-Erinnerung: " . count($overdue) . " Rechtstexte prüfen", $html);
 }
@@ -1132,39 +1132,47 @@ function theme_head_tags(): string {
         . '<script>(function(){try{var t=localStorage.getItem("paragrafy_theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();</script>';
 }
 
-function theme_base_css(string $accent = '#e11d48', bool $enableDarkMode = true): string {
+function theme_base_css(string $accent = '#6366F1', bool $enableDarkMode = true): string {
     $accent = htmlspecialchars($accent, ENT_QUOTES);
+    $lightAccent = $enableDarkMode ? "color-mix(in srgb, {$accent} 82%, black)" : $accent;
+    $lightVars = <<<VARS
+                --accent: {$lightAccent};
+                --accent-bg: color-mix(in srgb, {$accent} 12%, white);
+                --bg: #FAF9F6; --card: #ffffff; --border: #E8E4DC; --border-strong: #D8D2C6; --border-soft: #F1EEE7;
+                --text: #201C24; --text-muted: #746E78; --text-faint: #9C96A0; --text-faintest: #B8B2AA;
+                --green: #16814f; --green-bg: #E8F6EE; --amber: #92601a; --amber-bg: #FBF0DC; --red: #b3223a;
+                color-scheme: light;
+    VARS;
     $darkVars = <<<VARS
+                --accent: {$accent};
                 --accent-bg: color-mix(in srgb, {$accent} 22%, black);
                 --bg: #18151d; --card: #221f27; --border: #34303b; --border-strong: #45404d; --border-soft: #2b2830;
                 --text: #F0EDE9; --text-muted: #ACA6B2; --text-faint: #837d8a; --text-faintest: #5c5763;
                 --green: #3ecf8e; --green-bg: #1c3229; --amber: #e0a950; --amber-bg: #3a2e1a; --red: #ea7b8d;
                 color-scheme: dark;
     VARS;
-    $darkBlock = '';
-    if ($enableDarkMode) {
-        $darkBlock = <<<CSS
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme="light"]) {
-                {$darkVars}
+    if (!$enableDarkMode) {
+        $rootVars = $lightVars;
+        $themeBlock = '';
+    } else {
+        $rootVars = $darkVars;
+        $themeBlock = <<<CSS
+        @media (prefers-color-scheme: light) {
+            :root:not([data-theme="dark"]) {
+                {$lightVars}
             }
         }
-        :root[data-theme="dark"] {
-            {$darkVars}
+        :root[data-theme="light"] {
+            {$lightVars}
         }
     CSS;
     }
     return <<<CSS
     <style>
         :root {
-            --accent: {$accent};
-            --accent-bg: color-mix(in srgb, {$accent} 12%, white);
-            --bg: #FAF9F6; --card: #ffffff; --border: #E8E4DC; --border-strong: #D8D2C6; --border-soft: #F1EEE7;
-            --text: #201C24; --text-muted: #746E78; --text-faint: #9C96A0; --text-faintest: #B8B2AA;
-            --green: #16814f; --green-bg: #E8F6EE; --amber: #92601a; --amber-bg: #FBF0DC; --red: #b3223a;
-            color-scheme: light;
+            {$rootVars}
         }
-        {$darkBlock}
+        {$themeBlock}
         * { box-sizing: border-box; }
         body { font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
         h1, h2, h3, .heading-font { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.01em; }
@@ -1241,17 +1249,17 @@ function theme_base_css(string $accent = '#e11d48', bool $enableDarkMode = true)
         .pg-copy-btn:hover { color: var(--text-muted); }
 
         input[type=text], input[type=password], input[type=email], input[type=number], input[type=datetime-local], textarea, select {
-            font-family: 'IBM Plex Sans', sans-serif; border: 1px solid var(--border-strong); border-radius: 8px; padding: 9px 12px; font-size: 13px; background: var(--card); color: var(--text);
+            font-family: 'IBM Plex Sans', sans-serif; border: 1px solid var(--border-strong); border-radius: 9px; padding: 9px 12px; font-size: 13px; background: var(--card); color: var(--text);
         }
         label.pg-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; margin-top: 14px; }
         .pg-hint { font-size: 11.5px; color: var(--text-faint); margin-top: 6px; }
         .pg-help { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: var(--border-soft); color: var(--text-faint); font-size: 10px; font-weight: 700; font-style: normal; cursor: help; margin-left: 5px; flex-shrink: 0; vertical-align: middle; }
         .pg-help:hover { background: var(--border); color: var(--text-muted); }
 
-        .pg-btn { border: none; border-radius: 8px; padding: 10px 18px; background: var(--accent); color: #fff; font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
-        .pg-btn:hover { filter: brightness(0.92); }
-        .pg-btn-secondary { border: 1px solid var(--border-strong); background: var(--card); border-radius: 8px; padding: 9px 15px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
-        .pg-btn-secondary:hover { border-color: var(--text-faint); }
+        .pg-btn { border: none; border-radius: 9px; padding: 10px 18px; background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 65%, white)); box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent); color: #fff; font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+        .pg-btn:hover { filter: brightness(1.08); }
+        .pg-btn-secondary { border: 1px solid var(--border-strong); background: var(--card); border-radius: 9px; padding: 9px 15px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
+        .pg-btn-secondary:hover { border-color: var(--accent); }
         .pg-btn-dark { border: none; background: #17141b; color: #fff; border-radius: 7px; padding: 6px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
         .pg-btn-dark:hover { background: #2b2732; }
         .pg-btn-danger { border: none; background: #7f1d1d; color: #fecaca; border-radius: 8px; padding: 9px 15px; font-size: 13px; font-weight: 700; cursor: pointer; }

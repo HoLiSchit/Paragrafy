@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $projectDomain = trim($_POST['project_domain'] ?? '');
     $primaryLang = $_POST['primary_lang'] ?? 'de';
     $selectedLangs = $_POST['active_languages'] ?? ['de'];
-    $brandColor = trim($_POST['brand_color'] ?? '#e11d48');
+    $brandColor = trim($_POST['brand_color'] ?? '#6366F1');
     $deeplApiKey = trim($_POST['deepl_api_key'] ?? '');
     if (!str_starts_with($brandColor, '#')) {
         $brandColor = '#' . $brandColor;
@@ -205,34 +205,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
     <style>
-        :root { --primary: #e11d48; --bg: #090d16; --card: #131b2e; --text: #f8fafc; --muted: #94a3b8; --border: #1e293b; --input-bg: #0b1120; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 2.5rem 1rem; line-height: 1.5; }
+        :root {
+            --primary: #6366F1;
+            --primary-dark: #4F46E5;
+            --accent-text: #8B8FF6;
+            --accent-gradient: linear-gradient(135deg,#6366F1,#8B8FF6);
+            --bg: #10131F;
+            --card: #1C1F2E;
+            --text: #F5F5F7;
+            --muted: #B4B7C7;
+            --muted2: #8E92A6;
+            --border: rgba(255,255,255,0.14);
+            --input-bg: #0A0C14;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 2.5rem 1rem; line-height: 1.5; }
         .wizard-container { max-width: 820px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
         .logo-header { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.5rem; }
-        .logo-header img { width: 38px; height: 38px; border-radius: 10px; box-shadow: 0 4px 12px rgba(225,29,72,0.3); }
+        .logo-header img { width: 38px; height: 38px; border-radius: 10px; box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
         h1 { font-size: 1.85rem; margin: 0; color: #fff; font-weight: 800; letter-spacing: -0.02em; }
         .subtitle { color: var(--muted); margin-bottom: 2rem; font-size: 0.95rem; }
-        .section { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
-        .section-title { font-size: 1.05rem; font-weight: 700; margin-top: 0; margin-bottom: 1rem; color: #fb7185; display: flex; align-items: center; gap: 0.5rem; }
+        .section { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 14px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .section-title { font-size: 1.05rem; font-weight: 700; margin-top: 0; margin-bottom: 1rem; color: var(--accent-text); display: flex; align-items: center; gap: 0.5rem; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        label { display: block; font-size: 0.8125rem; font-weight: 600; color: #cbd5e1; margin-bottom: 0.35rem; }
-        input[type=text], input[type=password], input[type=email], textarea, select { width: 100%; box-sizing: border-box; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.9rem; color: #fff; font-size: 0.9rem; transition: all 0.2s; }
-        input:focus, textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(225,29,72,0.2); }
+        label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--muted); margin-bottom: 0.35rem; }
+        input[type=text], input[type=password], input[type=email], textarea, select { width: 100%; box-sizing: border-box; background: var(--input-bg); border: 1px solid var(--border); border-radius: 9px; padding: 0.7rem 0.9rem; color: #fff; font-size: 0.9rem; transition: all 0.2s; }
+        input:focus, textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(99,102,241,0.2); }
         .checkbox-group { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; }
-        .checkbox-card { display: flex; align-items: center; gap: 0.6rem; background: var(--input-bg); padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-        .checkbox-card:hover { border-color: #475569; }
+        .checkbox-card { display: flex; align-items: center; gap: 0.6rem; background: var(--input-bg); padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 9px; cursor: pointer; transition: all 0.2s; }
+        .checkbox-card:hover { border-color: rgba(255,255,255,0.32); }
         .checkbox-card input { cursor: pointer; width: 16px; height: 16px; accent-color: var(--primary); }
         .color-picker-wrap { display: flex; align-items: center; gap: 0.5rem; }
-        .color-picker-wrap input[type=color] { width: 44px; height: 40px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: transparent; cursor: pointer; }
+        .color-picker-wrap input[type=color] { width: 44px; height: 40px; padding: 0; border: 1px solid var(--border); border-radius: 9px; background: transparent; cursor: pointer; }
         .color-picker-wrap input[type=text] { width: 130px; text-transform: uppercase; font-family: monospace; }
-        .btn { width: 100%; background: var(--primary); color: #fff; border: none; padding: 0.9rem 1.5rem; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 1rem; box-shadow: 0 4px 15px rgba(225,29,72,0.3); }
-        .btn:hover { background: #be123c; transform: translateY(-1px); }
-        .btn-add { background: #1e293b; color: #f8fafc; border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 600; cursor: pointer; margin-top: 0.75rem; transition: all 0.2s; }
-        .btn-add:hover { background: #334155; }
-        .custom-row { display: grid; grid-template-columns: 1.5fr 1fr auto auto; gap: 0.5rem; align-items: center; background: var(--input-bg); padding: 0.6rem; border: 1px solid var(--border); border-radius: 8px; margin-top: 0.5rem; }
+        .btn { width: 100%; background: var(--accent-gradient); box-shadow: 0 6px 18px rgba(99,102,241,0.3); color: #fff; border: none; padding: 0.9rem 1.5rem; border-radius: 9px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 1rem; }
+        .btn:hover { filter: brightness(1.08); }
+        .btn-add { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 9px; font-size: 0.8125rem; font-weight: 600; cursor: pointer; margin-top: 0.75rem; transition: all 0.2s; }
+        .btn-add:hover { background: rgba(255,255,255,0.1); }
+        .custom-row { display: grid; grid-template-columns: 1.5fr 1fr auto auto; gap: 0.5rem; align-items: center; background: var(--input-bg); padding: 0.6rem; border: 1px solid var(--border); border-radius: 9px; margin-top: 0.5rem; }
         .custom-row input { margin: 0; }
-        .btn-del { background: #7f1d1d; color: #fecaca; border: none; padding: 0.4rem 0.65rem; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .error-box { background: #7f1d1d; border: 1px solid #dc2626; color: #fecaca; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; }
+        .btn-del { background: rgba(248,113,113,0.15); color: #FCA5A5; border: 1px solid rgba(248,113,113,0.35); padding: 0.4rem 0.65rem; border-radius: 7px; cursor: pointer; font-weight: bold; }
+        .error-box { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.35); color: #FCA5A5; padding: 1rem; border-radius: 9px; margin-bottom: 1.5rem; }
     </style>
 </head>
 <body>
@@ -277,8 +290,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div>
                         <label>Akzentfarbe (HEX):</label>
                         <div class="color-picker-wrap">
-                            <input type="color" id="color_picker" value="#e11d48" oninput="syncColor(this.value, 'text')">
-                            <input type="text" id="color_text" name="brand_color" value="#e11d48" placeholder="#E11D48" maxlength="7" oninput="syncColor(this.value, 'picker')">
+                            <input type="color" id="color_picker" value="#6366F1" oninput="syncColor(this.value, 'text')">
+                            <input type="text" id="color_text" name="brand_color" value="#6366F1" placeholder="#6366F1" maxlength="7" oninput="syncColor(this.value, 'picker')">
                         </div>
                     </div>
                 </div>

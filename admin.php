@@ -255,7 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newName = trim($_POST['new_project_name'] ?? '');
         $newDomain = trim($_POST['new_project_domain'] ?? '');
         $newLang = trim($_POST['new_primary_lang'] ?? 'de');
-        $newColor = trim($_POST['new_brand_color'] ?? '#e11d48');
+        $newColor = trim($_POST['new_brand_color'] ?? '#6366F1');
         if (!str_starts_with($newColor, '#')) $newColor = '#' . $newColor;
 
         $projectLimit = get_project_limit();
@@ -314,7 +314,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'save_project') {
         $activeLangs = implode(',', array_filter(array_map('trim', explode(',', $_POST['active_languages'] ?? 'de,en'))));
-        $brandColor = trim($_POST['brand_color'] ?? '#e11d48');
+        $brandColor = trim($_POST['brand_color'] ?? '#6366F1');
         $deeplKey = trim($_POST['deepl_api_key'] ?? '');
         $logoUrl = trim($_POST['logo_url'] ?? '');
         $webhookUrl = trim($_POST['webhook_url'] ?? '');
@@ -463,7 +463,7 @@ function send_invite_mail(array $project, string $name, string $email, string $t
     $html = "<h2>Einladung zu Paragrafy</h2>"
         . "<p>Hallo " . htmlspecialchars($name) . ",</p>"
         . "<p>du wurdest eingeladen, dem Paragrafy Admin-Panel beizutreten. Jede eingeladene Person hat vollen Zugriff auf alle Projekte — es gibt keine Rollen oder Rechte einzustellen.</p>"
-        . "<p><a href='" . htmlspecialchars($inviteLink) . "' style='background:#e11d48;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Zugang aktivieren</a></p>"
+        . "<p><a href='" . htmlspecialchars($inviteLink) . "' style='background:#6366F1;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Zugang aktivieren</a></p>"
         . "<p>Oder kopiere diesen Link in deinen Browser:<br>" . htmlspecialchars($inviteLink) . "</p>";
 
     return send_smtp_mail($project, $email, "Einladung zu Paragrafy", $html);
@@ -568,7 +568,7 @@ function handle_forgot_password(PDO $db): void {
                     $html = "<h2>Passwort zurücksetzen</h2>"
                         . "<p>Hallo " . htmlspecialchars($user['name']) . ",</p>"
                         . "<p>klicke auf den folgenden Link, um ein neues Passwort für dein Paragrafy-Konto festzulegen:</p>"
-                        . "<p><a href='" . htmlspecialchars($resetLink) . "' style='background:#e11d48;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Neues Passwort festlegen</a></p>"
+                        . "<p><a href='" . htmlspecialchars($resetLink) . "' style='background:#6366F1;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Neues Passwort festlegen</a></p>"
                         . "<p>Falls du das nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>";
                     send_smtp_mail($project, $user['email'], "Paragrafy: Passwort zurücksetzen", $html);
                 }
@@ -877,7 +877,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
+        <?= theme_base_css($project['brand_color'] ?: '#6366F1') ?>
         <style>
             .grid-add { display: grid; grid-template-columns: 2fr 1.5fr auto auto; gap: 0.75rem; align-items: center; margin-top: 10px; }
             .api-pill { background: var(--border-soft); padding: 2px 6px; border-radius: 5px; font-family: ui-monospace, monospace; font-size: 12px; }
@@ -1129,7 +1129,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                         </div>
                         <div>
                             <label class="pg-label">Akzentfarbe</label>
-                            <input type="text" name="new_brand_color" value="#e11d48" style="width:100%;font-family:ui-monospace,monospace">
+                            <input type="text" name="new_brand_color" value="#6366F1" style="width:100%;font-family:ui-monospace,monospace">
                         </div>
                     </div>
 
@@ -1249,7 +1249,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
+        <?= theme_base_css($project['brand_color'] ?: '#6366F1') ?>
         <style>
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; }
             label.pg-label { margin-top: 14px; }
@@ -1369,8 +1369,8 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                 <div>
                                     <label class="pg-label">Akzentfarbe</label>
                                     <div style="display:flex;gap:8px;align-items:center">
-                                        <input type="color" id="adm_cp" value="<?= htmlspecialchars($project['brand_color'] ?: '#e11d48') ?>" style="width:34px;height:34px;padding:0;border:1px solid var(--border-strong);border-radius:8px;cursor:pointer;flex-shrink:0" oninput="document.getElementById('adm_ct').value = this.value.toUpperCase();">
-                                        <input type="text" id="adm_ct" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#e11d48') ?>" maxlength="7" style="flex:1;font-family:ui-monospace,monospace;text-transform:uppercase" oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('adm_cp').value = this.value;">
+                                        <input type="color" id="adm_cp" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>" style="width:34px;height:34px;padding:0;border:1px solid var(--border-strong);border-radius:8px;cursor:pointer;flex-shrink:0" oninput="document.getElementById('adm_ct').value = this.value.toUpperCase();">
+                                        <input type="text" id="adm_ct" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>" maxlength="7" style="flex:1;font-family:ui-monospace,monospace;text-transform:uppercase" oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('adm_cp').value = this.value;">
                                     </div>
                                 </div>
                                 <div>
@@ -1419,7 +1419,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="domain" value="<?= htmlspecialchars($project['domain']) ?>">
                             <input type="hidden" name="primary_lang" value="<?= htmlspecialchars($project['primary_lang']) ?>">
                             <input type="hidden" name="active_languages" value="<?= htmlspecialchars($project['active_languages']) ?>">
-                            <input type="hidden" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#e11d48') ?>">
+                            <input type="hidden" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>">
                             <input type="hidden" name="logo_url" value="<?= htmlspecialchars($project['logo_url'] ?? '') ?>">
                             <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
                             <input type="hidden" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>">
@@ -1462,7 +1462,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="domain" value="<?= htmlspecialchars($project['domain']) ?>">
                             <input type="hidden" name="primary_lang" value="<?= htmlspecialchars($project['primary_lang']) ?>">
                             <input type="hidden" name="active_languages" value="<?= htmlspecialchars($project['active_languages']) ?>">
-                            <input type="hidden" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#e11d48') ?>">
+                            <input type="hidden" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>">
                             <input type="hidden" name="logo_url" value="<?= htmlspecialchars($project['logo_url'] ?? '') ?>">
                             <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
                             <?php if (!empty($project['cookie_banner_enabled'])): ?><input type="hidden" name="cookie_banner_enabled" value="1"><?php endif; ?>
@@ -1535,7 +1535,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="domain" value="<?= htmlspecialchars($project['domain']) ?>">
                             <input type="hidden" name="primary_lang" value="<?= htmlspecialchars($project['primary_lang']) ?>">
                             <input type="hidden" name="active_languages" value="<?= htmlspecialchars($project['active_languages']) ?>">
-                            <input type="hidden" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#e11d48') ?>">
+                            <input type="hidden" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>">
                             <input type="hidden" name="logo_url" value="<?= htmlspecialchars($project['logo_url'] ?? '') ?>">
                             <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
                             <?php if (!empty($project['cookie_banner_enabled'])): ?><input type="hidden" name="cookie_banner_enabled" value="1"><?php endif; ?>
@@ -1588,7 +1588,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="domain" value="<?= htmlspecialchars($project['domain']) ?>">
                             <input type="hidden" name="primary_lang" value="<?= htmlspecialchars($project['primary_lang']) ?>">
                             <input type="hidden" name="active_languages" value="<?= htmlspecialchars($project['active_languages']) ?>">
-                            <input type="hidden" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#e11d48') ?>">
+                            <input type="hidden" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>">
                             <input type="hidden" name="logo_url" value="<?= htmlspecialchars($project['logo_url'] ?? '') ?>">
                             <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
                             <?php if (!empty($project['cookie_banner_enabled'])): ?><input type="hidden" name="cookie_banner_enabled" value="1"><?php endif; ?>
@@ -1921,7 +1921,7 @@ function render_users_view(PDO $db, array $project, array $projects): void {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
+        <?= theme_base_css($project['brand_color'] ?: '#6366F1') ?>
         <style>
             .users-table th { text-align:left; }
         </style>
@@ -2057,7 +2057,7 @@ function render_audit_view(PDO $db, array $project, array $projects): void {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
         <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#e11d48') ?>
+        <?= theme_base_css($project['brand_color'] ?: '#6366F1') ?>
     </head>
     <body>
         <div class="pg-shell">
