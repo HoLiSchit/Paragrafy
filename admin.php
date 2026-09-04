@@ -351,6 +351,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $activeLangs = implode(',', array_filter(array_map('trim', explode(',', $_POST['active_languages'] ?? 'de,en'))));
         $brandColor = trim($_POST['brand_color'] ?? '#F0A63C');
         $deeplKey = trim($_POST['deepl_api_key'] ?? '');
+        $aiProvider = in_array($_POST['ai_provider'] ?? '', ['claude', 'openai'], true) ? $_POST['ai_provider'] : '';
+        $aiApiKey = trim($_POST['ai_api_key'] ?? '');
         $logoUrl = trim($_POST['logo_url'] ?? '');
         $webhookUrl = trim($_POST['webhook_url'] ?? '');
         $webhookSecret = trim($_POST['webhook_secret'] ?? '');
@@ -378,7 +380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare("
             UPDATE projects SET
                 name=?, domain=?, brand_color=?, primary_lang=?, active_languages=?,
-                deepl_api_key=?, logo_url=?, webhook_url=?, webhook_secret=?, audit_interval_months=?,
+                deepl_api_key=?, ai_provider=?, ai_api_key=?, logo_url=?, webhook_url=?, webhook_secret=?, audit_interval_months=?,
                 smtp_host=?, smtp_port=?, smtp_user=?, smtp_pass=?, smtp_secure=?, smtp_from=?, audit_email_recipient=?,
                 cookie_banner_enabled=?, cookie_banner_text=?, consent_logging_enabled=?, consent_log_retention_days=?,
                 company_name=?, address=?, email=?, phone=?, representative=?, register_info=?
@@ -386,7 +388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ");
         $stmt->execute([
             $_POST['name'], $domainToSave, $brandColor, $_POST['primary_lang'], $activeLangs,
-            $deeplKey, $logoUrl, $webhookUrl, $webhookSecret, $auditMonths,
+            $deeplKey, $aiProvider, $aiApiKey, $logoUrl, $webhookUrl, $webhookSecret, $auditMonths,
             $smtpHost, $smtpPort, $smtpUser, $smtpPass, $smtpSecure, $smtpFrom, $auditRecipient,
             $cookieBanner, $cookieBannerText, $consentLogging, $consentLogRetentionDays,
             $_POST['company_name'], $_POST['address'], $_POST['email'], $_POST['phone'], $_POST['representative'], $_POST['register_info'],
@@ -1279,6 +1281,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
 function render_settings_view(PDO $db, array $project, array $projects): void {
     $env = load_env_file();
     $envDeepl = $env['DEEPL_API_KEY'] ?? '';
+    $envAiKey = !empty($project['ai_api_key']) ? '' : (($project['ai_provider'] ?? '') === 'openai' ? ($env['OPENAI_API_KEY'] ?? '') : ($env['CLAUDE_API_KEY'] ?? ($env['OPENAI_API_KEY'] ?? '')));
 
     // Letzte Webhook-Logs für dieses Projekt laden
     $stmtLogs = $db->prepare("SELECT * FROM webhook_logs WHERE project_id = ? ORDER BY created_at DESC LIMIT 10");
@@ -1307,6 +1310,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
             hr.pg-sep { margin: 24px 0 18px; border: none; border-top: 1px solid var(--border-soft); }
             .btn-test { background: var(--text); color: var(--bg); border: none; padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8125rem; cursor: pointer; font-weight: 700; margin-top: 0.5rem; display: inline-flex; align-items: center; gap: 0.35rem; }
             .btn-test:hover { opacity: .85; }
+            .beta-badge-inline { display: inline-block; background: var(--amber-bg); color: var(--amber); font-size: 10px; font-weight: 800; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 999px; vertical-align: middle; margin-left: 4px; }
 
             /* Webhook Log Table */
             .log-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 13px; }
@@ -1702,6 +1706,20 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                     <div class="pg-hint" style="color:var(--green)"><?= htmlspecialchars(t('admin.settings.webhooks.deepl_env_hint')) ?></div>
                                 <?php else: ?>
                                     <div class="pg-hint"><?= t('admin.settings.webhooks.deepl_keys_hint') ?></div>
+                                <?php endif; ?>
+                            </div>
+
+                            <div style="border-top:1px solid var(--border-soft);padding-top:16px;margin-top:16px">
+                                <label class="pg-label" style="margin-top:0"><?= htmlspecialchars(t('admin.settings.ai_import.heading')) ?> <span class="beta-badge-inline"><?= htmlspecialchars(t('admin.settings.ai_import.beta_label')) ?></span></label>
+                                <p class="pg-hint" style="margin-top:0;margin-bottom:10px"><?= t('admin.settings.ai_import.subtitle') ?></p>
+                                <select name="ai_provider" style="width:100%;margin-bottom:10px">
+                                    <option value="" <?= empty($project['ai_provider']) ? 'selected' : '' ?>><?= htmlspecialchars(t('admin.settings.ai_import.provider_none')) ?></option>
+                                    <option value="claude" <?= ($project['ai_provider'] ?? '') === 'claude' ? 'selected' : '' ?>><?= htmlspecialchars(t('admin.settings.ai_import.provider_claude')) ?></option>
+                                    <option value="openai" <?= ($project['ai_provider'] ?? '') === 'openai' ? 'selected' : '' ?>><?= htmlspecialchars(t('admin.settings.ai_import.provider_openai')) ?></option>
+                                </select>
+                                <input type="password" name="ai_api_key" value="<?= htmlspecialchars($project['ai_api_key'] ?? '') ?>" placeholder="<?= htmlspecialchars(t('admin.settings.ai_import.key_placeholder')) ?>" style="width:100%" autocomplete="off">
+                                <?php if (!empty($envAiKey)): ?>
+                                    <div class="pg-hint" style="color:var(--green)"><?= htmlspecialchars(t('admin.settings.ai_import.env_hint')) ?></div>
                                 <?php endif; ?>
                             </div>
                         </form>

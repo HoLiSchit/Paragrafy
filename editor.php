@@ -14,7 +14,7 @@ $docId = (int)($_GET['doc_id'] ?? 0);
 $targetLang = strtolower($_GET['lang'] ?? 'de');
 
 $stmt = $db->prepare("
-    SELECT d.*, dt.title as type_title, dt.slug as default_slug, p.id as project_id, p.name as project_name, p.domain, p.primary_lang, p.active_languages, p.deepl_api_key, p.webhook_url, p.webhook_secret, p.brand_color
+    SELECT d.*, dt.title as type_title, dt.slug as default_slug, p.id as project_id, p.name as project_name, p.domain, p.primary_lang, p.active_languages, p.deepl_api_key, p.ai_provider, p.ai_api_key, p.webhook_url, p.webhook_secret, p.brand_color
     FROM documents d
     JOIN doc_types dt ON d.doc_type_id = dt.id
     JOIN projects p ON d.project_id = p.id
@@ -75,6 +75,55 @@ if (isset($_POST['action']) && $_POST['action'] === 'deepl_translate') {
         'title' => $translatedTitle,
         'content' => $resContent['text']
     ]);
+    exit;
+}
+
+// Einlesemodus (BETA): alten Rechtstext per KI in die Zielstruktur überführen
+if (isset($_POST['action']) && $_POST['action'] === 'ai_import') {
+    header('Content-Type: application/json');
+    $env = load_env_file();
+    $provider = !empty($doc['ai_provider']) ? $doc['ai_provider'] : ($env['AI_PROVIDER'] ?? 'claude');
+    $apiKey = !empty($doc['ai_api_key']) ? $doc['ai_api_key']
+        : ($provider === 'openai' ? ($env['OPENAI_API_KEY'] ?? '') : ($env['CLAUDE_API_KEY'] ?? ''));
+
+    $sourceType = $_POST['source_type'] ?? '';
+    if ($sourceType === 'url') {
+        $rawResult = fetch_raw_legal_text(trim($_POST['source_url'] ?? ''), 'url');
+    } elseif ($sourceType === 'file' && !empty($_FILES['import_file']['tmp_name'])) {
+        $rawResult = fetch_raw_legal_text($_FILES['import_file']['tmp_name'], 'file');
+    } else {
+        $rawResult = ['success' => false, 'error' => t('db.ai_import.empty_content')];
+    }
+
+    if (!$rawResult['success']) {
+        echo json_encode(['success' => false, 'error' => $rawResult['error']]);
+        exit;
+    }
+
+    $importResult = import_legal_text_with_ai($rawResult['text'], $doc['default_slug'], $provider, $apiKey);
+    if (!$importResult['success']) {
+        echo json_encode(['success' => false, 'error' => $importResult['error']]);
+        exit;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'content' => $importResult['content'],
+        'fields' => $importResult['fields']
+    ]);
+    exit;
+}
+
+// Einlesemodus (BETA): bestätigte Firmendaten in die Projekteinstellungen übernehmen
+if (isset($_POST['action']) && $_POST['action'] === 'ai_import_apply_fields') {
+    header('Content-Type: application/json');
+    $fields = [];
+    foreach (['company_name', 'address', 'email', 'phone', 'representative', 'register_info'] as $f) {
+        $fields[$f] = trim((string)($_POST['fields'][$f] ?? ''));
+    }
+    update_project_company_fields($db, (int)$doc['project_id'], $fields);
+    log_audit((int)$doc['project_id'], $doc['project_name'], t('editor.audit.ai_import_fields_applied'));
+    echo json_encode(['success' => true]);
     exit;
 }
 
@@ -234,6 +283,8 @@ $showRef = count($activeLangs) > 1 && ($_GET['showRef'] ?? '0') === '1';
 $stmtVersions = $db->prepare("SELECT * FROM translation_versions WHERE document_id = ? AND lang = ? ORDER BY created_at DESC LIMIT 50");
 $stmtVersions->execute([$docId, $targetLang]);
 $versions = $stmtVersions->fetchAll();
+
+$isStandardDocType = find_reference_template_for_slug($doc['default_slug']) !== null;
 ?>
 <!DOCTYPE html>
 <html lang="<?= htmlspecialchars(current_locale()) ?>">
@@ -280,6 +331,7 @@ $versions = $stmtVersions->fetchAll();
         .btn-deepl { background: transparent; color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
         .btn-deepl:hover { border-color: var(--accent); color: var(--accent); }
         .btn-diff { background: var(--border-soft); color: var(--text-muted); border: none; padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .beta-badge { display: inline-block; background: var(--amber-bg); color: var(--amber); font-size: 10px; font-weight: 800; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 999px; vertical-align: middle; }
 
         .warning-strip { background: var(--amber-bg); color: var(--amber); padding: 10px 28px; font-size: 12.5px; border-bottom: 1px solid var(--amber); display: flex; align-items: center; gap: 8px; }
         .scheduled-strip { background: var(--accent-bg); color: var(--text); border-bottom: 1px solid var(--border-strong); padding: 10px 28px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
@@ -401,6 +453,9 @@ $versions = $stmtVersions->fetchAll();
                                     <?= htmlspecialchars(t('editor.deepl_button', ['src' => strtoupper($sourceLang), 'tgt' => strtoupper($targetLang)])) ?>
                                 </button>
                             <?php endif; ?>
+                            <?php if ($isStandardDocType): ?>
+                                <button type="button" class="btn-diff" id="aiImportBtn" onclick="openAiImportModal()"><?= htmlspecialchars(t('editor.ai_import_button')) ?></button>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -512,6 +567,51 @@ $versions = $stmtVersions->fetchAll();
         </div>
     </div>
 
+    <?php if ($isStandardDocType): ?>
+    <!-- Modal: Einlesemodus (BETA) -->
+    <div id="aiImportModal" class="pg-modal-backdrop" onclick="if(event.target === this) closeAiImportModal()">
+        <div class="pg-modal" style="width:680px;max-height:85vh;display:flex;flex-direction:column">
+            <h2 style="font-size:19px;font-weight:800;margin:0 0 6px"><?= t('editor.ai_import_modal_title') ?> <span class="beta-badge">BETA</span></h2>
+            <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px"><?= t('editor.ai_import_modal_intro') ?></p>
+
+            <div id="aiImportStep1" style="overflow-y:auto;flex:1">
+                <label><?= htmlspecialchars(t('editor.ai_import_source_url_label')) ?></label>
+                <input type="url" id="aiImportUrl" placeholder="<?= htmlspecialchars(t('editor.ai_import_source_url_placeholder')) ?>" style="width:100%">
+
+                <label style="margin-top:14px"><?= htmlspecialchars(t('editor.ai_import_source_file_label')) ?></label>
+                <input type="file" id="aiImportFile" accept=".html,.htm,.txt,.pdf" style="width:100%">
+
+                <div class="pg-hint" style="margin-top:10px"><?= htmlspecialchars(t('editor.ai_import_no_api_key_hint')) ?></div>
+
+                <div id="aiImportError" style="display:none;margin-top:12px;color:#b91c1c;font-size:13px;font-weight:600"></div>
+                <div id="aiImportLoading" style="display:none;margin-top:12px;font-size:13px;color:var(--text-muted)"><?= htmlspecialchars(t('editor.ai_import_loading')) ?></div>
+            </div>
+
+            <div id="aiImportStep2" style="display:none;overflow-y:auto;flex:1">
+                <h3 style="font-size:14px;font-weight:700;margin:0 0 8px"><?= htmlspecialchars(t('editor.ai_import_result_title')) ?></h3>
+                <div id="aiImportPreview" style="border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;font-size:13px;line-height:1.6;max-height:220px;overflow-y:auto;margin-bottom:16px"></div>
+
+                <h3 style="font-size:14px;font-weight:700;margin:0 0 8px"><?= htmlspecialchars(t('editor.ai_import_fields_title')) ?></h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div><label style="font-size:12px">company_name</label><input type="text" id="aiField_company_name" style="width:100%"></div>
+                    <div><label style="font-size:12px">email</label><input type="text" id="aiField_email" style="width:100%"></div>
+                    <div><label style="font-size:12px">address</label><input type="text" id="aiField_address" style="width:100%"></div>
+                    <div><label style="font-size:12px">phone</label><input type="text" id="aiField_phone" style="width:100%"></div>
+                    <div><label style="font-size:12px">representative</label><input type="text" id="aiField_representative" style="width:100%"></div>
+                    <div><label style="font-size:12px">register_info</label><input type="text" id="aiField_register_info" style="width:100%"></div>
+                </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap">
+                <button type="button" class="pg-btn-secondary" onclick="closeAiImportModal()"><?= htmlspecialchars(t('editor.ai_import_cancel')) ?></button>
+                <button type="button" class="pg-btn-secondary" id="aiImportStartBtn" onclick="runAiImport()"><?= htmlspecialchars(t('editor.ai_import_start_button')) ?></button>
+                <button type="button" class="btn-save" id="aiImportApplyTextOnlyBtn" style="display:none" onclick="applyAiImportResult(false)"><?= htmlspecialchars(t('editor.ai_import_apply_text_only')) ?></button>
+                <button type="button" class="btn-save" id="aiImportApplyBothBtn" style="display:none" onclick="applyAiImportResult(true)"><?= htmlspecialchars(t('editor.ai_import_apply_text_and_fields')) ?></button>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <script>
         let isCodeMode = false;
         let isDiffActive = false;
@@ -528,7 +628,9 @@ $versions = $stmtVersions->fetchAll();
             translating: <?= json_encode(t('editor.js.translating')) ?>,
             deeplError: <?= json_encode(t('editor.js.deepl_error')) ?>,
             networkErrorPrefix: <?= json_encode(t('editor.js.network_error_prefix')) ?>,
-            deeplButtonTemplate: <?= json_encode(t('editor.deepl_button', ['src' => '%SRC%', 'tgt' => '%TGT%'])) ?>
+            deeplButtonTemplate: <?= json_encode(t('editor.deepl_button', ['src' => '%SRC%', 'tgt' => '%TGT%'])) ?>,
+            aiImportStartButton: <?= json_encode(t('editor.ai_import_start_button')) ?>,
+            aiImportLoading: <?= json_encode(t('editor.ai_import_loading')) ?>
         };
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -777,6 +879,120 @@ $versions = $stmtVersions->fetchAll();
                 btn.disabled = false;
                 btn.innerHTML = i18n.deeplButtonTemplate.replace('%SRC%', currentSourceLang.toUpperCase()).replace('%TGT%', currentTargetLang.toUpperCase());
             }
+        }
+
+        let aiImportResult = null;
+
+        function openAiImportModal() {
+            const modal = document.getElementById('aiImportModal');
+            if (!modal) return;
+            document.getElementById('aiImportStep1').style.display = 'block';
+            document.getElementById('aiImportStep2').style.display = 'none';
+            document.getElementById('aiImportError').style.display = 'none';
+            document.getElementById('aiImportLoading').style.display = 'none';
+            document.getElementById('aiImportStartBtn').style.display = 'inline-flex';
+            document.getElementById('aiImportApplyTextOnlyBtn').style.display = 'none';
+            document.getElementById('aiImportApplyBothBtn').style.display = 'none';
+            document.getElementById('aiImportUrl').value = '';
+            document.getElementById('aiImportFile').value = '';
+            aiImportResult = null;
+            modal.style.display = 'flex';
+        }
+
+        function closeAiImportModal() {
+            const modal = document.getElementById('aiImportModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function runAiImport() {
+            const url = document.getElementById('aiImportUrl').value.trim();
+            const fileInput = document.getElementById('aiImportFile');
+            const file = fileInput.files[0];
+            const errorBox = document.getElementById('aiImportError');
+            const loadingBox = document.getElementById('aiImportLoading');
+            const startBtn = document.getElementById('aiImportStartBtn');
+
+            errorBox.style.display = 'none';
+            if (!url && !file) {
+                errorBox.textContent = i18n.aiImportStartButton;
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'ai_import');
+            if (file) {
+                formData.append('source_type', 'file');
+                formData.append('import_file', file);
+            } else {
+                formData.append('source_type', 'url');
+                formData.append('source_url', url);
+            }
+
+            startBtn.disabled = true;
+            loadingBox.style.display = 'block';
+            loadingBox.textContent = i18n.aiImportLoading;
+
+            try {
+                const res = await fetch(window.location.href, { method: 'POST', body: formData });
+                const data = await res.json();
+                if (!data.success) {
+                    errorBox.textContent = data.error || i18n.deeplError;
+                    errorBox.style.display = 'block';
+                    return;
+                }
+                aiImportResult = data;
+                document.getElementById('aiImportPreview').innerHTML = data.content;
+                document.getElementById('aiField_company_name').value = data.fields.company_name || '';
+                document.getElementById('aiField_address').value = data.fields.address || '';
+                document.getElementById('aiField_email').value = data.fields.email || '';
+                document.getElementById('aiField_phone').value = data.fields.phone || '';
+                document.getElementById('aiField_representative').value = data.fields.representative || '';
+                document.getElementById('aiField_register_info').value = data.fields.register_info || '';
+
+                document.getElementById('aiImportStep1').style.display = 'none';
+                document.getElementById('aiImportStep2').style.display = 'block';
+                startBtn.style.display = 'none';
+                document.getElementById('aiImportApplyTextOnlyBtn').style.display = 'inline-flex';
+                document.getElementById('aiImportApplyBothBtn').style.display = 'inline-flex';
+            } catch (err) {
+                errorBox.textContent = i18n.networkErrorPrefix + err.message;
+                errorBox.style.display = 'block';
+            } finally {
+                startBtn.disabled = false;
+                loadingBox.style.display = 'none';
+            }
+        }
+
+        async function applyAiImportResult(withFields) {
+            if (!aiImportResult) return;
+
+            document.getElementById('visualEditor').innerHTML = aiImportResult.content;
+            document.getElementById('rawCodeEditor').value = aiImportResult.content;
+            updateWordCounts();
+            formDirty = true;
+            document.getElementById('dirtyIndicator').style.display = 'inline';
+
+            if (withFields) {
+                const fields = {
+                    company_name: document.getElementById('aiField_company_name').value.trim(),
+                    address: document.getElementById('aiField_address').value.trim(),
+                    email: document.getElementById('aiField_email').value.trim(),
+                    phone: document.getElementById('aiField_phone').value.trim(),
+                    representative: document.getElementById('aiField_representative').value.trim(),
+                    register_info: document.getElementById('aiField_register_info').value.trim()
+                };
+                const formData = new FormData();
+                formData.append('action', 'ai_import_apply_fields');
+                Object.keys(fields).forEach(k => formData.append('fields[' + k + ']', fields[k]));
+                try {
+                    await fetch(window.location.href, { method: 'POST', body: formData });
+                } catch (err) {
+                    alert(i18n.networkErrorPrefix + err.message);
+                }
+            }
+
+            closeAiImportModal();
         }
     </script>
 </body>

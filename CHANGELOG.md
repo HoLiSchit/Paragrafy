@@ -8,6 +8,23 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`) statt SemVer:
 jeden Monat wieder bei `1`. Änderungen vor `2026.9.1` sind nicht rückwirkend
 erfasst — siehe dafür die Git-Historie.
 
+## [2026.9.4] - 2026-09-04
+
+### Added
+- **Einlesemodus für Rechtstexte (BETA)**: Im Editor der 6 Standard-Rechtstexte (Impressum,
+  Datenschutzerklärung, AGB B2C/B2B, Cookie-Richtlinie, Widerrufsbelehrung) steht jetzt ein
+  neuer Button „Alten Text einlesen (BETA)" zur Verfügung. Er liest eine bestehende
+  Rechtstext-Seite per URL oder Datei-Upload (`.html`, `.htm`, `.txt`, `.pdf`) ein, lässt sie
+  von einem KI-Provider (Anthropic Claude oder OpenAI, konfigurierbar in den
+  Projekteinstellungen) in die passende Zielstruktur überführen und schlägt dabei sowohl den
+  generierten Inhalt (mit korrekt gesetzten `{{platzhaltern}}`) als auch die im Text erkannten
+  Firmendaten (Name, Adresse, E-Mail, Telefon, Vertretung, Registereintrag) zur Bestätigung vor.
+  Nichts wird automatisch übernommen — weder der Text noch die Firmendaten landen ohne
+  ausdrückliche Bestätigung im System. URL-Abrufe sind gegen SSRF abgesichert (keine
+  privaten/lokalen Adressen), Uploads sind auf zulässige Dateitypen und eine Maximalgröße
+  begrenzt. Neue Projekteinstellung „KI-Einlesemodus" für Provider-Auswahl und API-Key,
+  analog zum bestehenden DeepL-Key-Pattern inkl. `.env.local`-Fallback.
+
 ## [2026.9.3] - 2026-09-04
 
 ### Changed

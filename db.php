@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 // CalVer: JAHR.MONAT.BUILD - BUILD zaehlt Releases innerhalb des Monats hoch (startet bei 1).
 // Siehe CHANGELOG.md fuer die Aenderungen je Version.
-define('PARAGRAFY_VERSION', '2026.9.3');
+define('PARAGRAFY_VERSION', '2026.9.4');
 define('PARAGRAFY_DIR', __DIR__);
 // Where persistent data (DB, config, backups, .env) lives. Defaults to the
 // code directory (bare-metal installs); set PARAGRAFY_DATA_DIR to point this
@@ -157,7 +157,9 @@ function ensure_schema_migrations(PDO $pdo): void {
                 'smtp_from' => "TEXT DEFAULT ''",
                 'audit_email_recipient' => "TEXT DEFAULT ''",
                 'consent_logging_enabled' => "INTEGER DEFAULT 0",
-                'consent_log_retention_days' => "INTEGER DEFAULT 1095"
+                'consent_log_retention_days' => "INTEGER DEFAULT 1095",
+                'ai_provider' => "TEXT DEFAULT ''",
+                'ai_api_key' => "TEXT DEFAULT ''"
             ];
             foreach ($newCols as $c => $type) {
                 if (!in_array($c, $colNames)) {
@@ -319,6 +321,8 @@ function init_database_schema(PDO $pdo): void {
             cookie_banner_text TEXT DEFAULT '',
             consent_logging_enabled INTEGER DEFAULT 0,
             consent_log_retention_days INTEGER DEFAULT 1095,
+            ai_provider TEXT DEFAULT '',
+            ai_api_key TEXT DEFAULT '',
             company_name TEXT DEFAULT '',
             address TEXT DEFAULT '',
             email TEXT DEFAULT '',
@@ -587,6 +591,333 @@ function check_unfilled_placeholders(string $content, array $project): array {
         }
     }
     return array_unique($unfilled);
+}
+
+/**
+ * Referenzstruktur der 6 Standard-Rechtstexte. Wird sowohl vom Install-Wizard
+ * als auch vom KI-Einlesemodus (BETA) als Ziel-Vorlage genutzt.
+ */
+function get_standard_legal_templates(): array {
+    return [
+        'impressum' => [
+            'title' => 'Impressum',
+            'slug' => 'impressum',
+            'is_required' => 1,
+            'checked' => true,
+            'content' => "<h2>Angaben gemäß § 5 DDG</h2>\n<p><strong>{{company_name}}</strong><br>{{address}}</p>\n<h3>Vertreten durch:</h3>\n<p>{{representative}}</p>\n<h3>Kontakt:</h3>\n<p>E-Mail: {{email}}<br>Telefon: {{phone}}</p>\n<h3>Registereintrag:</h3>\n<p>{{register_info}}</p>"
+        ],
+        'privacy' => [
+            'title' => 'Datenschutzerklärung',
+            'slug' => 'datenschutz',
+            'is_required' => 1,
+            'checked' => true,
+            'content' => "<h2>1. Datenschutz auf einen Blick</h2>\n<h3>Allgemeine Hinweise</h3>\n<p>Die folgenden Hinweise geben einen einfachen Überblick darüber, was mit Ihren personenbezogenen Daten passiert, wenn Sie diese Website besuchen.</p>\n<h3>Verantwortliche Stelle:</h3>\n<p><strong>{{company_name}}</strong><br>{{address}}<br>E-Mail: {{email}}</p>\n<h2>2. Erfassung von Daten auf dieser Website</h2>\n<p>Die Datenverarbeitung auf dieser Website erfolgt durch den Websitebetreiber.</p>"
+        ],
+        'terms_b2c' => [
+            'title' => 'AGB (Endkunden / B2C)',
+            'slug' => 'agb-b2c',
+            'is_required' => 0,
+            'checked' => false,
+            'content' => "<h2>1. Geltungsbereich für Verbraucher (B2C)</h2>\n<p>Für alle Verträge mit Verbrauchern über die Angebote von {{company_name}} gelten nachfolgende Bedingungen.</p>"
+        ],
+        'terms_b2b' => [
+            'title' => 'AGB (Geschäftskunden / B2B)',
+            'slug' => 'agb-b2b',
+            'is_required' => 0,
+            'checked' => false,
+            'content' => "<h2>1. Geltungsbereich für Unternehmer (B2B)</h2>\n<p>Diese Geschäftsbedingungen gelten ausschließlich für Geschäftsbeziehungen mit Unternehmern, juristischen Personen des öffentlichen Rechts oder öffentlich-rechtlichen Sondervermögen.</p>"
+        ],
+        'cookies' => [
+            'title' => 'Cookie-Richtlinie',
+            'slug' => 'cookie-richtlinie',
+            'is_required' => 0,
+            'checked' => false,
+            'content' => "<h2>Verwendung von Cookies</h2>\n<p>Unsere Website verwendet technisch notwendige Cookies, um grundlegende Funktionen zu gewährleisten.</p>"
+        ],
+        'revocation' => [
+            'title' => 'Widerrufsbelehrung',
+            'slug' => 'widerruf',
+            'is_required' => 0,
+            'checked' => false,
+            'content' => "<h2>Widerrufsrecht</h2>\n<p>Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen.</p>"
+        ]
+    ];
+}
+
+/**
+ * Findet die passendste Standard-Referenzvorlage für einen gegebenen doc_type-Slug
+ * (z.B. 'impressum', 'datenschutz', 'agb-b2c', ...). Fällt auf null zurück,
+ * wenn kein Standardtyp passt (Einlesemodus BETA ist nur für Standardtypen gedacht).
+ */
+function find_reference_template_for_slug(string $docTypeSlug): ?array {
+    foreach (get_standard_legal_templates() as $tpl) {
+        if ($tpl['slug'] === $docTypeSlug) {
+            return $tpl;
+        }
+    }
+    return null;
+}
+
+/** Grenzwert für Rohtext-Import (BETA), gegen versehentliche Riesig-Uploads/Fetches. */
+const AI_IMPORT_MAX_RAW_BYTES = 200000;
+
+/**
+ * Prüft, ob eine per URL angegebene Adresse öffentlich (nicht privat/lokal) auflöst,
+ * als SSRF-Schutz für den serverseitigen Fetch im Einlesemodus (BETA).
+ */
+function is_public_http_url(string $url): bool {
+    $parts = parse_url($url);
+    if (!$parts || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) || empty($parts['host'])) {
+        return false;
+    }
+    $host = $parts['host'];
+    $ips = [];
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+        $ips[] = $host;
+    } else {
+        $resolved = @gethostbynamel($host);
+        if ($resolved === false || empty($resolved)) {
+            return false;
+        }
+        $ips = $resolved;
+    }
+    foreach ($ips as $ip) {
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Holt den Rohtext für den KI-Einlesemodus (BETA) entweder von einer URL oder aus
+ * einer hochgeladenen Datei (.html/.htm/.txt direkt, .pdf via pdftotext falls vorhanden).
+ */
+function fetch_raw_legal_text(string $source, string $type): array {
+    if ($type === 'url') {
+        $url = trim($source);
+        if (!is_public_http_url($url)) {
+            return ['success' => false, 'error' => t('db.ai_import.invalid_or_private_url')];
+        }
+        if (!function_exists('curl_init')) {
+            return ['success' => false, 'error' => t('db.deepl.curl_missing')];
+        }
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_USERAGENT => 'Paragrafy-Import-Bot/1.0',
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+        ]);
+        $body = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($body === false || $err) {
+            return ['success' => false, 'error' => t('db.ai_import.fetch_failed', ['error' => $err])];
+        }
+        if ($httpCode < 200 || $httpCode >= 300) {
+            return ['success' => false, 'error' => t('db.ai_import.fetch_http_error', ['code' => $httpCode])];
+        }
+        $text = html_entity_decode(strip_tags(preg_replace('/<(script|style)\b[^>]*>.*?<\/\1>/is', ' ', $body)), ENT_QUOTES, 'UTF-8');
+        $text = trim(preg_replace('/[ \t]+/', ' ', preg_replace('/\n{3,}/', "\n\n", $text)));
+        if ($text === '') {
+            return ['success' => false, 'error' => t('db.ai_import.empty_content')];
+        }
+        return ['success' => true, 'text' => substr($text, 0, AI_IMPORT_MAX_RAW_BYTES)];
+    }
+
+    if ($type === 'file') {
+        $tmpPath = $source;
+        if (!is_uploaded_file($tmpPath) && !is_readable($tmpPath)) {
+            return ['success' => false, 'error' => t('db.ai_import.upload_failed')];
+        }
+        if (filesize($tmpPath) > AI_IMPORT_MAX_RAW_BYTES * 4) {
+            return ['success' => false, 'error' => t('db.ai_import.file_too_large')];
+        }
+        $ext = strtolower(pathinfo($_FILES['import_file']['name'] ?? '', PATHINFO_EXTENSION));
+        $raw = '';
+        if (in_array($ext, ['html', 'htm'], true)) {
+            $raw = html_entity_decode(strip_tags(preg_replace('/<(script|style)\b[^>]*>.*?<\/\1>/is', ' ', (string)file_get_contents($tmpPath))), ENT_QUOTES, 'UTF-8');
+        } elseif ($ext === 'txt') {
+            $raw = (string)file_get_contents($tmpPath);
+        } elseif ($ext === 'pdf') {
+            if (function_exists('shell_exec') && trim((string)@shell_exec('which pdftotext 2>/dev/null')) !== '') {
+                $raw = (string)@shell_exec('pdftotext ' . escapeshellarg($tmpPath) . ' - 2>/dev/null');
+            }
+            if (trim($raw) === '') {
+                return ['success' => false, 'error' => t('db.ai_import.pdf_extraction_unavailable')];
+            }
+        } else {
+            return ['success' => false, 'error' => t('db.ai_import.unsupported_file_type')];
+        }
+        $raw = trim(preg_replace('/[ \t]+/', ' ', preg_replace('/\n{3,}/', "\n\n", $raw)));
+        if ($raw === '') {
+            return ['success' => false, 'error' => t('db.ai_import.empty_content')];
+        }
+        return ['success' => true, 'text' => substr($raw, 0, AI_IMPORT_MAX_RAW_BYTES)];
+    }
+
+    return ['success' => false, 'error' => t('db.ai_import.unsupported_file_type')];
+}
+
+/**
+ * KI-gestützter Einlesemodus (BETA): überführt einen alten Rechtstext in die
+ * Paragrafy-Zielstruktur inkl. {{platzhalter}} und liefert die im Text erkannten
+ * Firmendaten als Vorschlag zurück (werden NICHT automatisch übernommen).
+ */
+function import_legal_text_with_ai(string $rawText, string $docTypeSlug, string $provider, string $apiKey): array {
+    if (empty(trim($apiKey))) {
+        return ['success' => false, 'error' => t('db.ai_import.no_api_key')];
+    }
+    if (!function_exists('curl_init')) {
+        return ['success' => false, 'error' => t('db.deepl.curl_missing')];
+    }
+
+    $reference = find_reference_template_for_slug($docTypeSlug);
+    if (!$reference) {
+        return ['success' => false, 'error' => t('db.ai_import.unsupported_doc_type')];
+    }
+
+    $allowedTokens = ['{{company_name}}', '{{address}}', '{{email}}', '{{phone}}', '{{representative}}', '{{register_info}}'];
+
+    $prompt = "Du bekommst den rohen Text einer bestehenden Rechtstext-Seite (z.B. aus einem alten Impressum) sowie eine Ziel-Referenzstruktur im HTML-Format.\n\n"
+        . "AUFGABE:\n"
+        . "1. Erzeuge daraus HTML im Stil der Referenzstruktur (gleiche Überschriften-Ebenen und Abschnitte), aber mit den inhaltlichen Angaben aus dem Rohtext.\n"
+        . "2. Ersetze konkrete Firmendaten im HTML-Fließtext IMMER durch genau diese Platzhalter-Tokens (keine anderen erfinden): " . implode(', ', $allowedTokens) . "\n"
+        . "3. Extrahiere zusätzlich die erkannten Rohwerte für diese Felder aus dem Text: company_name, address, email, phone, representative, register_info. Wenn ein Feld nicht im Text vorkommt, liefere einen leeren String.\n"
+        . "4. Gib AUSSCHLIESSLICH ein valides JSON-Objekt zurück, keinen weiteren Text, kein Markdown, in exakt dieser Form:\n"
+        . '{"content": "<html-string>", "fields": {"company_name": "", "address": "", "email": "", "phone": "", "representative": "", "register_info": ""}}' . "\n\n"
+        . "REFERENZSTRUKTUR (" . $reference['title'] . "):\n" . $reference['content'] . "\n\n"
+        . "ROHTEXT:\n" . $rawText;
+
+    if ($provider === 'openai') {
+        $result = call_openai_chat($prompt, $apiKey);
+    } else {
+        $result = call_claude_messages($prompt, $apiKey);
+    }
+
+    if (!$result['success']) {
+        return $result;
+    }
+
+    $jsonText = trim($result['text']);
+    $jsonText = preg_replace('/^```(?:json)?/i', '', $jsonText);
+    $jsonText = preg_replace('/```$/', '', trim($jsonText));
+    $decoded = json_decode(trim($jsonText), true);
+
+    if (!is_array($decoded) || !isset($decoded['content'])) {
+        return ['success' => false, 'error' => t('db.ai_import.invalid_ai_response')];
+    }
+
+    $fields = [];
+    foreach (['company_name', 'address', 'email', 'phone', 'representative', 'register_info'] as $f) {
+        $fields[$f] = trim((string)($decoded['fields'][$f] ?? ''));
+    }
+
+    return ['success' => true, 'content' => (string)$decoded['content'], 'fields' => $fields];
+}
+
+function call_claude_messages(string $prompt, string $apiKey): array {
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => 'https://api.anthropic.com/v1/messages',
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 45,
+        CURLOPT_HTTPHEADER => [
+            'x-api-key: ' . trim($apiKey),
+            'anthropic-version: 2023-06-01',
+            'Content-Type: application/json',
+        ],
+        CURLOPT_POSTFIELDS => json_encode([
+            'model' => 'claude-sonnet-5',
+            'max_tokens' => 4096,
+            'messages' => [['role' => 'user', 'content' => $prompt]],
+        ]),
+    ]);
+    $body = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($body === false || $err) {
+        return ['success' => false, 'error' => t('db.ai_import.request_failed', ['error' => $err])];
+    }
+    $data = json_decode((string)$body, true);
+    if ($httpCode < 200 || $httpCode >= 300 || !is_array($data)) {
+        $apiErr = $data['error']['message'] ?? (string)$body;
+        return ['success' => false, 'error' => t('db.ai_import.provider_error', ['error' => $apiErr])];
+    }
+    $text = $data['content'][0]['text'] ?? '';
+    if ($text === '') {
+        return ['success' => false, 'error' => t('db.ai_import.invalid_ai_response')];
+    }
+    return ['success' => true, 'text' => $text];
+}
+
+function call_openai_chat(string $prompt, string $apiKey): array {
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => 'https://api.openai.com/v1/chat/completions',
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 45,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . trim($apiKey),
+            'Content-Type: application/json',
+        ],
+        CURLOPT_POSTFIELDS => json_encode([
+            'model' => 'gpt-4o',
+            'messages' => [['role' => 'user', 'content' => $prompt]],
+            'response_format' => ['type' => 'json_object'],
+        ]),
+    ]);
+    $body = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($body === false || $err) {
+        return ['success' => false, 'error' => t('db.ai_import.request_failed', ['error' => $err])];
+    }
+    $data = json_decode((string)$body, true);
+    if ($httpCode < 200 || $httpCode >= 300 || !is_array($data)) {
+        $apiErr = $data['error']['message'] ?? (string)$body;
+        return ['success' => false, 'error' => t('db.ai_import.provider_error', ['error' => $apiErr])];
+    }
+    $text = $data['choices'][0]['message']['content'] ?? '';
+    if ($text === '') {
+        return ['success' => false, 'error' => t('db.ai_import.invalid_ai_response')];
+    }
+    return ['success' => true, 'text' => $text];
+}
+
+/**
+ * Übernimmt bestätigte Firmendaten aus dem Einlesemodus (BETA) in die projects-Tabelle.
+ * Nur nicht-leere Felder werden geschrieben, bestehende Werte bleiben sonst erhalten.
+ */
+function update_project_company_fields(PDO $db, int $projectId, array $fields): void {
+    $allowed = ['company_name', 'address', 'email', 'phone', 'representative', 'register_info'];
+    $sets = [];
+    $params = [];
+    foreach ($allowed as $f) {
+        if (isset($fields[$f]) && trim((string)$fields[$f]) !== '') {
+            $sets[] = "$f = ?";
+            $params[] = trim((string)$fields[$f]);
+        }
+    }
+    if (empty($sets)) {
+        return;
+    }
+    $params[] = $projectId;
+    $stmt = $db->prepare("UPDATE projects SET " . implode(', ', $sets) . " WHERE id = ?");
+    $stmt->execute($params);
 }
 
 function send_smtp_mail(array $project, string $to, string $subject, string $bodyHtml): array {

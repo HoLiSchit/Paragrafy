@@ -14,50 +14,7 @@ if (is_installed()) {
 $error = null;
 $host = get_current_host();
 
-$standardTemplates = [
-    'impressum' => [
-        'title' => 'Impressum',
-        'slug' => 'impressum',
-        'is_required' => 1,
-        'checked' => true,
-        'content' => "<h2>Angaben gemäß § 5 DDG</h2>\n<p><strong>{{company_name}}</strong><br>{{address}}</p>\n<h3>Vertreten durch:</h3>\n<p>{{representative}}</p>\n<h3>Kontakt:</h3>\n<p>E-Mail: {{email}}<br>Telefon: {{phone}}</p>\n<h3>Registereintrag:</h3>\n<p>{{register_info}}</p>"
-    ],
-    'privacy' => [
-        'title' => 'Datenschutzerklärung',
-        'slug' => 'datenschutz',
-        'is_required' => 1,
-        'checked' => true,
-        'content' => "<h2>1. Datenschutz auf einen Blick</h2>\n<h3>Allgemeine Hinweise</h3>\n<p>Die folgenden Hinweise geben einen einfachen Überblick darüber, was mit Ihren personenbezogenen Daten passiert, wenn Sie diese Website besuchen.</p>\n<h3>Verantwortliche Stelle:</h3>\n<p><strong>{{company_name}}</strong><br>{{address}}<br>E-Mail: {{email}}</p>\n<h2>2. Erfassung von Daten auf dieser Website</h2>\n<p>Die Datenverarbeitung auf dieser Website erfolgt durch den Websitebetreiber.</p>"
-    ],
-    'terms_b2c' => [
-        'title' => 'AGB (Endkunden / B2C)',
-        'slug' => 'agb-b2c',
-        'is_required' => 0,
-        'checked' => false,
-        'content' => "<h2>1. Geltungsbereich für Verbraucher (B2C)</h2>\n<p>Für alle Verträge mit Verbrauchern über die Angebote von {{company_name}} gelten nachfolgende Bedingungen.</p>"
-    ],
-    'terms_b2b' => [
-        'title' => 'AGB (Geschäftskunden / B2B)',
-        'slug' => 'agb-b2b',
-        'is_required' => 0,
-        'checked' => false,
-        'content' => "<h2>1. Geltungsbereich für Unternehmer (B2B)</h2>\n<p>Diese Geschäftsbedingungen gelten ausschließlich für Geschäftsbeziehungen mit Unternehmern, juristischen Personen des öffentlichen Rechts oder öffentlich-rechtlichen Sondervermögen.</p>"
-    ],
-    'cookies' => [
-        'title' => 'Cookie-Richtlinie',
-        'slug' => 'cookie-richtlinie',
-        'is_required' => 0,
-        'checked' => false,
-        'content' => "<h2>Verwendung von Cookies</h2>\n<p>Unsere Website verwendet technisch notwendige Cookies, um grundlegende Funktionen zu gewährleisten.</p>"
-    ],
-    'revocation' => [
-        'title' => 'Widerrufsbelehrung',
-        'slug' => 'widerruf',
-        'is_required' => 0,
-        'checked' => false,
-        'content' => "<h2>Widerrufsrecht</h2>\n<p>Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen.</p>"
-    ]
-];
+$standardTemplates = get_standard_legal_templates();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $adminPass = $_POST['admin_password'] ?? '';
