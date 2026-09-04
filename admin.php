@@ -133,6 +133,23 @@ if (isset($_POST['action']) && $_POST['action'] === 'run_backup_now') {
     exit;
 }
 
+// 1e. Backup hochladen & Datenbank wiederherstellen
+if (isset($_POST['action']) && $_POST['action'] === 'restore_backup_upload') {
+    if (empty($_FILES['backup_file']['tmp_name'])) {
+        header("Location: /admin/settings?project_id=$projectId&msg=restore_failed&restore_error=" . urlencode(t('db.restore.upload_failed')));
+        exit;
+    }
+    $result = restore_database_from_upload($_FILES['backup_file']['tmp_name']);
+    if ($result['success']) {
+        log_audit(null, '', t('admin.common.audit.restore_triggered', ['count' => $result['project_count'] ?? 0]));
+        header("Location: /admin/settings?msg=restore_success&restore_count=" . (int)($result['project_count'] ?? 0));
+    } else {
+        log_audit(null, '', t('admin.common.audit.restore_failed', ['error' => $result['error'] ?? '']));
+        header("Location: /admin/settings?project_id=$projectId&msg=restore_failed&restore_error=" . urlencode($result['error'] ?? ''));
+    }
+    exit;
+}
+
 // 1d. Webhook-Warteschlange manuell abarbeiten
 if (isset($_POST['action']) && $_POST['action'] === 'run_webhook_queue_now') {
     process_webhook_queue();
@@ -1846,6 +1863,27 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                     </tbody>
                                 </table>
                             <?php endif; ?>
+                        </div>
+
+                        <div style="border-top:1px solid var(--border-soft);margin-top:20px;padding-top:16px">
+                            <h2 style="margin:0 0 4px;font-size:14px"><?= htmlspecialchars(t('admin.settings.restore.heading')) ?><?= help_icon(t('admin.settings.restore.help')) ?></h2>
+                            <?php if ($backupMsg === 'restore_success'): ?>
+                                <p style="font-size:12px;color:var(--green);margin:4px 0 10px"><?= htmlspecialchars(t('admin.settings.restore.success_msg', ['count' => (int)($_GET['restore_count'] ?? 0)])) ?></p>
+                            <?php elseif ($backupMsg === 'restore_failed'): ?>
+                                <p style="font-size:12px;color:var(--red);margin:4px 0 10px"><?= htmlspecialchars(t('admin.settings.restore.error_msg', ['error' => $_GET['restore_error'] ?? ''])) ?></p>
+                            <?php endif; ?>
+                            <div class="pg-alert pg-alert-red" style="margin-bottom:12px;font-size:12.5px">
+                                <?= htmlspecialchars(t('admin.settings.restore.warning')) ?>
+                            </div>
+                            <form method="post" enctype="multipart/form-data" id="restoreForm" onsubmit="return confirm(<?= json_encode(t('admin.settings.restore.confirm_dialog')) ?>);">
+                                <input type="hidden" name="action" value="restore_backup_upload">
+                                <input type="file" name="backup_file" accept=".sqlite" required style="width:100%;margin-bottom:10px">
+                                <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;font-weight:500;margin-bottom:12px">
+                                    <input type="checkbox" id="restoreConfirmCheckbox" onchange="document.getElementById('restoreSubmitBtn').disabled = !this.checked" style="margin-top:2px">
+                                    <?= htmlspecialchars(t('admin.settings.restore.confirm_checkbox')) ?>
+                                </label>
+                                <button type="submit" id="restoreSubmitBtn" class="pg-btn-secondary" disabled style="border-color:var(--red);color:var(--red)"><?= svg_icon('sync', '', 14) ?> <?= htmlspecialchars(t('admin.settings.restore.submit_button')) ?></button>
+                            </form>
                         </div>
                     </div>
 

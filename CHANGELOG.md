@@ -8,6 +8,19 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`) statt SemVer:
 jeden Monat wieder bei `1`. Änderungen vor `2026.9.1` sind nicht rückwirkend
 erfasst — siehe dafür die Git-Historie.
 
+## [2026.9.5] - 2026-09-04
+
+### Added
+- **Backup-Upload & Wiederherstellung**: In den Projekteinstellungen kann jetzt neben dem
+  Erstellen/Herunterladen von Backups auch eine `.sqlite`-Sicherungskopie hochgeladen werden, um
+  die komplette Datenbank der Instanz zu ersetzen — erleichtert den Wechsel zwischen Self-Hosting
+  und Managed Cloud in beide Richtungen. Die hochgeladene Datei wird vorab geprüft (gültiges
+  SQLite-Format, vorhandene Paragrafy-Kerntabellen); vor dem Ersetzen wird automatisch eine
+  Sicherheitskopie der aktuellen Datenbank angelegt (erscheint in der bestehenden Backup-Liste).
+  Backups aus älteren Paragrafy-Versionen mit fehlenden Spalten/Tabellen werden dabei automatisch
+  auf den aktuellen Schema-Stand gebracht. Zum Schutz vor Fehlklicks ist eine Bestätigungs-Checkbox
+  plus Bestätigungsdialog erforderlich.
+
 ## [2026.9.4] - 2026-09-04
 
 ### Added

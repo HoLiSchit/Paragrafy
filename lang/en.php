@@ -333,6 +333,8 @@ return [
 
     'admin.common.audit.backup_triggered' => 'Backup triggered manually',
     'admin.common.audit.backup_failed' => 'Backup failed: :error',
+    'admin.common.audit.restore_triggered' => 'Database restored from backup (:count project(s))',
+    'admin.common.audit.restore_failed' => 'Restore failed: :error',
     'admin.common.audit.cron_secret_regenerated' => 'Cron secret regenerated',
     'admin.common.audit.project_created' => 'Project created',
     'admin.common.audit.project_deleted' => 'Project deleted',
@@ -564,6 +566,16 @@ return [
     'admin.settings.backup.col_size' => 'Size',
     'admin.settings.backup.download_link' => 'Download',
 
+    'admin.settings.restore.heading' => 'Restore backup',
+    'admin.settings.restore.help' => 'Replaces this instance\'s entire database with an uploaded backup (.sqlite). Useful when switching between self-hosting and Managed Cloud. Backups from older Paragrafy versions are supported too — missing columns/tables are added automatically.',
+    'admin.settings.restore.warning' => 'Warning: all current projects, legal texts, and settings on this instance will be replaced by the content of the uploaded file. A safety copy of the current database is created automatically before replacing it (appears afterward at the top of the backup list).',
+    'admin.settings.restore.file_label' => 'Backup file (.sqlite):',
+    'admin.settings.restore.confirm_checkbox' => 'I understand that all current data on this instance will be replaced by the uploaded file.',
+    'admin.settings.restore.confirm_dialog' => 'Really continue? All current data on this instance will be replaced by the uploaded file. A safety copy is created automatically beforehand.',
+    'admin.settings.restore.submit_button' => 'Restore database',
+    'admin.settings.restore.success_msg' => 'Database restored successfully (:count project(s)). A safety copy of the previous database was created.',
+    'admin.settings.restore.error_msg' => 'Restore failed: :error',
+
     'admin.settings.queue.heading' => 'Webhook queue',
     'admin.settings.queue.help' => 'Publish events are no longer sent directly when saving, but placed in a queue instead. An external cron job must call /api/cron/webhooks regularly (e.g. every 5 minutes) for them to be delivered. Failed deliveries are retried up to 5 times with increasing delays.',
     'admin.settings.queue.run_now_button' => 'Process now',
@@ -630,6 +642,14 @@ return [
     'db.ai_import.request_failed' => 'Request to the AI provider failed: :error',
     'db.ai_import.provider_error' => 'Error from the AI provider: :error',
     'db.ai_import.invalid_ai_response' => 'The AI response could not be processed. Please try again.',
+
+    'db.restore.upload_failed' => 'File upload failed.',
+    'db.restore.file_too_large' => 'The file is too large (200 MB maximum).',
+    'db.restore.not_sqlite' => 'The file is not a valid SQLite database.',
+    'db.restore.missing_tables' => 'The file is not a valid Paragrafy database (missing tables: :tables).',
+    'db.restore.invalid_database' => 'The file could not be opened as a database.',
+    'db.restore.copy_failed' => 'The database could not be replaced (filesystem error).',
+    'db.restore.migration_failed' => 'The database was replaced, but the follow-up update failed: :error',
 
     'db.backup.no_database' => 'No database found.',
     'db.backup.dir_creation_failed' => 'Could not create the backup directory.',

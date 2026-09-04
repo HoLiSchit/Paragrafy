@@ -358,6 +358,8 @@ return [
 
     'admin.common.audit.backup_triggered' => 'Backup manuell ausgelöst',
     'admin.common.audit.backup_failed' => 'Backup fehlgeschlagen: :error',
+    'admin.common.audit.restore_triggered' => 'Datenbank aus Backup wiederhergestellt (:count Projekt(e))',
+    'admin.common.audit.restore_failed' => 'Wiederherstellung fehlgeschlagen: :error',
     'admin.common.audit.cron_secret_regenerated' => 'Cron-Secret neu generiert',
     'admin.common.audit.project_created' => 'Projekt erstellt',
     'admin.common.audit.project_deleted' => 'Projekt gelöscht',
@@ -589,6 +591,16 @@ return [
     'admin.settings.backup.col_size' => 'Größe',
     'admin.settings.backup.download_link' => 'Download',
 
+    'admin.settings.restore.heading' => 'Backup wiederherstellen',
+    'admin.settings.restore.help' => 'Ersetzt die komplette aktuelle Datenbank dieser Instanz durch eine hochgeladene Sicherungskopie (.sqlite). Nützlich beim Wechsel zwischen Self-Hosting und Managed Cloud. Auch Backups aus älteren Paragrafy-Versionen werden unterstützt — fehlende Spalten/Tabellen werden automatisch ergänzt.',
+    'admin.settings.restore.warning' => 'Achtung: Alle aktuellen Projekte, Rechtstexte und Einstellungen dieser Instanz werden durch den Inhalt der hochgeladenen Datei ersetzt. Vor dem Ersetzen wird automatisch eine Sicherungskopie der aktuellen Datenbank angelegt (erscheint danach oben in der Backup-Liste).',
+    'admin.settings.restore.file_label' => 'Backup-Datei (.sqlite):',
+    'admin.settings.restore.confirm_checkbox' => 'Ich verstehe, dass alle aktuellen Daten dieser Instanz durch die hochgeladene Datei ersetzt werden.',
+    'admin.settings.restore.confirm_dialog' => 'Wirklich fortfahren? Alle aktuellen Daten dieser Instanz werden durch die hochgeladene Datei ersetzt. Eine Sicherungskopie wird vorher automatisch angelegt.',
+    'admin.settings.restore.submit_button' => 'Datenbank wiederherstellen',
+    'admin.settings.restore.success_msg' => 'Datenbank erfolgreich wiederhergestellt (:count Projekt(e)). Eine Sicherungskopie der vorherigen Datenbank wurde angelegt.',
+    'admin.settings.restore.error_msg' => 'Wiederherstellung fehlgeschlagen: :error',
+
     'admin.settings.queue.heading' => 'Webhook-Warteschlange',
     'admin.settings.queue.help' => 'Veröffentlichungen werden nicht mehr direkt beim Speichern verschickt, sondern in einer Warteschlange abgelegt. Ein externer Cron-Job muss regelmäßig (z. B. alle 5 Minuten) /api/cron/webhooks aufrufen, damit sie zugestellt werden. Fehlgeschlagene Zustellungen werden bis zu 5-mal mit steigendem Abstand wiederholt.',
     'admin.settings.queue.run_now_button' => 'Jetzt abarbeiten',
@@ -655,6 +667,14 @@ return [
     'db.ai_import.request_failed' => 'Anfrage an den KI-Provider fehlgeschlagen: :error',
     'db.ai_import.provider_error' => 'Fehler vom KI-Provider: :error',
     'db.ai_import.invalid_ai_response' => 'Die KI-Antwort konnte nicht verarbeitet werden. Bitte erneut versuchen.',
+
+    'db.restore.upload_failed' => 'Datei-Upload fehlgeschlagen.',
+    'db.restore.file_too_large' => 'Die Datei ist zu groß (maximal 200 MB).',
+    'db.restore.not_sqlite' => 'Die Datei ist keine gültige SQLite-Datenbank.',
+    'db.restore.missing_tables' => 'Die Datei ist keine gültige Paragrafy-Datenbank (fehlende Tabellen: :tables).',
+    'db.restore.invalid_database' => 'Die Datei konnte nicht als Datenbank geöffnet werden.',
+    'db.restore.copy_failed' => 'Die Datenbank konnte nicht ersetzt werden (Dateisystem-Fehler).',
+    'db.restore.migration_failed' => 'Die Datenbank wurde ersetzt, die anschließende Aktualisierung ist aber fehlgeschlagen: :error',
 
     'db.backup.no_database' => 'Keine Datenbank gefunden.',
     'db.backup.dir_creation_failed' => 'Backup-Ordner konnte nicht angelegt werden.',

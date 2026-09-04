@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 // CalVer: JAHR.MONAT.BUILD - BUILD zaehlt Releases innerhalb des Monats hoch (startet bei 1).
 // Siehe CHANGELOG.md fuer die Aenderungen je Version.
-define('PARAGRAFY_VERSION', '2026.9.4');
+define('PARAGRAFY_VERSION', '2026.9.5');
 define('PARAGRAFY_DIR', __DIR__);
 // Where persistent data (DB, config, backups, .env) lives. Defaults to the
 // code directory (bare-metal installs); set PARAGRAFY_DATA_DIR to point this
@@ -1657,6 +1657,83 @@ function list_backups(): array {
     }
     usort($backups, fn($a, $b) => $b['created_at'] <=> $a['created_at']);
     return $backups;
+}
+
+/** Grenzwert für hochgeladene Backup-Dateien beim Restore. */
+const BACKUP_UPLOAD_MAX_BYTES = 200 * 1024 * 1024;
+
+/**
+ * Prüft, ob eine hochgeladene Datei eine valide Paragrafy-SQLite-Datenbank ist, bevor sie beim
+ * Restore die aktuelle Datenbank ersetzt. Öffnet dazu eine separate PDO-Instanz, um die
+ * Haupt-Connection (get_db()) nicht zu berühren.
+ */
+function validate_backup_upload(string $tmpPath): array {
+    if (!is_uploaded_file($tmpPath) && !is_readable($tmpPath)) {
+        return ['success' => false, 'error' => t('db.restore.upload_failed')];
+    }
+    if (filesize($tmpPath) > BACKUP_UPLOAD_MAX_BYTES) {
+        return ['success' => false, 'error' => t('db.restore.file_too_large')];
+    }
+
+    $handle = @fopen($tmpPath, 'rb');
+    $header = $handle ? fread($handle, 16) : '';
+    if ($handle) fclose($handle);
+    if ($header !== "SQLite format 3\000") {
+        return ['success' => false, 'error' => t('db.restore.not_sqlite')];
+    }
+
+    try {
+        $testPdo = new PDO('sqlite:' . $tmpPath);
+        $testPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $tables = $testPdo->query("SELECT name FROM sqlite_master WHERE type='table'")->fetchAll(PDO::FETCH_COLUMN);
+        $required = ['projects', 'doc_types', 'documents', 'translations'];
+        $missing = array_diff($required, $tables);
+        if (!empty($missing)) {
+            return ['success' => false, 'error' => t('db.restore.missing_tables', ['tables' => implode(', ', $missing)])];
+        }
+        $projectCount = (int)$testPdo->query("SELECT COUNT(*) FROM projects")->fetchColumn();
+        $testPdo = null;
+        return ['success' => true, 'project_count' => $projectCount];
+    } catch (Throwable $e) {
+        return ['success' => false, 'error' => t('db.restore.invalid_database')];
+    }
+}
+
+/**
+ * Ersetzt die aktuelle Datenbank durch eine hochgeladene Backup-Datei. Legt vorher über
+ * run_scheduled_backup() eine Sicherheitskopie der bisherigen Datenbank an und bringt die neue
+ * Datenbank direkt im selben Request per ensure_schema_migrations() auf den aktuellen Schema-Stand
+ * — auch wenn das Backup aus einer älteren Paragrafy-Version stammt und ihm neuere Spalten/Tabellen
+ * fehlen.
+ */
+function restore_database_from_upload(string $tmpPath): array {
+    $validation = validate_backup_upload($tmpPath);
+    if (!$validation['success']) {
+        return $validation;
+    }
+
+    $safetyBackup = run_scheduled_backup();
+
+    if (!copy($tmpPath, DB_FILE)) {
+        return ['success' => false, 'error' => t('db.restore.copy_failed')];
+    }
+    @unlink($tmpPath);
+
+    try {
+        $newPdo = new PDO('sqlite:' . DB_FILE);
+        $newPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $newPdo->exec("PRAGMA foreign_keys = ON;");
+        ensure_schema_migrations($newPdo);
+        $newPdo = null;
+    } catch (Throwable $e) {
+        return ['success' => false, 'error' => t('db.restore.migration_failed', ['error' => $e->getMessage()])];
+    }
+
+    return [
+        'success' => true,
+        'project_count' => $validation['project_count'],
+        'safety_backup' => $safetyBackup['success'] ?? false,
+    ];
 }
 
 /**
