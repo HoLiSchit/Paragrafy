@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 // CalVer: JAHR.MONAT.BUILD - BUILD zaehlt Releases innerhalb des Monats hoch (startet bei 1).
 // Siehe CHANGELOG.md fuer die Aenderungen je Version.
-define('PARAGRAFY_VERSION', '2026.9.2');
+define('PARAGRAFY_VERSION', '2026.9.3');
 define('PARAGRAFY_DIR', __DIR__);
 // Where persistent data (DB, config, backups, .env) lives. Defaults to the
 // code directory (bare-metal installs); set PARAGRAFY_DATA_DIR to point this
@@ -1481,6 +1481,206 @@ function theme_base_css(string $accent = '#6366F1', bool $enableDarkMode = true)
         .pg-modal { background: var(--card); border-radius: 16px; padding: 32px; width: 480px; max-width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.25); box-sizing: border-box; }
 
         .pg-toast { position: fixed; bottom: 2rem; right: 2rem; background: #17141b; color: #fff; padding: 0.85rem 1.5rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 99999; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .pg-toast.show { transform: translateY(0); opacity: 1; }
+    </style>
+    CSS;
+}
+
+/**
+ * Relative luminance (WCAG) of a hex color, used to pick readable button text
+ * against an arbitrary customer-chosen brand_color (unlike the fixed marketing
+ * amber, this accent can be any hue/lightness, so text color can't be hardcoded).
+ */
+function theme_contrast_text(string $hex): string {
+    $hex = ltrim($hex, '#');
+    if (strlen($hex) === 3) {
+        $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+    }
+    if (strlen($hex) !== 6 || !ctype_xdigit($hex)) {
+        return '#17130d';
+    }
+    $lin = function (int $c): float {
+        $c /= 255;
+        return $c <= 0.03928 ? $c / 12.92 : (($c + 0.055) / 1.055) ** 2.4;
+    };
+    $l = 0.2126 * $lin((int)hexdec(substr($hex, 0, 2)))
+        + 0.7152 * $lin((int)hexdec(substr($hex, 2, 2)))
+        + 0.0722 * $lin((int)hexdec(substr($hex, 4, 2)));
+    return $l > 0.45 ? '#17130d' : '#f5f1e8';
+}
+
+/**
+ * "§ — Ink & Paper, quiet" head tags for admin.php/editor.php ONLY.
+ * Self-hosted webfonts (no external font CDN in a consent-management product).
+ * index.php (the embedded public banner) keeps using theme_head_tags() unchanged.
+ */
+function theme_head_tags_admin(): string {
+    return '<style>'
+        . '@font-face { font-family: "Fraunces"; src: url("/assets/fonts/fraunces-variable.woff2") format("woff2-variations"); font-weight: 300 900; font-display: swap; }'
+        . '@font-face { font-family: "Inter"; src: url("/assets/fonts/inter-variable.woff2") format("woff2-variations"); font-weight: 300 900; font-display: swap; }'
+        . '@font-face { font-family: "JetBrains Mono"; src: url("/assets/fonts/jetbrainsmono-variable.woff2") format("woff2-variations"); font-weight: 300 800; font-display: swap; }'
+        . '</style>'
+        . '<script>(function(){try{var t=localStorage.getItem("paragrafy_theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();</script>';
+}
+
+/**
+ * "§ — Ink & Paper, quiet" base CSS for admin.php/editor.php ONLY.
+ * $accent stays the project's own brand_color (customer-controlled) and drives
+ * --accent/--accent-bg exactly as before -- only the surrounding palette,
+ * radii, typography and component styling move to the new design system.
+ * index.php keeps calling theme_base_css() unchanged, so the public banner
+ * widget's look is completely unaffected by this function.
+ */
+function theme_base_css_admin(string $accent = '#6366F1', bool $enableDarkMode = true): string {
+    $accent = htmlspecialchars($accent, ENT_QUOTES);
+    $btnInk = theme_contrast_text($accent);
+    $lightAccent = $enableDarkMode ? "color-mix(in srgb, {$accent} 82%, black)" : $accent;
+    $lightVars = <<<VARS
+                --accent: {$lightAccent};
+                --accent-bg: color-mix(in srgb, {$accent} 10%, white);
+                --btn-ink: {$btnInk};
+                --bg: #f7f3ea; --card: #fffdf8; --input-bg: #fbf8f1;
+                --border: rgba(28,23,18,.12); --border-strong: rgba(28,23,18,.24); --border-soft: rgba(28,23,18,.06);
+                --text: #1c1712; --text-muted: rgba(28,23,18,.65); --text-faint: rgba(28,23,18,.46); --text-faintest: rgba(28,23,18,.32);
+                --green: #1a8f63; --green-bg: rgba(26,143,99,.1); --amber: #a86a1c; --amber-bg: rgba(168,106,28,.1); --red: #b3382e; --red-bg: rgba(179,56,46,.1);
+                color-scheme: light;
+    VARS;
+    $darkVars = <<<VARS
+                --accent: {$accent};
+                --accent-bg: color-mix(in srgb, {$accent} 20%, black);
+                --btn-ink: {$btnInk};
+                --bg: #0b0a08; --card: #16130f; --input-bg: #0e0c09;
+                --border: rgba(245,241,232,.14); --border-strong: rgba(245,241,232,.28); --border-soft: rgba(245,241,232,.08);
+                --text: #f5f1e8; --text-muted: rgba(245,241,232,.68); --text-faint: rgba(245,241,232,.5); --text-faintest: rgba(245,241,232,.35);
+                --green: #34d399; --green-bg: rgba(52,211,153,.12); --amber: #f0a63c; --amber-bg: rgba(240,166,60,.12); --red: #e04b3f; --red-bg: rgba(224,75,63,.12);
+                color-scheme: dark;
+    VARS;
+    if (!$enableDarkMode) {
+        $rootVars = $lightVars;
+        $themeBlock = '';
+    } else {
+        $rootVars = $darkVars;
+        $themeBlock = <<<CSS
+        @media (prefers-color-scheme: light) {
+            :root:not([data-theme="dark"]) {
+                {$lightVars}
+            }
+        }
+        :root[data-theme="light"] {
+            {$lightVars}
+        }
+    CSS;
+    }
+    return <<<CSS
+    <style>
+        :root {
+            --radius: 3px; --radius-sm: 2px;
+            {$rootVars}
+        }
+        {$themeBlock}
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
+        h2, h3, .heading-font { font-family: 'Inter', sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+        h1, .pg-display { font-family: 'Fraunces', serif; font-weight: 600; letter-spacing: -0.01em; }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { opacity: 0.85; }
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+
+        .pg-topbar { height: 56px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 28px; flex-shrink: 0; }
+        .pg-crumb { font-size: 13.5px; color: var(--text-faint); }
+        .pg-crumb strong { color: var(--text); font-weight: 600; }
+
+        .pg-shell { display: flex; min-height: 100vh; }
+        .pg-sidebar { width: 236px; flex-shrink: 0; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 14px; box-sizing: border-box; position: sticky; top: 0; height: 100vh; }
+        .pg-logo-row { display: flex; align-items: center; gap: 9px; padding: 4px 8px 18px; }
+        .pg-logo-badge { width: 28px; height: 28px; border-radius: var(--radius); overflow: hidden; flex-shrink: 0; }
+        .pg-logo-badge img { width: 100%; height: 100%; display: block; }
+        .pg-logo-text { font-family: 'Fraunces', serif; font-weight: 600; font-size: 16.5px; letter-spacing: -0.01em; color: var(--text); }
+        .pg-proj-select { width: 100%; box-sizing: border-box; border: 1px solid var(--border); background: var(--bg); border-radius: var(--radius); padding: 8px 10px; font-size: 13px; font-weight: 600; color: var(--text); font-family: 'Inter', sans-serif; cursor: pointer; margin-bottom: 16px; }
+        .pg-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 4px; }
+        .pg-nav a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius); cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--text-muted); background-image: linear-gradient(currentColor, currentColor); background-size: 0 1px; background-position: 32px 100%; background-repeat: no-repeat; transition: background-size .15s ease; }
+        .pg-nav a:hover { background-color: var(--bg); opacity: 1; background-size: calc(100% - 42px) 1px; }
+        .pg-nav a.active { background-color: var(--accent-bg); color: var(--accent); background-size: 0 1px; }
+        .pg-nav-dot { width: 13px; height: 13px; border-radius: 50%; border: 2px solid currentColor; box-sizing: border-box; flex-shrink: 0; opacity: .85; }
+        .pg-nav-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; width: 13px; height: 13px; flex-shrink: 0; }
+        .pg-nav-grid span { background: currentColor; border-radius: 2px; opacity: .85; }
+        .pg-sidebar-spacer { flex: 1; }
+        .pg-viewer-link { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: var(--radius); font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 10px; text-decoration: none; }
+        .pg-viewer-link:hover { background: var(--bg); opacity: 1; }
+        .pg-settings-link { margin-bottom: 0; }
+        .pg-settings-link.active { background: var(--accent-bg); color: var(--accent); }
+        .pg-user-row { display: flex; align-items: center; gap: 9px; padding: 6px 8px; }
+        .pg-user-avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--text); color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+        .pg-user-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pg-logout { color: var(--text-faint); font-size: 12px; }
+
+        .pg-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .pg-content { padding: 32px 32px 80px; }
+        .pg-footer-note { padding: 14px 32px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-faintest); line-height: 1.5; }
+
+        .pg-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 18px; }
+        .pg-card-pad { padding: 22px; }
+        .pg-card h2 { font-size: 16px; font-weight: 700; margin: 0 0 5px; }
+        .pg-card .pg-card-sub { font-size: 12.5px; color: var(--text-muted); margin: 0; }
+
+        .pg-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+        @media (max-width: 980px) { .pg-kpi-grid { grid-template-columns: 1fr 1fr; } }
+        .pg-kpi { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+        .pg-kpi-label { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; color: var(--text-faint); text-transform: uppercase; margin-bottom: 10px; }
+        .pg-kpi-val { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 700; }
+        .pg-kpi-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        table.pg-table { width: 100%; border-collapse: collapse; }
+        .pg-table th { text-align: left; padding: 9px 22px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; color: var(--text-faint); text-transform: uppercase; background: var(--bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        .pg-table td { padding: 13px 22px; border-bottom: 1px solid var(--border-soft); font-size: 13.5px; vertical-align: middle; }
+        .pg-table tr:hover td { background: var(--bg); }
+
+        .pg-pill { display: inline-flex; align-items: center; gap: 5px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid currentColor; background: transparent; }
+        .pg-pill-dot { display: none; }
+        .pg-pill-green { color: var(--green); }
+        .pg-pill-amber { color: var(--amber); }
+        .pg-pill-red { color: var(--red); }
+        .pg-pill-muted { color: var(--text-faint); border-color: var(--border-strong); font-weight: 500; text-transform: none; letter-spacing: normal; font-family: 'Inter', sans-serif; }
+        .pg-req-label { font-size: 12px; font-weight: 700; color: var(--accent); }
+        .pg-opt-label { font-size: 12px; font-weight: 500; color: var(--text-faint); }
+
+        .pg-icon-btn { border: 1px solid var(--border); background: var(--card); border-radius: var(--radius); width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); }
+        .pg-icon-btn:hover { border-color: var(--border-strong); color: var(--text); }
+        .pg-icon-btn.danger:hover { border-color: var(--red); color: var(--red); }
+        .pg-copy-btn { border: none; background: transparent; padding: 2px; cursor: pointer; color: var(--text-faint); display: inline-flex; align-items: center; }
+        .pg-copy-btn:hover { color: var(--text-muted); }
+
+        input[type=text], input[type=password], input[type=email], input[type=number], input[type=datetime-local], textarea, select {
+            font-family: 'Inter', sans-serif; background: var(--input-bg); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 9px 12px; font-size: 13px; color: var(--text);
+        }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+        label.pg-label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--text-faint); margin-bottom: 6px; margin-top: 14px; }
+        .pg-hint { font-size: 11.5px; color: var(--text-faint); margin-top: 6px; }
+        .pg-help { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: var(--border-soft); color: var(--text-faint); font-size: 10px; font-weight: 700; font-style: normal; cursor: help; margin-left: 5px; flex-shrink: 0; vertical-align: middle; }
+        .pg-help:hover { background: var(--border); color: var(--text-muted); }
+
+        .pg-btn { border: none; border-radius: var(--radius); padding: 10px 18px; background: var(--accent); color: var(--btn-ink); font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: 'Inter', sans-serif; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; transition: transform .1s ease; }
+        .pg-btn:hover { background: color-mix(in srgb, var(--accent) 85%, white); }
+        .pg-btn:active { transform: scale(.98); }
+        .pg-btn-secondary { border: 1px solid var(--border-strong); background: transparent; border-radius: var(--radius); padding: 9px 15px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
+        .pg-btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+        .pg-btn-dark { border: 1px solid var(--border-strong); background: transparent; color: var(--text); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .pg-btn-dark:hover { border-color: var(--accent); color: var(--accent); }
+        .pg-btn-danger { border: 1px solid var(--red); background: transparent; color: var(--red); border-radius: var(--radius); padding: 9px 15px; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .pg-btn-danger:hover { background: var(--red-bg); }
+
+        .pg-alert { border-radius: var(--radius); padding: 13px 16px; margin-bottom: 24px; display: flex; align-items: flex-start; gap: 10px; font-size: 13px; border: 1px solid; }
+        .pg-alert-amber { background: var(--amber-bg); border-color: var(--amber); color: var(--amber); }
+        .pg-alert-red { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+        .pg-alert ul { margin: 6px 0 0 18px; padding: 0; }
+
+        .pg-modal-backdrop { position: fixed; inset: 0; background: rgba(20,16,22,.5); display: none; align-items: center; justify-content: center; z-index: 300; padding: 1rem; }
+        .pg-modal-backdrop.show { display: flex; }
+        .pg-modal { background: var(--card); border-radius: var(--radius); padding: 32px; width: 480px; max-width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.25); box-sizing: border-box; }
+
+        .pg-toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--text); color: var(--bg); padding: 0.85rem 1.5rem; border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 99999; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .pg-toast.show { transform: translateY(0); opacity: 1; }
     </style>
     CSS;

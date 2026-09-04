@@ -544,13 +544,13 @@ function render_accept_invite_view(?array $user, ?string $error): void {
         <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.login.accept_invite.page_title')) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
-        <?= theme_head_tags() ?>
-        <?= theme_base_css() ?>
+        <?= theme_head_tags_admin() ?>
+        <?= theme_base_css_admin() ?>
         <style>
             body { display: flex; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; gap: 20px; }
-            .login-card { background: var(--card); padding: 2.25rem; border-radius: 16px; width: 360px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); border: 1px solid var(--border); }
+            .login-card { background: var(--card); padding: 2.25rem; border-radius: var(--radius); width: 360px; box-shadow: none; border: 1px solid var(--border); }
             .logo-header { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem; }
-            .logo-header img { width: 34px; height: 34px; border-radius: 8px; }
+            .logo-header img { width: 34px; height: 34px; border-radius: var(--radius); }
             .logo-header h2 { margin: 0; font-size: 1.3rem; font-weight: 800; }
             .err { color: var(--red); font-size: 0.8125rem; margin-bottom: 0.5rem; }
         </style>
@@ -625,13 +625,13 @@ function render_forgot_password_view(bool $sent): void {
         <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.login.forgot.page_title')) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
-        <?= theme_head_tags() ?>
-        <?= theme_base_css() ?>
+        <?= theme_head_tags_admin() ?>
+        <?= theme_base_css_admin() ?>
         <style>
             body { display: flex; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; gap: 20px; }
-            .login-card { background: var(--card); padding: 2.25rem; border-radius: 16px; width: 360px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); border: 1px solid var(--border); }
+            .login-card { background: var(--card); padding: 2.25rem; border-radius: var(--radius); width: 360px; box-shadow: none; border: 1px solid var(--border); }
             .logo-header { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem; }
-            .logo-header img { width: 34px; height: 34px; border-radius: 8px; }
+            .logo-header img { width: 34px; height: 34px; border-radius: var(--radius); }
             .logo-header h2 { margin: 0; font-size: 1.3rem; font-weight: 800; }
         </style>
     </head>
@@ -702,13 +702,13 @@ function render_reset_password_view(?array $user, ?string $error): void {
         <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.login.reset.page_title')) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
-        <?= theme_head_tags() ?>
-        <?= theme_base_css() ?>
+        <?= theme_head_tags_admin() ?>
+        <?= theme_base_css_admin() ?>
         <style>
             body { display: flex; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; gap: 20px; }
-            .login-card { background: var(--card); padding: 2.25rem; border-radius: 16px; width: 360px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); border: 1px solid var(--border); }
+            .login-card { background: var(--card); padding: 2.25rem; border-radius: var(--radius); width: 360px; box-shadow: none; border: 1px solid var(--border); }
             .logo-header { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem; }
-            .logo-header img { width: 34px; height: 34px; border-radius: 8px; }
+            .logo-header img { width: 34px; height: 34px; border-radius: var(--radius); }
             .logo-header h2 { margin: 0; font-size: 1.3rem; font-weight: 800; }
             .err { color: var(--red); font-size: 0.8125rem; margin-bottom: 0.5rem; }
         </style>
@@ -824,13 +824,13 @@ function render_login_view(?string $error): void {
         <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.login.page_title')) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
-        <?= theme_head_tags() ?>
-        <?= theme_base_css() ?>
+        <?= theme_head_tags_admin() ?>
+        <?= theme_base_css_admin() ?>
         <style>
             body { display: flex; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; gap: 20px; }
-            .login-card { background: var(--card); padding: 2.25rem; border-radius: 16px; width: 340px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); border: 1px solid var(--border); }
+            .login-card { background: var(--card); padding: 2.25rem; border-radius: var(--radius); width: 340px; box-shadow: none; border: 1px solid var(--border); }
             .logo-header { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem; }
-            .logo-header img { width: 34px; height: 34px; border-radius: 8px; }
+            .logo-header img { width: 34px; height: 34px; border-radius: var(--radius); }
             .logo-header h2 { margin: 0; font-size: 1.3rem; font-weight: 800; }
             .err { color: var(--red); font-size: 0.8125rem; margin-bottom: 0.5rem; }
             .login-disclaimer { max-width: 340px; text-align: center; font-size: 11px; color: var(--text-faintest); line-height: 1.5; }
@@ -918,11 +918,11 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
         <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.matrix.page_title', ['project' => $project['name']])) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
-        <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#6366F1') ?>
+        <?= theme_head_tags_admin() ?>
+        <?= theme_base_css_admin($project['brand_color'] ?: '#6366F1') ?>
         <style>
             .grid-add { display: grid; grid-template-columns: 2fr 1.5fr auto auto; gap: 0.75rem; align-items: center; margin-top: 10px; }
-            .api-pill { background: var(--border-soft); padding: 2px 6px; border-radius: 5px; font-family: ui-monospace, monospace; font-size: 12px; }
+            .api-pill { background: var(--border-soft); padding: 2px 6px; border-radius: var(--radius-sm); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
         </style>
     </head>
     <body>
@@ -1060,7 +1060,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                                         <td>
                                             <div style="font-weight:600;font-size:13.5px"><?= htmlspecialchars($type['title']) ?></div>
                                             <div style="display:flex;align-items:center;gap:6px;margin-top:2px;white-space:nowrap">
-                                                <a href="/<?= htmlspecialchars($type['slug']) ?>" target="_blank" style="font-size:11.5px;color:var(--text-faint);font-family:ui-monospace,monospace;" title="<?= htmlspecialchars(t('admin.matrix.table.primary_link_title')) ?>">/<?= htmlspecialchars($type['slug']) ?></a>
+                                                <a href="/<?= htmlspecialchars($type['slug']) ?>" target="_blank" style="font-size:11.5px;color:var(--text-faint);font-family:'JetBrains Mono',monospace;" title="<?= htmlspecialchars(t('admin.matrix.table.primary_link_title')) ?>">/<?= htmlspecialchars($type['slug']) ?></a>
                                                 <button type="button" class="pg-copy-btn" title="<?= htmlspecialchars(t('admin.matrix.table.copy_link_title')) ?>" onclick="copyToClipboard('<?= htmlspecialchars($primaryUrl) ?>', '<?= htmlspecialchars(t('admin.matrix.table.copy_link_success'), ENT_QUOTES) ?>')"><?= svg_icon('link', '', 13) ?></button>
                                             </div>
                                         </td>
@@ -1171,7 +1171,7 @@ function render_matrix_view(PDO $db, array $project, array $projects): void {
                         </div>
                         <div>
                             <label class="pg-label"><?= htmlspecialchars(t('admin.matrix.new_project_modal.color_label')) ?></label>
-                            <input type="text" name="new_brand_color" value="#6366F1" style="width:100%;font-family:ui-monospace,monospace">
+                            <input type="text" name="new_brand_color" value="#6366F1" style="width:100%;font-family:'JetBrains Mono',monospace">
                         </div>
                     </div>
 
@@ -1299,26 +1299,26 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
         <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.settings.page_title', ['project' => $project['name']])) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
-        <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#6366F1') ?>
+        <?= theme_head_tags_admin() ?>
+        <?= theme_base_css_admin($project['brand_color'] ?: '#6366F1') ?>
         <style>
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; }
             label.pg-label { margin-top: 14px; }
             hr.pg-sep { margin: 24px 0 18px; border: none; border-top: 1px solid var(--border-soft); }
-            .btn-test { background: #17141b; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8125rem; cursor: pointer; font-weight: 700; margin-top: 0.5rem; display: inline-flex; align-items: center; gap: 0.35rem; }
-            .btn-test:hover { background: #2b2732; }
+            .btn-test { background: var(--text); color: var(--bg); border: none; padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8125rem; cursor: pointer; font-weight: 700; margin-top: 0.5rem; display: inline-flex; align-items: center; gap: 0.35rem; }
+            .btn-test:hover { opacity: .85; }
 
             /* Webhook Log Table */
             .log-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 13px; }
             .log-table th, .log-table td { padding: 10px 0; border-bottom: 1px solid var(--border-soft); text-align: left; }
             .log-table th { color: var(--text-faint); font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
-            .status-badge { padding: 3px 9px; border-radius: 20px; font-weight: 700; font-family: ui-monospace, monospace; font-size: 12px; }
-            .status-200 { background: var(--green-bg); color: var(--green); }
-            .status-err { background: #FBE7EA; color: var(--red); }
-            .payload-preview { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .status-badge { padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid currentColor; font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+            .status-200 { background: transparent; color: var(--green); }
+            .status-err { background: transparent; color: var(--red); }
+            .payload-preview { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-            .pg-theme-toggle { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
-            .pg-theme-toggle button { border: none; background: var(--card); color: var(--text-muted); padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; }
+            .pg-theme-toggle { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
+            .pg-theme-toggle button { border: none; background: var(--card); color: var(--text-muted); padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; }
             .pg-theme-toggle button + button { border-left: 1px solid var(--border-strong); }
             .pg-theme-toggle button.active { background: var(--accent-bg); color: var(--accent); }
         </style>
@@ -1390,7 +1390,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                     <div>
                                         <label class="pg-label" style="margin-top:0"><?= htmlspecialchars($cronLabel) ?> <span style="color:var(--text-faint);font-weight:400"><?= htmlspecialchars(t('admin.settings.automation.recommended_suffix', ['freq' => $cronFreq])) ?></span></label>
                                         <div style="display:flex;gap:6px">
-                                            <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars($cronLine) ?>" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted)">
+                                            <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars($cronLine) ?>" style="width:100%;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted)">
                                             <button type="button" class="pg-icon-btn" title="<?= htmlspecialchars(t('admin.settings.automation.copy_title')) ?>" onclick="copyToClipboard('<?= htmlspecialchars($cronLine, ENT_QUOTES) ?>')"><?= svg_icon('copy', '', 14) ?></button>
                                         </div>
                                     </div>
@@ -1440,8 +1440,8 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                 <div>
                                     <label class="pg-label"><?= htmlspecialchars(t('admin.settings.project.brand_color_label')) ?></label>
                                     <div style="display:flex;gap:8px;align-items:center">
-                                        <input type="color" id="adm_cp" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>" style="width:34px;height:34px;padding:0;border:1px solid var(--border-strong);border-radius:8px;cursor:pointer;flex-shrink:0" oninput="document.getElementById('adm_ct').value = this.value.toUpperCase();">
-                                        <input type="text" id="adm_ct" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>" maxlength="7" style="flex:1;font-family:ui-monospace,monospace;text-transform:uppercase" oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('adm_cp').value = this.value;">
+                                        <input type="color" id="adm_cp" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>" style="width:34px;height:34px;padding:0;border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;flex-shrink:0" oninput="document.getElementById('adm_ct').value = this.value.toUpperCase();">
+                                        <input type="text" id="adm_ct" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>" maxlength="7" style="flex:1;font-family:'JetBrains Mono',monospace;text-transform:uppercase" oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('adm_cp').value = this.value;">
                                     </div>
                                 </div>
                                 <div>
@@ -1809,7 +1809,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <?php if (empty($backups)): ?>
                                 <div style="color:var(--text-faint);font-size:13px;font-style:italic"><?= htmlspecialchars(t('admin.settings.backup.empty')) ?></div>
                             <?php else: ?>
-                                <table class="pg-table" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                                <table class="pg-table" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
                                     <thead>
                                         <tr>
                                             <th><?= htmlspecialchars(t('admin.settings.backup.col_created')) ?></th>
@@ -2065,8 +2065,8 @@ function render_users_view(PDO $db, array $project, array $projects): void {
         <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.users.page_title', ['project' => $project['name']])) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
-        <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#6366F1') ?>
+        <?= theme_head_tags_admin() ?>
+        <?= theme_base_css_admin($project['brand_color'] ?: '#6366F1') ?>
         <style>
             .users-table th { text-align:left; }
         </style>
@@ -2094,7 +2094,7 @@ function render_users_view(PDO $db, array $project, array $projects): void {
                         </div>
                         <p class="pg-card-sub" style="margin-bottom:16px"><?= htmlspecialchars(t('admin.users.subtitle')) ?></p>
 
-                        <table class="pg-table users-table" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                        <table class="pg-table users-table" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
                             <thead>
                                 <tr>
                                     <th><?= htmlspecialchars(t('admin.users.col_name')) ?></th>
@@ -2205,8 +2205,8 @@ function render_consent_log_view(PDO $db, array $project, array $projects): void
         <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.consent_log.page_title', ['project' => $project['name']])) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
-        <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#6366F1') ?>
+        <?= theme_head_tags_admin() ?>
+        <?= theme_base_css_admin($project['brand_color'] ?: '#6366F1') ?>
     </head>
     <body>
         <div class="pg-shell">
@@ -2236,7 +2236,7 @@ function render_consent_log_view(PDO $db, array $project, array $projects): void
                             <div style="color:var(--text-faint);font-size:13px;font-style:italic;padding:1rem 0;"><?= htmlspecialchars(t('admin.consent_log.empty')) ?></div>
                         <?php else: ?>
                             <div style="overflow-x:auto">
-                                <table class="pg-table" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                                <table class="pg-table" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
                                     <thead>
                                         <tr>
                                             <th><?= htmlspecialchars(t('admin.consent_log.col_time')) ?></th>
@@ -2258,8 +2258,8 @@ function render_consent_log_view(PDO $db, array $project, array $projects): void
                                                         <span class="pg-pill pg-pill-amber"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.consent_log.action_declined')) ?></span>
                                                     <?php endif; ?>
                                                 </td>
-                                                <td style="font-family:ui-monospace,monospace;font-size:12px"><?= htmlspecialchars($e['ip_anonymized']) ?></td>
-                                                <td style="font-family:ui-monospace,monospace;font-size:11px;color:var(--text-faint);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<?= htmlspecialchars($e['consent_id']) ?>"><?= htmlspecialchars($e['consent_id']) ?></td>
+                                                <td style="font-family:'JetBrains Mono',monospace;font-size:12px"><?= htmlspecialchars($e['ip_anonymized']) ?></td>
+                                                <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-faint);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<?= htmlspecialchars($e['consent_id']) ?>"><?= htmlspecialchars($e['consent_id']) ?></td>
                                                 <td><?= htmlspecialchars($e['lang']) ?></td>
                                                 <td style="color:var(--text-faint);font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<?= htmlspecialchars($e['user_agent']) ?>"><?= htmlspecialchars($e['user_agent']) ?></td>
                                             </tr>
@@ -2290,8 +2290,8 @@ function render_audit_view(PDO $db, array $project, array $projects): void {
         <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.audit.page_title', ['project' => $project['name']])) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
-        <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#6366F1') ?>
+        <?= theme_head_tags_admin() ?>
+        <?= theme_base_css_admin($project['brand_color'] ?: '#6366F1') ?>
     </head>
     <body>
         <div class="pg-shell">
@@ -2315,7 +2315,7 @@ function render_audit_view(PDO $db, array $project, array $projects): void {
                         <?php if (empty($entries)): ?>
                             <div style="color:var(--text-faint);font-size:13px;font-style:italic;padding:1rem 0;"><?= htmlspecialchars(t('admin.audit.empty')) ?></div>
                         <?php else: ?>
-                            <table class="pg-table" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                            <table class="pg-table" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
                                 <thead>
                                     <tr>
                                         <th><?= htmlspecialchars(t('admin.audit.col_time')) ?></th>

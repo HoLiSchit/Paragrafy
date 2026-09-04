@@ -66,6 +66,7 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`, z. B. `2026.9.1`) statt
 ├── editor.php            # Sprachen-Tabs-Editor mit Scheduled Publishing & Versionshistorie
 ├── install.php           # Interaktiver Setup-Wizard für die Erstinstallation
 ├── db.php                # SQLite-Datenbankanbindung, Migrationen, Webhooks, SMTP-Client & Theme
+├── assets/fonts/         # Self-hosted Webfonts (Fraunces, Inter, JetBrains Mono) für Admin/Editor
 ├── Dockerfile            # Container-Image-Definition
 ├── docker-compose.yaml   # Docker-Compose-Setup für den Betrieb via Container
 ├── docker-entrypoint.sh  # Setzt beim Container-Start Dateirechte auf das Daten-Volume

@@ -8,6 +8,21 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`) statt SemVer:
 jeden Monat wieder bei `1`. Änderungen vor `2026.9.1` sind nicht rückwirkend
 erfasst — siehe dafür die Git-Historie.
 
+## [2026.9.3] - 2026-09-04
+
+### Changed
+- **Admin-Dashboard & Editor auf das "§ — Ink & Paper, quiet"-Design umgestellt**: neue Farbpalette
+  (warmes Ink/Paper statt Indigo, sowohl Dark- als auch Light-Variante), self-hosted Fraunces/
+  Inter/JetBrains-Mono-Fonts statt Google-Fonts-CDN, durchgängig eckige 3px/2px-Radien statt der
+  bisherigen 7–20px-Rundungen, eckige Badges (Rand statt Füllfarbe, kein Farbpunkt) statt voller
+  Pillen, wachsender Unterstrich-Hover in der Sidebar-Navigation, sichtbarer Fokusring. Die vom
+  Kunden gewählte Akzentfarbe (`brand_color`) bleibt unverändert der Primärakzent; Button-Text
+  wird jetzt serverseitig per Kontrastberechnung (WCAG-Luminanz) automatisch hell oder dunkel
+  gewählt, damit auch sehr helle oder sehr dunkle Kundenfarben lesbar bleiben. Der bestehende
+  Hell/Dunkel/Automatisch-Umschalter bleibt unverändert erhalten. Das öffentlich eingebettete
+  Consent-Banner (`index.php`) ist von dieser Umstellung bewusst nicht betroffen.
+- Neues Logo (`paragrafy.svg`).
+
 ## [2026.9.2] - 2026-09-04
 
 ### Added
