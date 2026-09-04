@@ -1934,7 +1934,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <p class="pg-card-sub" style="margin:0 0 12px"><?= htmlspecialchars(t('admin.settings.project_transfer.subtitle')) ?></p>
 
                             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-                                <a href="/admin?action=export_project&project_id=<?= $projectId ?>" class="pg-btn-secondary"><?= svg_icon('folder', '', 14) ?> <?= htmlspecialchars(t('admin.settings.project_transfer.export_button')) ?></a>
+                                <a href="/admin?action=export_project&project_id=<?= (int)$project['id'] ?>" class="pg-btn-secondary"><?= svg_icon('folder', '', 14) ?> <?= htmlspecialchars(t('admin.settings.project_transfer.export_button')) ?></a>
                             </div>
 
                             <?php if ($backupMsg === 'project_import_success'): ?>

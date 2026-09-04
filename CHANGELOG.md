@@ -8,6 +8,15 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`) statt SemVer:
 jeden Monat wieder bei `1`. Änderungen vor `2026.9.1` sind nicht rückwirkend
 erfasst — siehe dafür die Git-Historie.
 
+## [2026.9.8] - 2026-09-04
+
+### Fixed
+- **„Projekt exportieren"-Link führte zu „Projekt wurde nicht gefunden"**: Der Button in den
+  Einstellungen verwendete versehentlich eine Variable außerhalb ihres Gültigkeitsbereichs
+  (`render_settings_view()` ist eine eigene Funktion, in der die globale `$projectId` nicht
+  existiert) und erzeugte dadurch eine URL ohne Projekt-ID. Betraf ausschließlich den in
+  `2026.9.7` neu eingeführten Projekt-Export — der Voll-Instanz-Restore war nicht betroffen.
+
 ## [2026.9.7] - 2026-09-04
 
 ### Added
