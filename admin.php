@@ -210,6 +210,28 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_audit_csv') {
     exit;
 }
 
+// 2c. Consent-Nachweise als CSV herunterladen (DSGVO-Prüfbericht)
+if (isset($_GET['action']) && $_GET['action'] === 'export_consent_log_csv') {
+    $stmt = $db->prepare("SELECT * FROM consent_logs WHERE project_id = ? ORDER BY created_at DESC LIMIT 5000");
+    $stmt->execute([$projectId]);
+    $entries = $stmt->fetchAll();
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . preg_replace('/[^a-zA-Z0-9]+/', '_', $project['name']) . '_consent_nachweise.csv"');
+    $out = fopen('php://output', 'w');
+    fputs($out, "\xEF\xBB\xBF");
+    fputcsv($out, [
+        t('admin.consent_log.col_time'), t('admin.consent_log.col_consent_id'), t('admin.consent_log.col_action'),
+        t('admin.consent_log.col_lang'), t('admin.consent_log.col_ip'), t('admin.consent_log.col_text_hash'), t('admin.consent_log.col_useragent')
+    ]);
+    foreach ($entries as $e) {
+        $actionLabel = $e['action'] === 'accepted' ? t('admin.consent_log.action_accepted') : t('admin.consent_log.action_declined');
+        fputcsv($out, [$e['created_at'], $e['consent_id'], $actionLabel, $e['lang'], $e['ip_anonymized'], $e['banner_text_hash'], $e['user_agent']]);
+    }
+    fclose($out);
+    exit;
+}
+
 // 3. Webhook Test Trigger mit detailliertem Protokoll
 if (isset($_POST['action']) && $_POST['action'] === 'test_webhook') {
     header('Content-Type: application/json');
@@ -344,6 +366,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $cookieBanner = !empty($_POST['cookie_banner_enabled']) ? 1 : 0;
         $cookieBannerText = trim($_POST['cookie_banner_text'] ?? '');
+        $consentLogging = !empty($_POST['consent_logging_enabled']) ? 1 : 0;
+        $consentLogRetentionDays = max(0, (int)($_POST['consent_log_retention_days'] ?? 1095));
         if (!str_starts_with($brandColor, '#')) {
             $brandColor = '#' . $brandColor;
         }
@@ -356,7 +380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 name=?, domain=?, brand_color=?, primary_lang=?, active_languages=?,
                 deepl_api_key=?, logo_url=?, webhook_url=?, webhook_secret=?, audit_interval_months=?,
                 smtp_host=?, smtp_port=?, smtp_user=?, smtp_pass=?, smtp_secure=?, smtp_from=?, audit_email_recipient=?,
-                cookie_banner_enabled=?, cookie_banner_text=?,
+                cookie_banner_enabled=?, cookie_banner_text=?, consent_logging_enabled=?, consent_log_retention_days=?,
                 company_name=?, address=?, email=?, phone=?, representative=?, register_info=?
             WHERE id=?
         ");
@@ -364,7 +388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['name'], $domainToSave, $brandColor, $_POST['primary_lang'], $activeLangs,
             $deeplKey, $logoUrl, $webhookUrl, $webhookSecret, $auditMonths,
             $smtpHost, $smtpPort, $smtpUser, $smtpPass, $smtpSecure, $smtpFrom, $auditRecipient,
-            $cookieBanner, $cookieBannerText,
+            $cookieBanner, $cookieBannerText, $consentLogging, $consentLogRetentionDays,
             $_POST['company_name'], $_POST['address'], $_POST['email'], $_POST['phone'], $_POST['representative'], $_POST['register_info'],
             $projectId
         ]);
@@ -782,6 +806,11 @@ if (str_starts_with($subRoute, '/admin/users')) {
 
 if (str_starts_with($subRoute, '/admin/audit')) {
     render_audit_view($db, $project, $projects);
+    exit;
+}
+
+if (str_starts_with($subRoute, '/admin/consent-log')) {
+    render_consent_log_view($db, $project, $projects);
     exit;
 }
 
@@ -1429,6 +1458,8 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
                             <input type="hidden" name="cookie_banner_enabled" value="<?= !empty($project['cookie_banner_enabled']) ? '1' : '0' ?>">
                             <input type="hidden" name="cookie_banner_text" value="<?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?>">
+                            <input type="hidden" name="consent_logging_enabled" value="<?= !empty($project['consent_logging_enabled']) ? '1' : '0' ?>">
+                            <input type="hidden" name="consent_log_retention_days" value="<?= htmlspecialchars((string)($project['consent_log_retention_days'] ?? 1095)) ?>">
                             <input type="hidden" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>">
                             <input type="hidden" name="smtp_port" value="<?= htmlspecialchars((string)($project['smtp_port'] ?? 587)) ?>">
                             <input type="hidden" name="smtp_user" value="<?= htmlspecialchars($project['smtp_user'] ?? '') ?>">
@@ -1480,6 +1511,8 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="email" value="<?= htmlspecialchars($project['email'] ?? '') ?>">
                             <input type="hidden" name="phone" value="<?= htmlspecialchars($project['phone'] ?? '') ?>">
                             <input type="hidden" name="register_info" value="<?= htmlspecialchars($project['register_info'] ?? '') ?>">
+                            <input type="hidden" name="consent_logging_enabled" value="<?= !empty($project['consent_logging_enabled']) ? '1' : '0' ?>">
+                            <input type="hidden" name="consent_log_retention_days" value="<?= htmlspecialchars((string)($project['consent_log_retention_days'] ?? 1095)) ?>">
 
                             <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;cursor:pointer">
                                 <input type="checkbox" name="cookie_banner_enabled" value="1" <?= !empty($project['cookie_banner_enabled']) ? 'checked' : '' ?>>
@@ -1491,6 +1524,55 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
                             <div style="margin-top:16px">
                                 <button type="submit" class="pg-btn"><?= svg_icon('disk', '', 16) ?> <?= htmlspecialchars(t('admin.settings.project.save_button')) ?></button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="pg-card pg-card-pad">
+                        <h2><?= htmlspecialchars(t('admin.settings.consent_log.heading')) ?></h2>
+                        <p class="pg-card-sub" style="margin-bottom:16px"><?= t('admin.settings.consent_log.subtitle') ?></p>
+                        <form method="post">
+                            <input type="hidden" name="action" value="save_project">
+                            <input type="hidden" name="name" value="<?= htmlspecialchars($project['name']) ?>">
+                            <input type="hidden" name="domain" value="<?= htmlspecialchars($project['domain']) ?>">
+                            <input type="hidden" name="primary_lang" value="<?= htmlspecialchars($project['primary_lang']) ?>">
+                            <input type="hidden" name="active_languages" value="<?= htmlspecialchars($project['active_languages']) ?>">
+                            <input type="hidden" name="brand_color" value="<?= htmlspecialchars($project['brand_color'] ?: '#6366F1') ?>">
+                            <input type="hidden" name="logo_url" value="<?= htmlspecialchars($project['logo_url'] ?? '') ?>">
+                            <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
+                            <?php if (!empty($project['cookie_banner_enabled'])): ?><input type="hidden" name="cookie_banner_enabled" value="1"><?php endif; ?>
+                            <input type="hidden" name="cookie_banner_text" value="<?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?>">
+                            <input type="hidden" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>">
+                            <input type="hidden" name="smtp_port" value="<?= htmlspecialchars((string)($project['smtp_port'] ?? 587)) ?>">
+                            <input type="hidden" name="smtp_user" value="<?= htmlspecialchars($project['smtp_user'] ?? '') ?>">
+                            <input type="hidden" name="smtp_pass" value="<?= htmlspecialchars($project['smtp_pass'] ?? '') ?>">
+                            <input type="hidden" name="smtp_secure" value="<?= htmlspecialchars($project['smtp_secure'] ?? 'tls') ?>">
+                            <input type="hidden" name="smtp_from" value="<?= htmlspecialchars($project['smtp_from'] ?? '') ?>">
+                            <input type="hidden" name="audit_email_recipient" value="<?= htmlspecialchars($project['audit_email_recipient'] ?? '') ?>">
+                            <input type="hidden" name="webhook_url" value="<?= htmlspecialchars($project['webhook_url'] ?? '') ?>">
+                            <input type="hidden" name="webhook_secret" value="<?= htmlspecialchars($project['webhook_secret'] ?? '') ?>">
+                            <input type="hidden" name="deepl_api_key" value="<?= htmlspecialchars($project['deepl_api_key'] ?? '') ?>">
+                            <input type="hidden" name="company_name" value="<?= htmlspecialchars($project['company_name'] ?? '') ?>">
+                            <input type="hidden" name="representative" value="<?= htmlspecialchars($project['representative'] ?? '') ?>">
+                            <input type="hidden" name="address" value="<?= htmlspecialchars($project['address'] ?? '') ?>">
+                            <input type="hidden" name="email" value="<?= htmlspecialchars($project['email'] ?? '') ?>">
+                            <input type="hidden" name="phone" value="<?= htmlspecialchars($project['phone'] ?? '') ?>">
+                            <input type="hidden" name="register_info" value="<?= htmlspecialchars($project['register_info'] ?? '') ?>">
+
+                            <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;cursor:pointer">
+                                <input type="checkbox" name="consent_logging_enabled" value="1" <?= !empty($project['consent_logging_enabled']) ? 'checked' : '' ?>>
+                                <?= htmlspecialchars(t('admin.settings.consent_log.enable_label')) ?>
+                                <?= help_icon(t('admin.settings.consent_log.enable_help')) ?>
+                            </label>
+
+                            <label class="pg-label"><?= htmlspecialchars(t('admin.settings.consent_log.retention_label')) ?> <span style="color:var(--text-faint);font-weight:400"><?= htmlspecialchars(t('admin.settings.consent_log.retention_hint')) ?></span></label>
+                            <input type="number" name="consent_log_retention_days" min="0" value="<?= htmlspecialchars((string)($project['consent_log_retention_days'] ?? 1095)) ?>" style="width:120px">
+
+                            <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                                <button type="submit" class="pg-btn"><?= svg_icon('disk', '', 16) ?> <?= htmlspecialchars(t('admin.settings.consent_log.save_button')) ?></button>
+                                <?php if (!empty($project['consent_logging_enabled'])): ?>
+                                    <a href="/admin/consent-log?project_id=<?= $project['id'] ?>" class="pg-btn-secondary"><?= svg_icon('shield', '', 14) ?> <?= htmlspecialchars(t('admin.settings.consent_log.view_link')) ?></a>
+                                <?php endif; ?>
                             </div>
                         </form>
                     </div>
@@ -1509,6 +1591,8 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
                             <?php if (!empty($project['cookie_banner_enabled'])): ?><input type="hidden" name="cookie_banner_enabled" value="1"><?php endif; ?>
                             <input type="hidden" name="cookie_banner_text" value="<?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?>">
+                            <input type="hidden" name="consent_logging_enabled" value="<?= !empty($project['consent_logging_enabled']) ? '1' : '0' ?>">
+                            <input type="hidden" name="consent_log_retention_days" value="<?= htmlspecialchars((string)($project['consent_log_retention_days'] ?? 1095)) ?>">
                             <input type="hidden" name="webhook_url" value="<?= htmlspecialchars($project['webhook_url'] ?? '') ?>">
                             <input type="hidden" name="webhook_secret" value="<?= htmlspecialchars($project['webhook_secret'] ?? '') ?>">
                             <input type="hidden" name="deepl_api_key" value="<?= htmlspecialchars($project['deepl_api_key'] ?? '') ?>">
@@ -1582,6 +1666,8 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="audit_interval_months" value="<?= htmlspecialchars((string)($project['audit_interval_months'] ?? 12)) ?>">
                             <?php if (!empty($project['cookie_banner_enabled'])): ?><input type="hidden" name="cookie_banner_enabled" value="1"><?php endif; ?>
                             <input type="hidden" name="cookie_banner_text" value="<?= htmlspecialchars($project['cookie_banner_text'] ?? '') ?>">
+                            <input type="hidden" name="consent_logging_enabled" value="<?= !empty($project['consent_logging_enabled']) ? '1' : '0' ?>">
+                            <input type="hidden" name="consent_log_retention_days" value="<?= htmlspecialchars((string)($project['consent_log_retention_days'] ?? 1095)) ?>">
                             <input type="hidden" name="smtp_host" value="<?= htmlspecialchars($project['smtp_host'] ?? '') ?>">
                             <input type="hidden" name="smtp_port" value="<?= htmlspecialchars((string)($project['smtp_port'] ?? 587)) ?>">
                             <input type="hidden" name="smtp_user" value="<?= htmlspecialchars($project['smtp_user'] ?? '') ?>">
@@ -1642,6 +1728,8 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <input type="hidden" name="smtp_secure" value="<?= htmlspecialchars($project['smtp_secure'] ?? 'tls') ?>">
                             <input type="hidden" name="smtp_from" value="<?= htmlspecialchars($project['smtp_from'] ?? '') ?>">
                             <input type="hidden" name="audit_email_recipient" value="<?= htmlspecialchars($project['audit_email_recipient'] ?? '') ?>">
+                            <input type="hidden" name="consent_logging_enabled" value="<?= !empty($project['consent_logging_enabled']) ? '1' : '0' ?>">
+                            <input type="hidden" name="consent_log_retention_days" value="<?= htmlspecialchars((string)($project['consent_log_retention_days'] ?? 1095)) ?>">
                             <input type="hidden" name="webhook_url" value="<?= htmlspecialchars($project['webhook_url'] ?? '') ?>">
                             <input type="hidden" name="webhook_secret" value="<?= htmlspecialchars($project['webhook_secret'] ?? '') ?>">
                             <input type="hidden" name="deepl_api_key" value="<?= htmlspecialchars($project['deepl_api_key'] ?? '') ?>">
@@ -2097,6 +2185,95 @@ function render_users_view(PDO $db, array $project, array $projects): void {
                 document.getElementById('inviteModal').style.display = 'none';
             }
         </script>
+    </body>
+    </html>
+    <?php
+}
+
+function render_consent_log_view(PDO $db, array $project, array $projects): void {
+    $loggingEnabled = !empty($project['consent_logging_enabled']);
+    $entries = [];
+    if ($loggingEnabled) {
+        $stmt = $db->prepare("SELECT * FROM consent_logs WHERE project_id = ? ORDER BY created_at DESC LIMIT 500");
+        $stmt->execute([$project['id']]);
+        $entries = $stmt->fetchAll();
+    }
+    ?>
+    <!DOCTYPE html>
+    <html lang="<?= htmlspecialchars(current_locale()) ?>">
+    <head>
+        <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.consent_log.page_title', ['project' => $project['name']])) ?></title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
+        <?= theme_head_tags() ?>
+        <?= theme_base_css($project['brand_color'] ?: '#6366F1') ?>
+    </head>
+    <body>
+        <div class="pg-shell">
+            <?= render_sidebar('consent_log', $project, $projects) ?>
+
+            <div class="pg-main">
+                <div class="pg-topbar">
+                    <div class="pg-crumb"><?= htmlspecialchars($project['name']) ?> <span style="margin:0 4px">/</span> <strong><?= htmlspecialchars(t('admin.consent_log.crumb')) ?></strong></div>
+                </div>
+
+                <div class="pg-content" style="max-width:1040px">
+                    <div class="pg-card pg-card-pad" style="margin-bottom:0">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                            <h2 style="margin:0"><?= htmlspecialchars(t('admin.consent_log.heading')) ?></h2>
+                            <?php if (!empty($entries)): ?>
+                                <a href="/admin?project_id=<?= $project['id'] ?>&action=export_consent_log_csv" class="pg-btn-secondary" style="padding:6px 12px;font-size:12px"><?= svg_icon('folder', '', 13) ?> <?= htmlspecialchars(t('admin.consent_log.export_csv')) ?></a>
+                            <?php endif; ?>
+                        </div>
+                        <p class="pg-card-sub" style="margin:5px 0 16px"><?= htmlspecialchars(t('admin.consent_log.subtitle')) ?></p>
+
+                        <?php if (!$loggingEnabled): ?>
+                            <div style="color:var(--text-faint);font-size:13px;padding:1rem 0;">
+                                <?= htmlspecialchars(t('admin.consent_log.disabled_hint')) ?>
+                                <a href="/admin/settings?project_id=<?= $project['id'] ?>"><?= htmlspecialchars(t('admin.consent_log.disabled_hint_link')) ?></a>
+                            </div>
+                        <?php elseif (empty($entries)): ?>
+                            <div style="color:var(--text-faint);font-size:13px;font-style:italic;padding:1rem 0;"><?= htmlspecialchars(t('admin.consent_log.empty')) ?></div>
+                        <?php else: ?>
+                            <div style="overflow-x:auto">
+                                <table class="pg-table" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                                    <thead>
+                                        <tr>
+                                            <th><?= htmlspecialchars(t('admin.consent_log.col_time')) ?></th>
+                                            <th><?= htmlspecialchars(t('admin.consent_log.col_action')) ?></th>
+                                            <th><?= htmlspecialchars(t('admin.consent_log.col_ip')) ?></th>
+                                            <th><?= htmlspecialchars(t('admin.consent_log.col_consent_id')) ?></th>
+                                            <th><?= htmlspecialchars(t('admin.consent_log.col_lang')) ?></th>
+                                            <th><?= htmlspecialchars(t('admin.consent_log.col_useragent')) ?></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($entries as $e): ?>
+                                            <tr>
+                                                <td style="color:var(--text-muted);white-space:nowrap"><?= date('d.m.Y H:i', strtotime($e['created_at'])) ?></td>
+                                                <td>
+                                                    <?php if ($e['action'] === 'accepted'): ?>
+                                                        <span class="pg-pill pg-pill-green"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.consent_log.action_accepted')) ?></span>
+                                                    <?php else: ?>
+                                                        <span class="pg-pill pg-pill-amber"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.consent_log.action_declined')) ?></span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td style="font-family:ui-monospace,monospace;font-size:12px"><?= htmlspecialchars($e['ip_anonymized']) ?></td>
+                                                <td style="font-family:ui-monospace,monospace;font-size:11px;color:var(--text-faint);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<?= htmlspecialchars($e['consent_id']) ?>"><?= htmlspecialchars($e['consent_id']) ?></td>
+                                                <td><?= htmlspecialchars($e['lang']) ?></td>
+                                                <td style="color:var(--text-faint);font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<?= htmlspecialchars($e['user_agent']) ?>"><?= htmlspecialchars($e['user_agent']) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <div class="pg-footer-note"><?= htmlspecialchars(t('admin.common.footer_disclaimer')) ?></div>
+            </div>
+        </div>
     </body>
     </html>
     <?php

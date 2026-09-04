@@ -74,6 +74,11 @@ if ($uri === '/consent.js') {
     exit;
 }
 
+if ($uri === '/api/consent-log') {
+    handle_consent_log($project ?: null, $db);
+    exit;
+}
+
 if (!$project) {
     http_response_code(404);
     echo "<h1>" . htmlspecialchars(t('public.error.no_project_title')) . "</h1><p>" . t('public.error.no_project_desc', ['domain' => htmlspecialchars($host)]) . "</p>";
@@ -301,6 +306,61 @@ function get_i18n_strings(string $lang): array {
         ]
     ];
     return $dict[$lang] ?? $dict['en'];
+}
+
+/**
+ * DSGVO-Nachweispflicht: receives the fire-and-forget POST that /consent.js
+ * sends whenever a visitor accepts/declines the cookie banner, and stores a
+ * privacy-preserving proof record via log_consent(). Called from an
+ * arbitrary third-party website, so it needs its own CORS handling (the
+ * JSON Content-Type makes this a non-simple request, requiring an OPTIONS
+ * preflight response) independent of the read-only JSON API above.
+ */
+function handle_consent_log(?array $project, PDO $db): void {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type');
+
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+        http_response_code(204);
+        return;
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !$project || empty($project['consent_logging_enabled'])) {
+        echo json_encode(['success' => false]);
+        return;
+    }
+
+    $body = json_decode((string)file_get_contents('php://input'), true);
+    if (!is_array($body)) {
+        $body = [];
+    }
+
+    $action = (string)($body['action'] ?? '');
+    if ($action !== 'accepted' && $action !== 'declined') {
+        http_response_code(400);
+        echo json_encode(['success' => false]);
+        return;
+    }
+
+    $consentId = substr(trim((string)($body['consentId'] ?? '')), 0, 100);
+    $lang = substr(trim((string)($body['lang'] ?? '')), 0, 20);
+    $textHash = substr(trim((string)($body['textHash'] ?? '')), 0, 64);
+
+    log_consent(
+        $db,
+        (int)$project['id'],
+        $consentId,
+        $action,
+        $lang,
+        $textHash,
+        get_client_ip(),
+        (string)($_SERVER['HTTP_USER_AGENT'] ?? '')
+    );
+
+    echo json_encode(['success' => true]);
 }
 
 function handle_cron_audit(array $project, PDO $db): void {
@@ -843,6 +903,8 @@ function render_consent_js(?array $project): void {
     $brandJs = json_encode($brand, JSON_UNESCAPED_UNICODE);
     $textJs = json_encode($bannerText, JSON_UNESCAPED_UNICODE);
     $privacyUrlJs = json_encode($privacyUrl, JSON_UNESCAPED_UNICODE);
+    $loggingEnabledJs = json_encode(!empty($project['consent_logging_enabled']));
+    $bannerTextHashJs = json_encode(hash('sha256', $bannerText));
     $i18nJs = json_encode([
         'learnMore' => t('public.consent.learn_more'),
         'decline' => t('public.consent.decline'),
@@ -852,12 +914,17 @@ function render_consent_js(?array $project): void {
     ?>
 (function () {
     var CONSENT_KEY = 'paragrafy_consent';
+    var CONSENT_ID_KEY = 'paragrafy_consent_id';
     try { if (localStorage.getItem(CONSENT_KEY)) return; } catch (e) {}
 
     var brand = <?= $brandJs ?>;
     var text = <?= $textJs ?>;
     var privacyUrl = <?= $privacyUrlJs ?>;
     var i18n = <?= $i18nJs ?>;
+    var loggingEnabled = <?= $loggingEnabledJs ?>;
+    var bannerTextHash = <?= $bannerTextHashJs ?>;
+    var origin;
+    try { origin = new URL((document.currentScript || {}).src || '', window.location.href).origin; } catch (e) { origin = window.location.origin; }
 
     var style = document.createElement('style');
     style.textContent =
@@ -904,6 +971,29 @@ function render_consent_js(?array $project): void {
         try { localStorage.setItem(CONSENT_KEY, value); } catch (e) {}
         bar.remove();
         document.dispatchEvent(new CustomEvent('paragrafy:consent', { detail: { consent: value } }));
+
+        if (loggingEnabled) {
+            var consentId = '';
+            try { consentId = localStorage.getItem(CONSENT_ID_KEY) || ''; } catch (e) {}
+            if (!consentId) {
+                consentId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() :
+                    ('cid-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2));
+                try { localStorage.setItem(CONSENT_ID_KEY, consentId); } catch (e) {}
+            }
+            try {
+                fetch(origin + '/api/consent-log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: value,
+                        lang: navigator.language || '',
+                        textHash: bannerTextHash,
+                        consentId: consentId
+                    }),
+                    keepalive: true
+                }).catch(function () {});
+            } catch (e) {}
+        }
     }
 
     acceptBtn.addEventListener('click', function () { setConsent('accepted'); });

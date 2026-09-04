@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 // CalVer: JAHR.MONAT.BUILD - BUILD zaehlt Releases innerhalb des Monats hoch (startet bei 1).
 // Siehe CHANGELOG.md fuer die Aenderungen je Version.
-define('PARAGRAFY_VERSION', '2026.9.1');
+define('PARAGRAFY_VERSION', '2026.9.2');
 define('PARAGRAFY_DIR', __DIR__);
 // Where persistent data (DB, config, backups, .env) lives. Defaults to the
 // code directory (bare-metal installs); set PARAGRAFY_DATA_DIR to point this
@@ -155,7 +155,9 @@ function ensure_schema_migrations(PDO $pdo): void {
                 'smtp_pass' => "TEXT DEFAULT ''",
                 'smtp_secure' => "TEXT DEFAULT 'tls'",
                 'smtp_from' => "TEXT DEFAULT ''",
-                'audit_email_recipient' => "TEXT DEFAULT ''"
+                'audit_email_recipient' => "TEXT DEFAULT ''",
+                'consent_logging_enabled' => "INTEGER DEFAULT 0",
+                'consent_log_retention_days' => "INTEGER DEFAULT 1095"
             ];
             foreach ($newCols as $c => $type) {
                 if (!in_array($c, $colNames)) {
@@ -273,6 +275,21 @@ function ensure_schema_migrations(PDO $pdo): void {
                 sent_at DATETIME DEFAULT NULL
             );
         ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS consent_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                consent_id TEXT NOT NULL,
+                action TEXT NOT NULL,
+                lang TEXT DEFAULT '',
+                banner_text_hash TEXT DEFAULT '',
+                ip_anonymized TEXT DEFAULT '',
+                user_agent TEXT DEFAULT '',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+        ");
     } catch (Throwable $e) {
     }
 }
@@ -300,6 +317,8 @@ function init_database_schema(PDO $pdo): void {
             audit_email_recipient TEXT DEFAULT '',
             cookie_banner_enabled INTEGER DEFAULT 0,
             cookie_banner_text TEXT DEFAULT '',
+            consent_logging_enabled INTEGER DEFAULT 0,
+            consent_log_retention_days INTEGER DEFAULT 1095,
             company_name TEXT DEFAULT '',
             address TEXT DEFAULT '',
             email TEXT DEFAULT '',
@@ -414,6 +433,19 @@ function init_database_schema(PDO $pdo): void {
             last_status_code INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             sent_at DATETIME DEFAULT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS consent_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            consent_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            lang TEXT DEFAULT '',
+            banner_text_hash TEXT DEFAULT '',
+            ip_anonymized TEXT DEFAULT '',
+            user_agent TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
         );
     ");
 }
@@ -1099,6 +1131,69 @@ function record_translation_version(PDO $db, int $documentId, string $lang, stri
     }
 }
 
+/**
+ * Truncates an IP address to network level so it can never be traced back to
+ * an individual visitor -- IPv4 loses its last octet, IPv6 keeps only the
+ * first 48 bits. This is the same "IP anonymization" approach used by
+ * Google Analytics/most consent-management tools: enough to remain a
+ * meaningful audit artifact (proves a request came from a given network at a
+ * given time) without storing personal data. Unparseable input returns ''.
+ */
+function anonymize_ip(string $ip): string {
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+        $parts = explode('.', $ip);
+        if (count($parts) === 4) {
+            $parts[3] = '0';
+            return implode('.', $parts);
+        }
+        return '';
+    }
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+        $bin = @inet_pton($ip);
+        if ($bin !== false && strlen($bin) === 16) {
+            $bin = substr($bin, 0, 6) . str_repeat("\0", 10);
+            $anon = inet_ntop($bin);
+            return $anon !== false ? $anon : '';
+        }
+        return '';
+    }
+    return '';
+}
+
+/**
+ * Inserts one DSGVO consent-proof record (see /consent.js + /api/consent-log
+ * in index.php). Never stores the raw IP -- only anonymize_ip()'s output.
+ */
+function log_consent(PDO $db, int $projectId, string $consentId, string $action, string $lang, string $textHash, string $ip, string $userAgent): void {
+    try {
+        $stmt = $db->prepare("INSERT INTO consent_logs (project_id, consent_id, action, lang, banner_text_hash, ip_anonymized, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$projectId, $consentId, $action, $lang, $textHash, anonymize_ip($ip), substr($userAgent, 0, 255)]);
+    } catch (Throwable $e) {
+    }
+}
+
+/**
+ * Deletes consent_logs rows past each project's own consent_log_retention_days
+ * (0 = keep forever). Called from run_scheduled_backup() so it rides the
+ * existing daily /api/cron/backup cadence instead of needing its own cron.
+ */
+function cleanup_expired_consent_logs(PDO $db): int {
+    try {
+        $stmt = $db->prepare("
+            DELETE FROM consent_logs WHERE id IN (
+                SELECT cl.id FROM consent_logs cl
+                JOIN projects p ON cl.project_id = p.id
+                WHERE p.consent_log_retention_days > 0
+                  AND cl.created_at < datetime('now', '-' || p.consent_log_retention_days || ' days')
+            )
+        ");
+        $stmt->execute();
+        return $stmt->rowCount();
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MINUTES = 15;
 
@@ -1148,6 +1243,7 @@ function clear_login_failures(PDO $db, string $identifier): void {
  */
 function run_scheduled_backup(): array {
     try {
+        cleanup_expired_consent_logs(get_db());
         if (!file_exists(DB_FILE)) {
             return ['success' => false, 'error' => t('db.backup.no_database')];
         }
@@ -1395,6 +1491,7 @@ function render_sidebar(string $active, array $project, array $projects): string
         'dashboard' => ['/admin', t('admin.common.nav.dashboard'), 'grid'],
         'users' => ['/admin/users', t('admin.common.nav.users'), 'users'],
         'audit' => ['/admin/audit?project_id=' . $project['id'], t('admin.common.nav.audit'), 'clock'],
+        'consent_log' => ['/admin/consent-log?project_id=' . $project['id'], t('admin.common.nav.consent_log'), 'shield'],
     ];
     $currentUserName = $_SESSION['paragrafy_user_name'] ?? 'Admin';
     $initials = '';
@@ -1429,6 +1526,8 @@ function render_sidebar(string $active, array $project, array $projects): string
                         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.85"><circle cx="8" cy="8" r="6.3"/><path d="M8 4.6V8l2.6 1.6"/></svg>
                     <?php elseif ($icon === 'gear'): ?>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.85"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <?php elseif ($icon === 'shield'): ?>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.85"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     <?php else: ?>
                         <span class="pg-nav-dot"></span>
                     <?php endif; ?>

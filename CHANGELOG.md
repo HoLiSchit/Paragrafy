@@ -8,6 +8,19 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`) statt SemVer:
 jeden Monat wieder bei `1`. Änderungen vor `2026.9.1` sind nicht rückwirkend
 erfasst — siehe dafür die Git-Historie.
 
+## [2026.9.2] - 2026-09-04
+
+### Added
+- **Consent-Nachweise (DSGVO-Nachweispflicht) für `/consent.js`**: Optionales, projektweit
+  aktivierbares serverseitiges Protokoll jeder Consent-Entscheidung (akzeptiert/abgelehnt),
+  gedacht als Nachweis bei Prüfungen. Gespeichert werden Zeitpunkt, Aktion, eine anonymisierte
+  IP-Adresse (letztes Oktett bzw. bei IPv6 die letzten 80 Bit genullt — nie die vollständige
+  IP), der Browser (User-Agent), eine Consent-ID sowie ein Hash des zum Zeitpunkt der
+  Einwilligung angezeigten Banner-Texts. Neue Admin-Seite „Consent-Nachweise" mit CSV-Export,
+  neuer Endpunkt `/api/consent-log`, konfigurierbare Aufbewahrungsdauer (Einstellungen →
+  Consent-Nachweise) — abgelaufene Einträge werden automatisch zusammen mit dem täglichen
+  rollierenden Backup bereinigt.
+
 ## [2026.9.1] - 2026-09-02
 
 ### Changed

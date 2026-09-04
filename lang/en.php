@@ -68,6 +68,7 @@ return [
     'admin.common.nav.dashboard' => 'Dashboard',
     'admin.common.nav.users' => 'Users',
     'admin.common.nav.audit' => 'Log',
+    'admin.common.nav.consent_log' => 'Consent Records',
     'admin.common.nav.settings' => 'Settings',
     'admin.common.sidebar.managed_cloud' => 'Managed Cloud &middot; v:version',
     'admin.common.sidebar.self_hosted' => 'Self-Hosted &middot; v:version',
@@ -256,6 +257,27 @@ return [
     'admin.audit.col_time' => 'Time',
     'admin.audit.col_user' => 'User',
     'admin.audit.col_action' => 'Action',
+
+    // ---------------------------------------------------------------
+    // admin.consent_log.* - DSGVO consent proof log view
+    // ---------------------------------------------------------------
+    'admin.consent_log.page_title' => 'Consent Records - :project',
+    'admin.consent_log.crumb' => 'Consent Records',
+    'admin.consent_log.heading' => 'Consent Records',
+    'admin.consent_log.subtitle' => 'Server-side log of every consent decision made via the cookie banner (/consent.js) — kept as GDPR proof. Shows the last 500 entries.',
+    'admin.consent_log.export_csv' => 'Download as CSV',
+    'admin.consent_log.empty' => 'No consent decisions logged yet.',
+    'admin.consent_log.disabled_hint' => 'Consent records are disabled for this project.',
+    'admin.consent_log.disabled_hint_link' => 'Enable it in Settings',
+    'admin.consent_log.col_time' => 'Time',
+    'admin.consent_log.col_action' => 'Action',
+    'admin.consent_log.col_ip' => 'Anonymized IP',
+    'admin.consent_log.col_consent_id' => 'Consent ID',
+    'admin.consent_log.col_lang' => 'Language',
+    'admin.consent_log.col_useragent' => 'Browser',
+    'admin.consent_log.col_text_hash' => 'Banner Text Hash',
+    'admin.consent_log.action_accepted' => 'Accepted',
+    'admin.consent_log.action_declined' => 'Declined',
 
     // ---------------------------------------------------------------
     // admin.users.* - user management view
@@ -450,6 +472,14 @@ return [
     'admin.settings.cookie.banner_text_hint' => '(optional, otherwise default text)',
     'admin.settings.cookie.banner_text_help' => 'This text appears in the banner shown by /consent.js on your website. If you do not embed the script, this text has no effect.',
     'admin.settings.cookie.save_button' => 'Save',
+    'admin.settings.consent_log.heading' => 'Consent Records (GDPR proof of consent)',
+    'admin.settings.consent_log.subtitle' => 'Logs server-side whenever a visitor accepts or declines the cookie banner — as proof for audits. Requires /consent.js to be embedded on the website.',
+    'admin.settings.consent_log.enable_label' => 'Log consent records',
+    'admin.settings.consent_log.enable_help' => 'Stores, per consent decision: timestamp, action (accepted/declined), an anonymized IP address (last octet, or last 80 bits for IPv6, zeroed out — never the full IP), the browser (User-Agent), and a hash of the banner text that was shown. No names, email addresses, or full IP addresses are ever stored.',
+    'admin.settings.consent_log.retention_label' => 'Retention period (days)',
+    'admin.settings.consent_log.retention_hint' => '0 = keep forever. Expired entries are purged daily alongside the rolling backup.',
+    'admin.settings.consent_log.save_button' => 'Save',
+    'admin.settings.consent_log.view_link' => 'View records',
 
     'admin.settings.email.heading' => 'Email delivery &amp; review reminders',
     'admin.settings.email.subtitle' => 'Used by Paragrafy to send review reminders and test emails. Get the credentials from your email provider (SMTP).',

@@ -32,6 +32,10 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`, z. B. `2026.9.1`) statt
   Stellt Endpunkte unter `/api/:lang/:slug` bereit und liefert ein modales Sheet-Script (`/embed.js`) für das direkte Einbinden in Web-Apps.
 - **DSGVO Cookie-Consent-Banner**:
   Integriertes, leichtgewichtiges Consent-Skript (`/consent.js`) ohne externe Abhängigkeiten.
+- **Consent-Nachweise (IP-Consent-Logging)**:
+  Optionales, serverseitiges Nachweisprotokoll jeder Consent-Entscheidung — Zeitpunkt, Aktion,
+  anonymisierte IP, Browser und ein Hash des angezeigten Banner-Texts. Für Prüfungen als
+  CSV exportierbar, mit konfigurierbarer Aufbewahrungsdauer.
 - **Notion/Stripe-Style Public Viewer**:
   Mitscrollendes Inhaltsverzeichnis (Sticky TOC mit Scroll-Spy), Lesezeit-Berechnung, Direktlink-Anker (`#`) und Live-Textfilter in allen Zielsprachen.
 - **Backups & Exporte**:
@@ -225,3 +229,30 @@ GET https://legal.deinedomain.de/api/agb-b2c
 ```html
 <script src="https://legal.deinedomain.de/consent.js"></script>
 ```
+
+#### Consent-Nachweise (IP-Consent-Logging)
+
+Das reine Einbinden des Banners löst noch kein serverseitiges Protokoll aus — dafür muss das
+Consent-Logging pro Projekt in **Einstellungen → Consent-Nachweise** aktiviert werden. Ist es
+aktiv, sendet `/consent.js` bei jedem Klick auf "Akzeptieren"/"Nur notwendige" zusätzlich einen
+Fire-and-Forget-Request an `/api/consent-log`, der einen Nachweis-Eintrag anlegt.
+
+Gespeichert wird pro Entscheidung:
+- Zeitpunkt und Aktion (akzeptiert/abgelehnt)
+- eine **anonymisierte** IP-Adresse (letztes Oktett bei IPv4 bzw. die letzten 80 Bit bei IPv6
+  auf `0` gesetzt) — die vollständige IP wird zu keinem Zeitpunkt gespeichert
+- der Browser (`User-Agent`)
+- eine zufällige Consent-ID (auch im `localStorage` der Website unter `paragrafy_consent_id`
+  hinterlegt, zur Korrelation)
+- ein SHA-256-Hash des zu diesem Zeitpunkt angezeigten Banner-Texts (Nachweis, *was* akzeptiert
+  wurde)
+
+Einsehbar und als CSV exportierbar unter **Admin → Consent-Nachweise**
+(`/admin/consent-log`). Über **Einstellungen → Consent-Nachweise** lässt sich außerdem eine
+Aufbewahrungsdauer in Tagen festlegen (Standard: 1095 Tage / ~3 Jahre, `0` = unbegrenzt);
+abgelaufene Einträge werden automatisch beim täglichen rollierenden Backup-Cron
+(`/api/cron/backup`) bereinigt, es ist also kein zusätzlicher Cron-Job nötig.
+
+Dies ist ein technisches Hilfsmittel zur Nachweisführung, keine Rechtsberatung — ob und wie
+lange eine Aufbewahrung im jeweiligen Anwendungsfall sinnvoll oder erforderlich ist, sollte im
+Zweifel individuell geprüft werden.

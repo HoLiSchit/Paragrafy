@@ -82,6 +82,7 @@ return [
     'admin.common.nav.dashboard' => 'Dashboard',
     'admin.common.nav.users' => 'Benutzer',
     'admin.common.nav.audit' => 'Protokoll',
+    'admin.common.nav.consent_log' => 'Consent-Nachweise',
     'admin.common.nav.settings' => 'Einstellungen',
     'admin.common.sidebar.managed_cloud' => 'Managed Cloud &middot; v:version',
     'admin.common.sidebar.self_hosted' => 'Self-Hosted &middot; v:version',
@@ -283,6 +284,27 @@ return [
     'admin.audit.col_action' => 'Aktion',
 
     // ---------------------------------------------------------------
+    // admin.consent_log.* - DSGVO consent proof log view
+    // ---------------------------------------------------------------
+    'admin.consent_log.page_title' => 'Consent-Nachweise - :project',
+    'admin.consent_log.crumb' => 'Consent-Nachweise',
+    'admin.consent_log.heading' => 'Consent-Nachweise',
+    'admin.consent_log.subtitle' => 'Server-seitiges Protokoll aller Consent-Entscheidungen über das Cookie-Banner (/consent.js) — als DSGVO-Nachweis. Zeigt die letzten 500 Einträge.',
+    'admin.consent_log.export_csv' => 'Als CSV herunterladen',
+    'admin.consent_log.empty' => 'Noch keine Consent-Entscheidungen protokolliert.',
+    'admin.consent_log.disabled_hint' => 'Consent-Nachweise sind für dieses Projekt deaktiviert.',
+    'admin.consent_log.disabled_hint_link' => 'Jetzt in den Einstellungen aktivieren',
+    'admin.consent_log.col_time' => 'Zeitpunkt',
+    'admin.consent_log.col_action' => 'Aktion',
+    'admin.consent_log.col_ip' => 'Anonymisierte IP',
+    'admin.consent_log.col_consent_id' => 'Consent-ID',
+    'admin.consent_log.col_lang' => 'Sprache',
+    'admin.consent_log.col_useragent' => 'Browser',
+    'admin.consent_log.col_text_hash' => 'Banner-Text-Hash',
+    'admin.consent_log.action_accepted' => 'Akzeptiert',
+    'admin.consent_log.action_declined' => 'Abgelehnt',
+
+    // ---------------------------------------------------------------
     // admin.users.* - user management view
     // ---------------------------------------------------------------
     'admin.users.msg.invited' => 'Einladung erfolgreich per E-Mail versendet.',
@@ -475,6 +497,14 @@ return [
     'admin.settings.cookie.banner_text_hint' => '(optional, sonst Standardtext)',
     'admin.settings.cookie.banner_text_help' => 'Dieser Text erscheint im Banner, das /consent.js auf deiner Website einblendet. Bindest du das Skript nicht ein, hat dieser Text keine Wirkung.',
     'admin.settings.cookie.save_button' => 'Speichern',
+    'admin.settings.consent_log.heading' => 'Consent-Nachweise (DSGVO-Nachweispflicht)',
+    'admin.settings.consent_log.subtitle' => 'Protokolliert serverseitig, wann ein Besuch das Cookie-Banner akzeptiert oder abgelehnt hat — als Nachweis für Prüfungen. Setzt voraus, dass /consent.js auf der Website eingebunden ist.',
+    'admin.settings.consent_log.enable_label' => 'Consent-Nachweise protokollieren',
+    'admin.settings.consent_log.enable_help' => 'Speichert pro Consent-Entscheidung: Zeitpunkt, Aktion (akzeptiert/abgelehnt), eine anonymisierte IP-Adresse (letztes Oktett bzw. bei IPv6 die letzten 80 Bit genullt — nie die vollständige IP), den Browser (User-Agent) sowie einen Hash des angezeigten Banner-Texts. Es werden keine Namen, E-Mail-Adressen oder vollständigen IP-Adressen gespeichert.',
+    'admin.settings.consent_log.retention_label' => 'Aufbewahrungsdauer (Tage)',
+    'admin.settings.consent_log.retention_hint' => '0 = unbegrenzt aufbewahren. Abgelaufene Einträge werden täglich zusammen mit dem rollierenden Backup bereinigt.',
+    'admin.settings.consent_log.save_button' => 'Speichern',
+    'admin.settings.consent_log.view_link' => 'Nachweise ansehen',
 
     'admin.settings.email.heading' => 'E-Mail-Versand &amp; Prüf-Erinnerungen',
     'admin.settings.email.subtitle' => 'Damit verschickt Paragrafy Prüf-Erinnerungen und Testmails. Zugangsdaten bekommst du von deinem E-Mail-Anbieter (SMTP).',
