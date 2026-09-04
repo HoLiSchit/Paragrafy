@@ -243,7 +243,7 @@ $versions = $stmtVersions->fetchAll();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
     <?= theme_head_tags_admin() ?>
-    <?= theme_base_css_admin($doc['brand_color'] ?? '#6366F1') ?>
+    <?= theme_base_css_admin($doc['brand_color'] ?? '#F0A63C') ?>
     <style>
         .editor-container { max-width: 1440px; margin: 24px auto; padding: 0 28px 60px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }

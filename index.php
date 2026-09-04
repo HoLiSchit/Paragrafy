@@ -435,7 +435,7 @@ function handle_json_api(array $parts, array $project, PDO $db, string $primaryL
 
 function render_public_document(array $project, array $trans, string $content, array $languages, string $currentLang, bool $isPreview = false, ?string $liveSlug = null): void {
     $liveSlug = $liveSlug ?? $trans['slug'];
-    $brand = htmlspecialchars($project['brand_color'] ?: '#6366F1');
+    $brand = htmlspecialchars($project['brand_color'] ?: '#F0A63C');
     $logoUrl = $project['logo_url'] ?: '/paragrafy.svg';
     $i18n = get_i18n_strings($currentLang);
 
@@ -454,7 +454,7 @@ function render_public_document(array $project, array $trans, string $content, a
         <title><?= htmlspecialchars($trans['title']) ?><?= $isPreview ? htmlspecialchars($i18n['preview_suffix']) : '' ?> - <?= htmlspecialchars($project['name']) ?></title>
         <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars($logoUrl) ?>">
         <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#6366F1', false) ?>
+        <?= theme_base_css($project['brand_color'] ?: '#F0A63C', false) ?>
         <style>
             body { line-height: 1.7; }
             .preview-banner { background: oklch(24% 0.05 250); border-radius: 10px; padding: 14px 18px; margin-bottom: 22px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -650,7 +650,7 @@ function render_public_document(array $project, array $trans, string $content, a
 }
 
 function render_public_overview(array $project, PDO $db, string $lang): void {
-    $brand = htmlspecialchars($project['brand_color'] ?: '#6366F1');
+    $brand = htmlspecialchars($project['brand_color'] ?: '#F0A63C');
     $logoUrl = $project['logo_url'] ?: '/paragrafy.svg';
     $i18n = get_i18n_strings($lang);
 
@@ -672,7 +672,7 @@ function render_public_overview(array $project, PDO $db, string $lang): void {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars($logoUrl) ?>">
         <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#6366F1', false) ?>
+        <?= theme_base_css($project['brand_color'] ?: '#F0A63C', false) ?>
         <style>
             body { display: flex; align-items: center; justify-content: center; padding: 70px 20px; }
             .box { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 36px; max-width: 460px; width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,.04); }
@@ -746,7 +746,7 @@ function render_public_404(array $project, string $lang): void {
         <meta charset="utf-8"><title>404 - <?= htmlspecialchars($i18n['not_found_title']) ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <?= theme_head_tags() ?>
-        <?= theme_base_css($project['brand_color'] ?: '#6366F1', false) ?>
+        <?= theme_base_css($project['brand_color'] ?: '#F0A63C', false) ?>
     </head>
     <body style="text-align:center; padding: 5rem 1rem;">
         <h2 style="font-size:20px;font-weight:800;"><?= htmlspecialchars($i18n['not_found_title']) ?></h2>
@@ -871,7 +871,7 @@ function render_embed_js(): void {
  * back to generic text/colors in that case.
  */
 function render_consent_js(?array $project): void {
-    $brand = $project['brand_color'] ?? '#6366F1';
+    $brand = $project['brand_color'] ?? '#F0A63C';
     $primaryLang = $project['primary_lang'] ?? 'de';
     $bannerText = trim($project['cookie_banner_text'] ?? '') ?: t('public.consent.default_text');
 

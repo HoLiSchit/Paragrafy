@@ -302,7 +302,7 @@ function init_database_schema(PDO $pdo): void {
             name TEXT NOT NULL,
             primary_lang TEXT DEFAULT 'de',
             active_languages TEXT DEFAULT 'de,en',
-            brand_color TEXT DEFAULT '#6366F1',
+            brand_color TEXT DEFAULT '#F0A63C',
             logo_url TEXT DEFAULT '',
             deepl_api_key TEXT DEFAULT '',
             webhook_url TEXT DEFAULT '',
@@ -1308,7 +1308,7 @@ function run_audit_check(array $project, PDO $db): array {
     $html = "<h2>" . htmlspecialchars(t('db.audit.mail_heading')) . "</h2>";
     $html .= "<p>" . t('db.audit.mail_intro', ['project' => htmlspecialchars($project['name']), 'domain' => htmlspecialchars($project['domain']), 'months' => $auditMonths]) . "</p>";
     $html .= "<ul>" . implode('', $overdue) . "</ul>";
-    $html .= "<p><a href='https://" . htmlspecialchars($project['domain']) . "/admin' style='background:#6366F1;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Zum Admin-Dashboard</a></p>";
+    $html .= "<p><a href='https://" . htmlspecialchars($project['domain']) . "/admin' style='background:#F0A63C;color:#fff;padding:0.6rem 1.2rem;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold;'>Zum Admin-Dashboard</a></p>";
 
     return send_smtp_mail($project, $recipient, t('db.audit.mail_subject', ['count' => count($overdue)]), $html);
 }
@@ -1338,7 +1338,7 @@ function theme_head_tags(): string {
         . '<script>(function(){try{var t=localStorage.getItem("paragrafy_theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();</script>';
 }
 
-function theme_base_css(string $accent = '#6366F1', bool $enableDarkMode = true): string {
+function theme_base_css(string $accent = '#F0A63C', bool $enableDarkMode = true): string {
     $accent = htmlspecialchars($accent, ENT_QUOTES);
     $lightAccent = $enableDarkMode ? "color-mix(in srgb, {$accent} 82%, black)" : $accent;
     $lightVars = <<<VARS
@@ -1531,7 +1531,7 @@ function theme_head_tags_admin(): string {
  * index.php keeps calling theme_base_css() unchanged, so the public banner
  * widget's look is completely unaffected by this function.
  */
-function theme_base_css_admin(string $accent = '#6366F1', bool $enableDarkMode = true): string {
+function theme_base_css_admin(string $accent = '#F0A63C', bool $enableDarkMode = true): string {
     $accent = htmlspecialchars($accent, ENT_QUOTES);
     $btnInk = theme_contrast_text($accent);
     $lightAccent = $enableDarkMode ? "color-mix(in srgb, {$accent} 82%, black)" : $accent;
