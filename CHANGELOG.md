@@ -8,6 +8,18 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`) statt SemVer:
 jeden Monat wieder bei `1`. Änderungen vor `2026.9.1` sind nicht rückwirkend
 erfasst — siehe dafür die Git-Historie.
 
+## [2026.9.9] - 2026-09-04
+
+### Changed
+- **Projekt-Import: explizite Zielprojekt-Auswahl statt automatischer Domain-Erkennung**: Der
+  Projekt-Import erkannte bislang selbst per Domain-Abgleich, ob ein bestehendes Projekt
+  aktualisiert oder ein neues angelegt werden soll. Das führte auf Managed Cloud zu
+  Duplikaten, wenn sich die gespeicherte Domain zwischen Export und Import geändert hatte (z. B.
+  weil zwischenzeitlich eine eigene Domain verbunden wurde) — der Abgleich schlug fehl und legte
+  statt eines Updates ein neues, doppeltes Projekt an. Der Import verlangt jetzt zwingend die
+  explizite Auswahl eines **bereits bestehenden** Zielprojekts aus einem Dropdown; es wird nie
+  mehr automatisch ein neues Projekt angelegt. Ein Zielprojekt muss vorher regulär angelegt sein.
+
 ## [2026.9.8] - 2026-09-04
 
 ### Fixed

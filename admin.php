@@ -170,16 +170,18 @@ if (isset($_POST['action']) && $_POST['action'] === 'restore_backup_upload') {
     exit;
 }
 
-// 1f. Einzelnes Projekt importieren (Merge, andere Projekte dieser Instanz bleiben unberührt)
+// 1f. Einzelnes Projekt in ein explizit gewähltes, bestehendes Projekt importieren (Merge,
+// andere Projekte dieser Instanz bleiben unberührt)
 if (isset($_POST['action']) && $_POST['action'] === 'import_project_upload') {
-    if (empty($_FILES['project_file']['tmp_name'])) {
+    $targetProjectId = (int)($_POST['target_project_id'] ?? 0);
+    if (empty($_FILES['project_file']['tmp_name']) || $targetProjectId <= 0) {
         header("Location: /admin/settings?project_id=$projectId&msg=project_import_failed&import_error=" . urlencode(t('db.restore.upload_failed')));
         exit;
     }
-    $result = import_project_backup($db, $_FILES['project_file']['tmp_name']);
+    $result = import_project_backup($db, $_FILES['project_file']['tmp_name'], $targetProjectId);
     if ($result['success']) {
-        log_audit($result['target_project_id'], '', t($result['was_new_project'] ? 'admin.common.audit.project_import_created' : 'admin.common.audit.project_import_merged', ['docs' => $result['documents_merged'], 'translations' => $result['translations_merged']]));
-        header("Location: /admin/settings?project_id=" . (int)$result['target_project_id'] . "&msg=project_import_success&import_was_new=" . ($result['was_new_project'] ? 1 : 0) . "&import_docs=" . (int)$result['documents_merged']);
+        log_audit($result['target_project_id'], '', t('admin.common.audit.project_import_merged', ['docs' => $result['documents_merged'], 'translations' => $result['translations_merged']]));
+        header("Location: /admin/settings?project_id=" . (int)$result['target_project_id'] . "&msg=project_import_success&import_docs=" . (int)$result['documents_merged']);
     } else {
         log_audit(null, '', t('admin.common.audit.project_import_failed', ['error' => $result['error'] ?? '']));
         header("Location: /admin/settings?project_id=$projectId&msg=project_import_failed&import_error=" . urlencode($result['error'] ?? ''));
@@ -1938,7 +1940,7 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             </div>
 
                             <?php if ($backupMsg === 'project_import_success'): ?>
-                                <p style="font-size:12px;color:var(--green);margin:4px 0 10px"><?= htmlspecialchars(t(!empty($_GET['import_was_new']) ? 'admin.settings.project_transfer.import_created_msg' : 'admin.settings.project_transfer.import_merged_msg', ['count' => (int)($_GET['import_docs'] ?? 0)])) ?></p>
+                                <p style="font-size:12px;color:var(--green);margin:4px 0 10px"><?= htmlspecialchars(t('admin.settings.project_transfer.import_merged_msg', ['count' => (int)($_GET['import_docs'] ?? 0)])) ?></p>
                             <?php elseif ($backupMsg === 'project_import_failed'): ?>
                                 <p style="font-size:12px;color:var(--red);margin:4px 0 10px"><?= htmlspecialchars(t('admin.settings.project_transfer.import_error_msg', ['error' => $_GET['import_error'] ?? ''])) ?></p>
                             <?php endif; ?>
@@ -1948,6 +1950,12 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             </div>
                             <form method="post" enctype="multipart/form-data" id="projectImportForm" onsubmit="return confirm(<?= json_encode(t('admin.settings.project_transfer.confirm_dialog')) ?>);">
                                 <input type="hidden" name="action" value="import_project_upload">
+                                <label class="pg-label" style="margin-top:0;font-size:12.5px"><?= htmlspecialchars(t('admin.settings.project_transfer.target_label')) ?></label>
+                                <select name="target_project_id" required style="width:100%;margin-bottom:10px">
+                                    <?php foreach ($projects as $p): ?>
+                                        <option value="<?= $p['id'] ?>" <?= (int)$p['id'] === (int)$project['id'] ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?> (<?= htmlspecialchars($p['domain']) ?>)</option>
+                                    <?php endforeach; ?>
+                                </select>
                                 <input type="file" name="project_file" accept=".sqlite" required style="width:100%;margin-bottom:10px">
                                 <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;font-weight:500;margin-bottom:12px">
                                     <input type="checkbox" id="projectImportConfirmCheckbox" onchange="document.getElementById('projectImportSubmitBtn').disabled = !this.checked" style="margin-top:2px">

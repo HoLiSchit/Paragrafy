@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 // CalVer: JAHR.MONAT.BUILD - BUILD zaehlt Releases innerhalb des Monats hoch (startet bei 1).
 // Siehe CHANGELOG.md fuer die Aenderungen je Version.
-define('PARAGRAFY_VERSION', '2026.9.8');
+define('PARAGRAFY_VERSION', '2026.9.9');
 define('PARAGRAFY_DIR', __DIR__);
 // Where persistent data (DB, config, backups, .env) lives. Defaults to the
 // code directory (bare-metal installs); set PARAGRAFY_DATA_DIR to point this
@@ -1902,16 +1902,22 @@ function validate_project_upload(string $tmpPath): array {
 }
 
 /**
- * Führt ein hochgeladenes Projekt-Export in die aktuelle Instanz zusammen (Merge), ohne andere
- * dort vorhandene Projekte anzutasten. Existiert die Domain des importierten Projekts bereits,
- * werden nur dessen Dokumente/Übersetzungen aktualisiert (Firmendaten/Settings des bestehenden
- * Zielprojekts bleiben unverändert); sonst wird ein neues Projekt angelegt. doc_types werden per
- * slug gegen bestehende Einträge abgeglichen (instanzweit geteilt, keine Duplikate).
+ * Führt ein hochgeladenes Projekt-Export in ein explizit ausgewähltes, bereits bestehendes
+ * Zielprojekt zusammen (Merge) — kein automatisches Domain-Raten und kein Anlegen neuer
+ * Projekte. Nur Dokumente/Übersetzungen des Zielprojekts werden aktualisiert; dessen
+ * Firmendaten/Settings sowie alle anderen Projekte der Instanz bleiben unverändert. doc_types
+ * werden per slug gegen bestehende Einträge abgeglichen (instanzweit geteilt, keine Duplikate).
  */
-function import_project_backup(PDO $db, string $tmpPath): array {
+function import_project_backup(PDO $db, string $tmpPath, int $targetProjectId): array {
     $validation = validate_project_upload($tmpPath);
     if (!$validation['success']) {
         return $validation;
+    }
+
+    $stmtCheck = $db->prepare("SELECT id FROM projects WHERE id = ?");
+    $stmtCheck->execute([$targetProjectId]);
+    if (!$stmtCheck->fetchColumn()) {
+        return ['success' => false, 'error' => t('db.project_import.target_not_found')];
     }
 
     run_scheduled_backup();
@@ -1923,24 +1929,6 @@ function import_project_backup(PDO $db, string $tmpPath): array {
 
     try {
         $db->beginTransaction();
-
-        $importProject = $importPdo->query("SELECT * FROM projects LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-
-        $stmtFind = $db->prepare("SELECT id FROM projects WHERE domain = ?");
-        $stmtFind->execute([$importProject['domain']]);
-        $existingId = $stmtFind->fetchColumn();
-
-        $wasNew = false;
-        if ($existingId) {
-            $targetProjectId = (int)$existingId;
-        } else {
-            $wasNew = true;
-            $cols = array_values(array_filter(array_keys($importProject), fn($c) => $c !== 'id'));
-            $values = array_map(fn($c) => $importProject[$c], $cols);
-            $placeholders = implode(',', array_fill(0, count($cols), '?'));
-            $db->prepare("INSERT INTO projects (" . implode(',', $cols) . ") VALUES ($placeholders)")->execute($values);
-            $targetProjectId = (int)$db->lastInsertId();
-        }
 
         $docTypeIdMap = [];
         $importDocTypes = $importPdo->query("SELECT * FROM doc_types")->fetchAll(PDO::FETCH_ASSOC);
@@ -2016,7 +2004,6 @@ function import_project_backup(PDO $db, string $tmpPath): array {
         return [
             'success' => true,
             'target_project_id' => $targetProjectId,
-            'was_new_project' => $wasNew,
             'documents_merged' => count($documentIdMap),
             'translations_merged' => $translationsMerged,
         ];
