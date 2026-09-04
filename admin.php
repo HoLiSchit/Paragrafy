@@ -142,7 +142,11 @@ if (isset($_POST['action']) && $_POST['action'] === 'restore_backup_upload') {
     $result = restore_database_from_upload($_FILES['backup_file']['tmp_name']);
     if ($result['success']) {
         log_audit(null, '', t('admin.common.audit.restore_triggered', ['count' => $result['project_count'] ?? 0]));
-        header("Location: /admin/settings?msg=restore_success&restore_count=" . (int)($result['project_count'] ?? 0));
+        $redirect = "/admin/settings?msg=restore_success&restore_count=" . (int)($result['project_count'] ?? 0);
+        if (!empty($result['over_limit'])) {
+            $redirect .= "&restore_over_limit=1&restore_limit=" . (int)($result['project_limit'] ?? 0);
+        }
+        header("Location: $redirect");
     } else {
         log_audit(null, '', t('admin.common.audit.restore_failed', ['error' => $result['error'] ?? '']));
         header("Location: /admin/settings?project_id=$projectId&msg=restore_failed&restore_error=" . urlencode($result['error'] ?? ''));
@@ -1869,11 +1873,17 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                             <h2 style="margin:0 0 4px;font-size:14px"><?= htmlspecialchars(t('admin.settings.restore.heading')) ?><?= help_icon(t('admin.settings.restore.help')) ?></h2>
                             <?php if ($backupMsg === 'restore_success'): ?>
                                 <p style="font-size:12px;color:var(--green);margin:4px 0 10px"><?= htmlspecialchars(t('admin.settings.restore.success_msg', ['count' => (int)($_GET['restore_count'] ?? 0)])) ?></p>
+                                <?php if (!empty($_GET['restore_over_limit'])): ?>
+                                    <div class="pg-alert pg-alert-amber" style="margin-bottom:12px;font-size:12.5px">
+                                        <?= htmlspecialchars(t('admin.settings.restore.over_limit_warning', ['count' => (int)($_GET['restore_count'] ?? 0), 'limit' => (int)($_GET['restore_limit'] ?? 0)])) ?>
+                                    </div>
+                                <?php endif; ?>
                             <?php elseif ($backupMsg === 'restore_failed'): ?>
                                 <p style="font-size:12px;color:var(--red);margin:4px 0 10px"><?= htmlspecialchars(t('admin.settings.restore.error_msg', ['error' => $_GET['restore_error'] ?? ''])) ?></p>
                             <?php endif; ?>
                             <div class="pg-alert pg-alert-red" style="margin-bottom:12px;font-size:12.5px">
                                 <?= htmlspecialchars(t('admin.settings.restore.warning')) ?>
+                                <?php if ($isManagedCloud): ?> <?= htmlspecialchars(t('admin.settings.restore.warning_cloud_domain')) ?><?php endif; ?>
                             </div>
                             <form method="post" enctype="multipart/form-data" id="restoreForm" onsubmit="return confirm(<?= json_encode(t('admin.settings.restore.confirm_dialog')) ?>);">
                                 <input type="hidden" name="action" value="restore_backup_upload">

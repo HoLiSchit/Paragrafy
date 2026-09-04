@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 // CalVer: JAHR.MONAT.BUILD - BUILD zaehlt Releases innerhalb des Monats hoch (startet bei 1).
 // Siehe CHANGELOG.md fuer die Aenderungen je Version.
-define('PARAGRAFY_VERSION', '2026.9.5');
+define('PARAGRAFY_VERSION', '2026.9.6');
 define('PARAGRAFY_DIR', __DIR__);
 // Where persistent data (DB, config, backups, .env) lives. Defaults to the
 // code directory (bare-metal installs); set PARAGRAFY_DATA_DIR to point this
@@ -1729,10 +1729,15 @@ function restore_database_from_upload(string $tmpPath): array {
         return ['success' => false, 'error' => t('db.restore.migration_failed', ['error' => $e->getMessage()])];
     }
 
+    $projectLimit = get_project_limit();
+    $overLimit = $projectLimit !== null && $validation['project_count'] > $projectLimit;
+
     return [
         'success' => true,
         'project_count' => $validation['project_count'],
         'safety_backup' => $safetyBackup['success'] ?? false,
+        'over_limit' => $overLimit,
+        'project_limit' => $projectLimit,
     ];
 }
 

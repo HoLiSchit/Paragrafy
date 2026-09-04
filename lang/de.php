@@ -593,7 +593,9 @@ return [
 
     'admin.settings.restore.heading' => 'Backup wiederherstellen',
     'admin.settings.restore.help' => 'Ersetzt die komplette aktuelle Datenbank dieser Instanz durch eine hochgeladene Sicherungskopie (.sqlite). Nützlich beim Wechsel zwischen Self-Hosting und Managed Cloud. Auch Backups aus älteren Paragrafy-Versionen werden unterstützt — fehlende Spalten/Tabellen werden automatisch ergänzt.',
-    'admin.settings.restore.warning' => 'Achtung: Alle aktuellen Projekte, Rechtstexte und Einstellungen dieser Instanz werden durch den Inhalt der hochgeladenen Datei ersetzt. Vor dem Ersetzen wird automatisch eine Sicherungskopie der aktuellen Datenbank angelegt (erscheint danach oben in der Backup-Liste).',
+    'admin.settings.restore.warning' => 'Achtung: Alle aktuellen Projekte, Rechtstexte und Einstellungen dieser Instanz werden durch den Inhalt der hochgeladenen Datei ersetzt — kein Zusammenführen, sondern ein vollständiger Ersatz. Vor dem Ersetzen wird automatisch eine Sicherungskopie der aktuellen Datenbank angelegt (erscheint danach oben in der Backup-Liste).',
+    'admin.settings.restore.warning_cloud_domain' => 'Auf Managed Cloud wird dabei auch die hinterlegte Domain überschrieben — prüfe danach im Cloud-Dashboard, ob die Domain-Zuordnung noch stimmt, und passe sie bei Bedarf an.',
+    'admin.settings.restore.over_limit_warning' => 'Hinweis: Die wiederhergestellte Datenbank enthält :count Projekt(e), dein aktueller Plan erlaubt aber nur :limit. Bitte im Cloud-Dashboard prüfen bzw. Plan anpassen.',
     'admin.settings.restore.file_label' => 'Backup-Datei (.sqlite):',
     'admin.settings.restore.confirm_checkbox' => 'Ich verstehe, dass alle aktuellen Daten dieser Instanz durch die hochgeladene Datei ersetzt werden.',
     'admin.settings.restore.confirm_dialog' => 'Wirklich fortfahren? Alle aktuellen Daten dieser Instanz werden durch die hochgeladene Datei ersetzt. Eine Sicherungskopie wird vorher automatisch angelegt.',

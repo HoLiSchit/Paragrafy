@@ -8,6 +8,18 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`) statt SemVer:
 jeden Monat wieder bei `1`. Änderungen vor `2026.9.1` sind nicht rückwirkend
 erfasst — siehe dafür die Git-Historie.
 
+## [2026.9.6] - 2026-09-04
+
+### Changed
+- **Backup-Wiederherstellung: klarere Warnungen**: Der Warnhinweis vor dem Restore macht jetzt
+  explizit deutlich, dass es sich um einen vollständigen Ersatz (kein Zusammenführen) handelt.
+  Auf Managed Cloud erscheint zusätzlich der Hinweis, dass die in der hochgeladenen Datei
+  enthaltene Domain die bisherige überschreibt und danach im Cloud-Dashboard geprüft werden
+  sollte. Enthält die wiederhergestellte Datenbank mehr Projekte, als der aktuelle Plan
+  (`project_limit`) erlaubt, erscheint nach dem Restore ein zusätzlicher Warnhinweis — der
+  Restore selbst wird dadurch nicht blockiert, da es sich um die eigenen Daten des Kunden
+  handelt.
+
 ## [2026.9.5] - 2026-09-04
 
 ### Added

@@ -568,7 +568,9 @@ return [
 
     'admin.settings.restore.heading' => 'Restore backup',
     'admin.settings.restore.help' => 'Replaces this instance\'s entire database with an uploaded backup (.sqlite). Useful when switching between self-hosting and Managed Cloud. Backups from older Paragrafy versions are supported too — missing columns/tables are added automatically.',
-    'admin.settings.restore.warning' => 'Warning: all current projects, legal texts, and settings on this instance will be replaced by the content of the uploaded file. A safety copy of the current database is created automatically before replacing it (appears afterward at the top of the backup list).',
+    'admin.settings.restore.warning' => 'Warning: all current projects, legal texts, and settings on this instance will be replaced by the content of the uploaded file — this is a full replacement, not a merge. A safety copy of the current database is created automatically before replacing it (appears afterward at the top of the backup list).',
+    'admin.settings.restore.warning_cloud_domain' => 'On Managed Cloud this also overwrites the stored domain — afterward, check the Cloud dashboard to make sure the domain assignment still matches, and adjust it if needed.',
+    'admin.settings.restore.over_limit_warning' => 'Note: the restored database contains :count project(s), but your current plan only allows :limit. Please check your Cloud dashboard and adjust your plan if needed.',
     'admin.settings.restore.file_label' => 'Backup file (.sqlite):',
     'admin.settings.restore.confirm_checkbox' => 'I understand that all current data on this instance will be replaced by the uploaded file.',
     'admin.settings.restore.confirm_dialog' => 'Really continue? All current data on this instance will be replaced by the uploaded file. A safety copy is created automatically beforehand.',
