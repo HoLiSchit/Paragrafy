@@ -113,7 +113,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_backup') {
 if (isset($_GET['action']) && $_GET['action'] === 'download_backup_file') {
     $requested = basename((string)($_GET['file'] ?? ''));
     $path = BACKUP_DIR . '/' . $requested;
-    if (preg_match('/^paragrafy_backup_[0-9_]+\.sqlite$/', $requested) && file_exists($path)) {
+    if (preg_match('/^paragrafy_backup_[0-9_-]+\.sqlite$/', $requested) && file_exists($path)) {
         header('Content-Type: application/x-sqlite3');
         header('Content-Disposition: attachment; filename="' . $requested . '"');
         header('Content-Length: ' . filesize($path));
@@ -122,6 +122,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_backup_file') {
     }
     http_response_code(404);
     echo htmlspecialchars(t('admin.common.backup_not_found'));
+    exit;
+}
+
+// 1b2. Einzelnes Projekt exportieren (nur Rechtsinhalte, kein Voll-Instanz-Export)
+if (isset($_GET['action']) && $_GET['action'] === 'export_project') {
+    $exportResult = export_project_backup($db, $projectId);
+    if ($exportResult['success']) {
+        header('Content-Type: application/x-sqlite3');
+        header('Content-Disposition: attachment; filename="' . $exportResult['filename'] . '"');
+        header('Content-Length: ' . filesize($exportResult['path']));
+        readfile($exportResult['path']);
+        @unlink($exportResult['path']);
+        exit;
+    }
+    http_response_code(500);
+    echo htmlspecialchars($exportResult['error'] ?? '');
     exit;
 }
 
@@ -150,6 +166,23 @@ if (isset($_POST['action']) && $_POST['action'] === 'restore_backup_upload') {
     } else {
         log_audit(null, '', t('admin.common.audit.restore_failed', ['error' => $result['error'] ?? '']));
         header("Location: /admin/settings?project_id=$projectId&msg=restore_failed&restore_error=" . urlencode($result['error'] ?? ''));
+    }
+    exit;
+}
+
+// 1f. Einzelnes Projekt importieren (Merge, andere Projekte dieser Instanz bleiben unberührt)
+if (isset($_POST['action']) && $_POST['action'] === 'import_project_upload') {
+    if (empty($_FILES['project_file']['tmp_name'])) {
+        header("Location: /admin/settings?project_id=$projectId&msg=project_import_failed&import_error=" . urlencode(t('db.restore.upload_failed')));
+        exit;
+    }
+    $result = import_project_backup($db, $_FILES['project_file']['tmp_name']);
+    if ($result['success']) {
+        log_audit($result['target_project_id'], '', t($result['was_new_project'] ? 'admin.common.audit.project_import_created' : 'admin.common.audit.project_import_merged', ['docs' => $result['documents_merged'], 'translations' => $result['translations_merged']]));
+        header("Location: /admin/settings?project_id=" . (int)$result['target_project_id'] . "&msg=project_import_success&import_was_new=" . ($result['was_new_project'] ? 1 : 0) . "&import_docs=" . (int)$result['documents_merged']);
+    } else {
+        log_audit(null, '', t('admin.common.audit.project_import_failed', ['error' => $result['error'] ?? '']));
+        header("Location: /admin/settings?project_id=$projectId&msg=project_import_failed&import_error=" . urlencode($result['error'] ?? ''));
     }
     exit;
 }
@@ -1893,6 +1926,34 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
                                     <?= htmlspecialchars(t('admin.settings.restore.confirm_checkbox')) ?>
                                 </label>
                                 <button type="submit" id="restoreSubmitBtn" class="pg-btn-secondary" disabled style="border-color:var(--red);color:var(--red)"><?= svg_icon('sync', '', 14) ?> <?= htmlspecialchars(t('admin.settings.restore.submit_button')) ?></button>
+                            </form>
+                        </div>
+
+                        <div style="border-top:1px solid var(--border-soft);margin-top:20px;padding-top:16px">
+                            <h2 style="margin:0 0 4px;font-size:14px"><?= htmlspecialchars(t('admin.settings.project_transfer.heading')) ?><?= help_icon(t('admin.settings.project_transfer.help')) ?></h2>
+                            <p class="pg-card-sub" style="margin:0 0 12px"><?= htmlspecialchars(t('admin.settings.project_transfer.subtitle')) ?></p>
+
+                            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+                                <a href="/admin?action=export_project&project_id=<?= $projectId ?>" class="pg-btn-secondary"><?= svg_icon('folder', '', 14) ?> <?= htmlspecialchars(t('admin.settings.project_transfer.export_button')) ?></a>
+                            </div>
+
+                            <?php if ($backupMsg === 'project_import_success'): ?>
+                                <p style="font-size:12px;color:var(--green);margin:4px 0 10px"><?= htmlspecialchars(t(!empty($_GET['import_was_new']) ? 'admin.settings.project_transfer.import_created_msg' : 'admin.settings.project_transfer.import_merged_msg', ['count' => (int)($_GET['import_docs'] ?? 0)])) ?></p>
+                            <?php elseif ($backupMsg === 'project_import_failed'): ?>
+                                <p style="font-size:12px;color:var(--red);margin:4px 0 10px"><?= htmlspecialchars(t('admin.settings.project_transfer.import_error_msg', ['error' => $_GET['import_error'] ?? ''])) ?></p>
+                            <?php endif; ?>
+
+                            <div class="pg-alert pg-alert-amber" style="margin-bottom:12px;font-size:12.5px">
+                                <?= htmlspecialchars(t('admin.settings.project_transfer.import_warning')) ?>
+                            </div>
+                            <form method="post" enctype="multipart/form-data" id="projectImportForm" onsubmit="return confirm(<?= json_encode(t('admin.settings.project_transfer.confirm_dialog')) ?>);">
+                                <input type="hidden" name="action" value="import_project_upload">
+                                <input type="file" name="project_file" accept=".sqlite" required style="width:100%;margin-bottom:10px">
+                                <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;font-weight:500;margin-bottom:12px">
+                                    <input type="checkbox" id="projectImportConfirmCheckbox" onchange="document.getElementById('projectImportSubmitBtn').disabled = !this.checked" style="margin-top:2px">
+                                    <?= htmlspecialchars(t('admin.settings.project_transfer.confirm_checkbox')) ?>
+                                </label>
+                                <button type="submit" id="projectImportSubmitBtn" class="pg-btn-secondary" disabled><?= svg_icon('sync', '', 14) ?> <?= htmlspecialchars(t('admin.settings.project_transfer.submit_button')) ?></button>
                             </form>
                         </div>
                     </div>

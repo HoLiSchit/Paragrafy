@@ -8,6 +8,30 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`) statt SemVer:
 jeden Monat wieder bei `1`. Änderungen vor `2026.9.1` sind nicht rückwirkend
 erfasst — siehe dafür die Git-Historie.
 
+## [2026.9.7] - 2026-09-04
+
+### Added
+- **Projekt-Export & Merge-Import**: Neben dem Voll-Instanz-Backup gibt es jetzt in den
+  Projekteinstellungen einen gezielten Export/Import für ein **einzelnes Projekt** — nützlich, um
+  z. B. nur ein Projekt zwischen Self-Hosting und Managed Cloud zu übertragen, ohne dabei andere
+  Projekte der Zielinstanz zu überschreiben (im Gegensatz zum bestehenden Voll-Restore, der immer
+  die komplette Datenbank ersetzt). „Dieses Projekt exportieren" lädt eine eigenständige Datei mit
+  nur den Rechtsinhalten dieses Projekts herunter (Stammdaten, Dokumente, Übersetzungen,
+  Versionshistorie — keine Betriebsdaten wie Webhook-Logs oder Nutzerkonten). Beim Import wird die
+  Domain des importierten Projekts gegen die Zielinstanz abgeglichen: Existiert sie bereits,
+  werden nur dessen Dokumente/Übersetzungen aktualisiert (Firmendaten des bestehenden Projekts
+  bleiben unverändert, andere Projekte der Instanz bleiben komplett unberührt); existiert sie
+  noch nicht, wird ein neues Projekt angelegt. Rechtstext-Typen (`doc_types`) werden dabei per
+  Slug gegen bestehende Einträge abgeglichen, keine Duplikate. Vor jedem Import wird automatisch
+  eine Sicherheitskopie der Zielinstanz angelegt.
+
+### Fixed
+- **Backup-Download für rollierende Backups repariert**: Der Download-Link für einzelne
+  rollierende Backups (7-Tage-Verlauf) warf immer „Backup nicht gefunden", weil die
+  Dateinamens-Prüfung keine Bindestriche zuließ, obwohl die Backup-Dateinamen (`Y-m-d_His`) welche
+  enthalten. Betraf alle Backup-Dateien unabhängig vom Erstellungsdatum, war kein neues Problem
+  durch diese Version.
+
 ## [2026.9.6] - 2026-09-04
 
 ### Changed

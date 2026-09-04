@@ -335,6 +335,9 @@ return [
     'admin.common.audit.backup_failed' => 'Backup failed: :error',
     'admin.common.audit.restore_triggered' => 'Database restored from backup (:count project(s))',
     'admin.common.audit.restore_failed' => 'Restore failed: :error',
+    'admin.common.audit.project_import_created' => 'Project created from import (:docs document(s), :translations translation(s))',
+    'admin.common.audit.project_import_merged' => 'Project import merged (:docs document(s), :translations translation(s))',
+    'admin.common.audit.project_import_failed' => 'Project import failed: :error',
     'admin.common.audit.cron_secret_regenerated' => 'Cron secret regenerated',
     'admin.common.audit.project_created' => 'Project created',
     'admin.common.audit.project_deleted' => 'Project deleted',
@@ -578,6 +581,18 @@ return [
     'admin.settings.restore.success_msg' => 'Database restored successfully (:count project(s)). A safety copy of the previous database was created.',
     'admin.settings.restore.error_msg' => 'Restore failed: :error',
 
+    'admin.settings.project_transfer.heading' => 'Export & import a project',
+    'admin.settings.project_transfer.help' => 'Transfers only the legal content of a single project (not the whole instance) — handy for moving one project between two instances without touching any others.',
+    'admin.settings.project_transfer.subtitle' => 'Exports only the currently selected project (legal texts, translations, version history) as a standalone file — unlike the backup above, which covers the entire instance.',
+    'admin.settings.project_transfer.export_button' => 'Export this project',
+    'admin.settings.project_transfer.import_warning' => 'Adds one project\'s legal content to this instance. If the domain already exists, only its documents/translations are updated — the existing project\'s company data and settings, and every other project on this instance, stay untouched.',
+    'admin.settings.project_transfer.confirm_checkbox' => 'I understand that the target project\'s legal content (if it already exists) will be updated with the imported content.',
+    'admin.settings.project_transfer.confirm_dialog' => 'Import this project now? Existing translations of the target project (if the domain already exists) will be overwritten for the languages included, other projects on this instance stay untouched.',
+    'admin.settings.project_transfer.submit_button' => 'Import project (merge)',
+    'admin.settings.project_transfer.import_created_msg' => 'New project created from the import (:count document(s)).',
+    'admin.settings.project_transfer.import_merged_msg' => 'Existing project updated (:count document(s) merged).',
+    'admin.settings.project_transfer.import_error_msg' => 'Import failed: :error',
+
     'admin.settings.queue.heading' => 'Webhook queue',
     'admin.settings.queue.help' => 'Publish events are no longer sent directly when saving, but placed in a queue instead. An external cron job must call /api/cron/webhooks regularly (e.g. every 5 minutes) for them to be delivered. Failed deliveries are retried up to 5 times with increasing delays.',
     'admin.settings.queue.run_now_button' => 'Process now',
@@ -652,6 +667,12 @@ return [
     'db.restore.invalid_database' => 'The file could not be opened as a database.',
     'db.restore.copy_failed' => 'The database could not be replaced (filesystem error).',
     'db.restore.migration_failed' => 'The database was replaced, but the follow-up update failed: :error',
+
+    'db.project_export.tmp_failed' => 'Could not create a temporary file.',
+    'db.project_export.project_not_found' => 'Project not found.',
+
+    'db.project_import.expects_single_project' => 'This file contains :count projects — the project import expects a file with exactly one project. Use the full restore instead.',
+    'db.project_import.merge_failed' => 'Merge failed, no changes were applied: :error',
 
     'db.backup.no_database' => 'No database found.',
     'db.backup.dir_creation_failed' => 'Could not create the backup directory.',

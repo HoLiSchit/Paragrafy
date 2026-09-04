@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 // CalVer: JAHR.MONAT.BUILD - BUILD zaehlt Releases innerhalb des Monats hoch (startet bei 1).
 // Siehe CHANGELOG.md fuer die Aenderungen je Version.
-define('PARAGRAFY_VERSION', '2026.9.6');
+define('PARAGRAFY_VERSION', '2026.9.7');
 define('PARAGRAFY_DIR', __DIR__);
 // Where persistent data (DB, config, backups, .env) lives. Defaults to the
 // code directory (bare-metal installs); set PARAGRAFY_DATA_DIR to point this
@@ -1667,6 +1667,13 @@ const BACKUP_UPLOAD_MAX_BYTES = 200 * 1024 * 1024;
  * Restore die aktuelle Datenbank ersetzt. Öffnet dazu eine separate PDO-Instanz, um die
  * Haupt-Connection (get_db()) nicht zu berühren.
  */
+function is_valid_sqlite_signature(string $path): bool {
+    $handle = @fopen($path, 'rb');
+    $header = $handle ? fread($handle, 16) : '';
+    if ($handle) fclose($handle);
+    return $header === "SQLite format 3\000";
+}
+
 function validate_backup_upload(string $tmpPath): array {
     if (!is_uploaded_file($tmpPath) && !is_readable($tmpPath)) {
         return ['success' => false, 'error' => t('db.restore.upload_failed')];
@@ -1674,11 +1681,7 @@ function validate_backup_upload(string $tmpPath): array {
     if (filesize($tmpPath) > BACKUP_UPLOAD_MAX_BYTES) {
         return ['success' => false, 'error' => t('db.restore.file_too_large')];
     }
-
-    $handle = @fopen($tmpPath, 'rb');
-    $header = $handle ? fread($handle, 16) : '';
-    if ($handle) fclose($handle);
-    if ($header !== "SQLite format 3\000") {
+    if (!is_valid_sqlite_signature($tmpPath)) {
         return ['success' => false, 'error' => t('db.restore.not_sqlite')];
     }
 
@@ -1739,6 +1742,290 @@ function restore_database_from_upload(string $tmpPath): array {
         'over_limit' => $overLimit,
         'project_limit' => $projectLimit,
     ];
+}
+
+/**
+ * Exportiert nur die Rechtsinhalte eines einzelnen Projekts (projects-Zeile, doc_types,
+ * documents, translations, translation_versions) als eigenständige SQLite-Datei — im Gegensatz
+ * zu restore_database_from_upload() betrifft ein späterer Import damit gezielt nur dieses eine
+ * Projekt, nicht die ganze Zielinstanz.
+ */
+function export_project_backup(PDO $db, int $projectId): array {
+    $tmpFile = tempnam(sys_get_temp_dir(), 'pgexp_');
+    if ($tmpFile === false) {
+        return ['success' => false, 'error' => t('db.project_export.tmp_failed')];
+    }
+    @unlink($tmpFile);
+
+    try {
+        $stmt = $db->prepare("SELECT * FROM projects WHERE id = ?");
+        $stmt->execute([$projectId]);
+        $projectRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$projectRow) {
+            return ['success' => false, 'error' => t('db.project_export.project_not_found')];
+        }
+
+        $docTypeStmt = $db->prepare("SELECT DISTINCT dt.* FROM doc_types dt JOIN documents d ON d.doc_type_id = dt.id WHERE d.project_id = ?");
+        $docTypeStmt->execute([$projectId]);
+        $docTypeRows = $docTypeStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $docStmt = $db->prepare("SELECT * FROM documents WHERE project_id = ?");
+        $docStmt->execute([$projectId]);
+        $documentRows = $docStmt->fetchAll(PDO::FETCH_ASSOC);
+        $documentIds = array_column($documentRows, 'id');
+
+        $translationRows = [];
+        $versionRows = [];
+        if (!empty($documentIds)) {
+            $inPlaceholders = implode(',', array_fill(0, count($documentIds), '?'));
+            $trStmt = $db->prepare("SELECT * FROM translations WHERE document_id IN ($inPlaceholders)");
+            $trStmt->execute($documentIds);
+            $translationRows = $trStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $vStmt = $db->prepare("SELECT * FROM translation_versions WHERE document_id IN ($inPlaceholders)");
+            $vStmt->execute($documentIds);
+            $versionRows = $vStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // Ab hier eine komplett unabhängige Connection auf die neue, leere Export-Datei —
+        // bewusst KEIN ATTACH DATABASE auf DB_FILE, das kollidiert mit der bereits offenen
+        // Haupt-Connection ($db) und führt zu "database is locked".
+        $exportPdo = new PDO('sqlite:' . $tmpFile);
+        $exportPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $exportPdo->exec("
+            CREATE TABLE projects (
+                id INTEGER PRIMARY KEY, domain TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
+                primary_lang TEXT DEFAULT 'de', active_languages TEXT DEFAULT 'de,en',
+                brand_color TEXT DEFAULT '#F0A63C', logo_url TEXT DEFAULT '',
+                deepl_api_key TEXT DEFAULT '', webhook_url TEXT DEFAULT '', webhook_secret TEXT DEFAULT '',
+                audit_interval_months INTEGER DEFAULT 12, smtp_host TEXT DEFAULT '', smtp_port INTEGER DEFAULT 587,
+                smtp_user TEXT DEFAULT '', smtp_pass TEXT DEFAULT '', smtp_secure TEXT DEFAULT 'tls',
+                smtp_from TEXT DEFAULT '', audit_email_recipient TEXT DEFAULT '',
+                cookie_banner_enabled INTEGER DEFAULT 0, cookie_banner_text TEXT DEFAULT '',
+                consent_logging_enabled INTEGER DEFAULT 0, consent_log_retention_days INTEGER DEFAULT 1095,
+                ai_provider TEXT DEFAULT '', ai_api_key TEXT DEFAULT '',
+                company_name TEXT DEFAULT '', address TEXT DEFAULT '', email TEXT DEFAULT '',
+                phone TEXT DEFAULT '', representative TEXT DEFAULT '', register_info TEXT DEFAULT '',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE doc_types (
+                id INTEGER PRIMARY KEY, slug TEXT UNIQUE NOT NULL, title TEXT NOT NULL,
+                description TEXT DEFAULT '', is_required INTEGER DEFAULT 1
+            );
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, doc_type_id INTEGER NOT NULL
+            );
+            CREATE TABLE translations (
+                id INTEGER PRIMARY KEY, document_id INTEGER NOT NULL, lang TEXT NOT NULL,
+                title TEXT NOT NULL, slug TEXT NOT NULL, content TEXT NOT NULL,
+                previous_content TEXT DEFAULT '', status TEXT DEFAULT 'draft', change_note TEXT DEFAULT '',
+                source_hash TEXT DEFAULT '', scheduled_at DATETIME DEFAULT NULL, scheduled_title TEXT DEFAULT '',
+                scheduled_slug TEXT DEFAULT '', scheduled_content TEXT DEFAULT '', scheduled_note TEXT DEFAULT '',
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE translation_versions (
+                id INTEGER PRIMARY KEY, document_id INTEGER NOT NULL, lang TEXT NOT NULL,
+                title TEXT NOT NULL, slug TEXT NOT NULL, content TEXT NOT NULL,
+                change_note TEXT DEFAULT '', status TEXT DEFAULT 'published', user_name TEXT DEFAULT 'Admin',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE paragrafy_export_meta (key TEXT PRIMARY KEY, value TEXT);
+        ");
+
+        $insertRow = function (PDO $pdo, string $table, array $row) {
+            $cols = array_keys($row);
+            $placeholders = implode(',', array_fill(0, count($cols), '?'));
+            $pdo->prepare("INSERT INTO $table (" . implode(',', $cols) . ") VALUES ($placeholders)")->execute(array_values($row));
+        };
+
+        $insertRow($exportPdo, 'projects', $projectRow);
+        foreach ($docTypeRows as $row) $insertRow($exportPdo, 'doc_types', $row);
+        foreach ($documentRows as $row) $insertRow($exportPdo, 'documents', $row);
+        foreach ($translationRows as $row) $insertRow($exportPdo, 'translations', $row);
+        foreach ($versionRows as $row) $insertRow($exportPdo, 'translation_versions', $row);
+
+        $meta = [
+            'export_type' => 'project',
+            'source_project_id' => (string)$projectId,
+            'exported_at' => date('c'),
+            'paragrafy_version' => PARAGRAFY_VERSION,
+        ];
+        foreach ($meta as $k => $v) {
+            $insertRow($exportPdo, 'paragrafy_export_meta', ['key' => $k, 'value' => $v]);
+        }
+        $exportPdo = null;
+
+        $domainSlug = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($projectRow['domain'])), '-');
+        $filename = 'paragrafy_project_' . $domainSlug . '_' . date('Y-m-d_His') . '.sqlite';
+
+        return ['success' => true, 'path' => $tmpFile, 'filename' => $filename];
+    } catch (Throwable $e) {
+        @unlink($tmpFile);
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+/**
+ * Prüft eine hochgeladene Datei für den Projekt-Import: valides SQLite-Format, vorhandene
+ * Kerntabellen, und GENAU EIN Projekt darin (mehr wäre ein Voll-Instanz-Export und gehört zu
+ * restore_database_from_upload(), nicht hierher).
+ */
+function validate_project_upload(string $tmpPath): array {
+    if (!is_uploaded_file($tmpPath) && !is_readable($tmpPath)) {
+        return ['success' => false, 'error' => t('db.restore.upload_failed')];
+    }
+    if (filesize($tmpPath) > BACKUP_UPLOAD_MAX_BYTES) {
+        return ['success' => false, 'error' => t('db.restore.file_too_large')];
+    }
+    if (!is_valid_sqlite_signature($tmpPath)) {
+        return ['success' => false, 'error' => t('db.restore.not_sqlite')];
+    }
+
+    try {
+        $testPdo = new PDO('sqlite:' . $tmpPath);
+        $testPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $tables = $testPdo->query("SELECT name FROM sqlite_master WHERE type='table'")->fetchAll(PDO::FETCH_COLUMN);
+        $required = ['projects', 'doc_types', 'documents', 'translations'];
+        $missing = array_diff($required, $tables);
+        if (!empty($missing)) {
+            return ['success' => false, 'error' => t('db.restore.missing_tables', ['tables' => implode(', ', $missing)])];
+        }
+        $projectCount = (int)$testPdo->query("SELECT COUNT(*) FROM projects")->fetchColumn();
+        if ($projectCount !== 1) {
+            return ['success' => false, 'error' => t('db.project_import.expects_single_project', ['count' => $projectCount])];
+        }
+        $testPdo = null;
+        return ['success' => true];
+    } catch (Throwable $e) {
+        return ['success' => false, 'error' => t('db.restore.invalid_database')];
+    }
+}
+
+/**
+ * Führt ein hochgeladenes Projekt-Export in die aktuelle Instanz zusammen (Merge), ohne andere
+ * dort vorhandene Projekte anzutasten. Existiert die Domain des importierten Projekts bereits,
+ * werden nur dessen Dokumente/Übersetzungen aktualisiert (Firmendaten/Settings des bestehenden
+ * Zielprojekts bleiben unverändert); sonst wird ein neues Projekt angelegt. doc_types werden per
+ * slug gegen bestehende Einträge abgeglichen (instanzweit geteilt, keine Duplikate).
+ */
+function import_project_backup(PDO $db, string $tmpPath): array {
+    $validation = validate_project_upload($tmpPath);
+    if (!$validation['success']) {
+        return $validation;
+    }
+
+    run_scheduled_backup();
+
+    // Unabhängige Read-Only-Connection auf die hochgeladene Datei — bewusst KEIN
+    // ATTACH DATABASE auf $db, das kollidiert mit dessen bereits offener Connection.
+    $importPdo = new PDO('sqlite:' . $tmpPath);
+    $importPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    try {
+        $db->beginTransaction();
+
+        $importProject = $importPdo->query("SELECT * FROM projects LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+
+        $stmtFind = $db->prepare("SELECT id FROM projects WHERE domain = ?");
+        $stmtFind->execute([$importProject['domain']]);
+        $existingId = $stmtFind->fetchColumn();
+
+        $wasNew = false;
+        if ($existingId) {
+            $targetProjectId = (int)$existingId;
+        } else {
+            $wasNew = true;
+            $cols = array_values(array_filter(array_keys($importProject), fn($c) => $c !== 'id'));
+            $values = array_map(fn($c) => $importProject[$c], $cols);
+            $placeholders = implode(',', array_fill(0, count($cols), '?'));
+            $db->prepare("INSERT INTO projects (" . implode(',', $cols) . ") VALUES ($placeholders)")->execute($values);
+            $targetProjectId = (int)$db->lastInsertId();
+        }
+
+        $docTypeIdMap = [];
+        $importDocTypes = $importPdo->query("SELECT * FROM doc_types")->fetchAll(PDO::FETCH_ASSOC);
+        $findDocType = $db->prepare("SELECT id FROM doc_types WHERE slug = ?");
+        $insertDocType = $db->prepare("INSERT INTO doc_types (slug, title, description, is_required) VALUES (?, ?, ?, ?)");
+        foreach ($importDocTypes as $dt) {
+            $findDocType->execute([$dt['slug']]);
+            $existingDtId = $findDocType->fetchColumn();
+            if ($existingDtId) {
+                $docTypeIdMap[$dt['id']] = (int)$existingDtId;
+            } else {
+                $insertDocType->execute([$dt['slug'], $dt['title'], $dt['description'], $dt['is_required']]);
+                $docTypeIdMap[$dt['id']] = (int)$db->lastInsertId();
+            }
+        }
+
+        $documentIdMap = [];
+        $importDocuments = $importPdo->query("SELECT * FROM documents")->fetchAll(PDO::FETCH_ASSOC);
+        $findDoc = $db->prepare("SELECT id FROM documents WHERE project_id = ? AND doc_type_id = ?");
+        $insertDoc = $db->prepare("INSERT INTO documents (project_id, doc_type_id) VALUES (?, ?)");
+        foreach ($importDocuments as $doc) {
+            $mappedDocTypeId = $docTypeIdMap[$doc['doc_type_id']] ?? null;
+            if ($mappedDocTypeId === null) continue;
+            $findDoc->execute([$targetProjectId, $mappedDocTypeId]);
+            $existingDocId = $findDoc->fetchColumn();
+            if ($existingDocId) {
+                $documentIdMap[$doc['id']] = (int)$existingDocId;
+            } else {
+                $insertDoc->execute([$targetProjectId, $mappedDocTypeId]);
+                $documentIdMap[$doc['id']] = (int)$db->lastInsertId();
+            }
+        }
+
+        $importTranslations = $importPdo->query("SELECT * FROM translations")->fetchAll(PDO::FETCH_ASSOC);
+        $upsertTranslation = $db->prepare("
+            INSERT INTO translations (document_id, lang, title, slug, content, previous_content, status, change_note, source_hash, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(document_id, lang) DO UPDATE SET
+                title=excluded.title, slug=excluded.slug, content=excluded.content,
+                previous_content=excluded.previous_content, status=excluded.status,
+                change_note=excluded.change_note, source_hash=excluded.source_hash,
+                updated_at=excluded.updated_at
+        ");
+        $translationsMerged = 0;
+        foreach ($importTranslations as $tr) {
+            $mappedDocId = $documentIdMap[$tr['document_id']] ?? null;
+            if ($mappedDocId === null) continue;
+            $upsertTranslation->execute([
+                $mappedDocId, $tr['lang'], $tr['title'], $tr['slug'], $tr['content'],
+                $tr['previous_content'], $tr['status'], $tr['change_note'], $tr['source_hash'],
+            ]);
+            $translationsMerged++;
+        }
+
+        $importVersions = $importPdo->query("SELECT * FROM translation_versions")->fetchAll(PDO::FETCH_ASSOC);
+        $insertVersion = $db->prepare("
+            INSERT INTO translation_versions (document_id, lang, title, slug, content, change_note, status, user_name, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        foreach ($importVersions as $v) {
+            $mappedDocId = $documentIdMap[$v['document_id']] ?? null;
+            if ($mappedDocId === null) continue;
+            $insertVersion->execute([
+                $mappedDocId, $v['lang'], $v['title'], $v['slug'], $v['content'],
+                $v['change_note'], $v['status'], $v['user_name'], $v['created_at'],
+            ]);
+        }
+
+        $db->commit();
+        $importPdo = null;
+        @unlink($tmpPath);
+
+        return [
+            'success' => true,
+            'target_project_id' => $targetProjectId,
+            'was_new_project' => $wasNew,
+            'documents_merged' => count($documentIdMap),
+            'translations_merged' => $translationsMerged,
+        ];
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        return ['success' => false, 'error' => t('db.project_import.merge_failed', ['error' => $e->getMessage()])];
+    }
 }
 
 /**

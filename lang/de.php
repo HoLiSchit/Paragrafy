@@ -360,6 +360,9 @@ return [
     'admin.common.audit.backup_failed' => 'Backup fehlgeschlagen: :error',
     'admin.common.audit.restore_triggered' => 'Datenbank aus Backup wiederhergestellt (:count Projekt(e))',
     'admin.common.audit.restore_failed' => 'Wiederherstellung fehlgeschlagen: :error',
+    'admin.common.audit.project_import_created' => 'Projekt aus Import neu angelegt (:docs Dokument(e), :translations Übersetzung(en))',
+    'admin.common.audit.project_import_merged' => 'Projekt-Import zusammengeführt (:docs Dokument(e), :translations Übersetzung(en))',
+    'admin.common.audit.project_import_failed' => 'Projekt-Import fehlgeschlagen: :error',
     'admin.common.audit.cron_secret_regenerated' => 'Cron-Secret neu generiert',
     'admin.common.audit.project_created' => 'Projekt erstellt',
     'admin.common.audit.project_deleted' => 'Projekt gelöscht',
@@ -603,6 +606,18 @@ return [
     'admin.settings.restore.success_msg' => 'Datenbank erfolgreich wiederhergestellt (:count Projekt(e)). Eine Sicherungskopie der vorherigen Datenbank wurde angelegt.',
     'admin.settings.restore.error_msg' => 'Wiederherstellung fehlgeschlagen: :error',
 
+    'admin.settings.project_transfer.heading' => 'Projekt exportieren & importieren',
+    'admin.settings.project_transfer.help' => 'Überträgt nur die Rechtsinhalte eines einzelnen Projekts (nicht die ganze Instanz) — praktisch, um gezielt ein Projekt zwischen zwei Instanzen zu verschieben, ohne andere Projekte anzutasten.',
+    'admin.settings.project_transfer.subtitle' => 'Exportiert nur das aktuell ausgewählte Projekt (Rechtstexte, Übersetzungen, Versionshistorie) als eigenständige Datei — im Gegensatz zum Backup oben, das die komplette Instanz sichert.',
+    'admin.settings.project_transfer.export_button' => 'Dieses Projekt exportieren',
+    'admin.settings.project_transfer.import_warning' => 'Fügt die Rechtsinhalte eines einzelnen Projekts zu dieser Instanz hinzu. Existiert die Domain bereits, werden nur dessen Dokumente/Übersetzungen aktualisiert — Firmendaten und Einstellungen des bestehenden Projekts sowie alle anderen Projekte dieser Instanz bleiben unberührt.',
+    'admin.settings.project_transfer.confirm_checkbox' => 'Ich verstehe, dass die Rechtsinhalte des Zielprojekts (falls vorhanden) durch die importierten Inhalte aktualisiert werden.',
+    'admin.settings.project_transfer.confirm_dialog' => 'Projekt jetzt importieren? Bestehende Übersetzungen des Zielprojekts (falls die Domain schon existiert) werden für die enthaltenen Sprachen überschrieben, andere Projekte dieser Instanz bleiben unberührt.',
+    'admin.settings.project_transfer.submit_button' => 'Projekt importieren (Merge)',
+    'admin.settings.project_transfer.import_created_msg' => 'Neues Projekt aus dem Import angelegt (:count Dokument(e)).',
+    'admin.settings.project_transfer.import_merged_msg' => 'Bestehendes Projekt aktualisiert (:count Dokument(e) zusammengeführt).',
+    'admin.settings.project_transfer.import_error_msg' => 'Import fehlgeschlagen: :error',
+
     'admin.settings.queue.heading' => 'Webhook-Warteschlange',
     'admin.settings.queue.help' => 'Veröffentlichungen werden nicht mehr direkt beim Speichern verschickt, sondern in einer Warteschlange abgelegt. Ein externer Cron-Job muss regelmäßig (z. B. alle 5 Minuten) /api/cron/webhooks aufrufen, damit sie zugestellt werden. Fehlgeschlagene Zustellungen werden bis zu 5-mal mit steigendem Abstand wiederholt.',
     'admin.settings.queue.run_now_button' => 'Jetzt abarbeiten',
@@ -677,6 +692,12 @@ return [
     'db.restore.invalid_database' => 'Die Datei konnte nicht als Datenbank geöffnet werden.',
     'db.restore.copy_failed' => 'Die Datenbank konnte nicht ersetzt werden (Dateisystem-Fehler).',
     'db.restore.migration_failed' => 'Die Datenbank wurde ersetzt, die anschließende Aktualisierung ist aber fehlgeschlagen: :error',
+
+    'db.project_export.tmp_failed' => 'Temporäre Datei konnte nicht angelegt werden.',
+    'db.project_export.project_not_found' => 'Projekt wurde nicht gefunden.',
+
+    'db.project_import.expects_single_project' => 'Diese Datei enthält :count Projekte — für den Projekt-Import wird eine Datei mit genau einem Projekt erwartet. Nutze stattdessen den vollständigen Restore.',
+    'db.project_import.merge_failed' => 'Zusammenführen fehlgeschlagen, keine Änderungen wurden übernommen: :error',
 
     'db.backup.no_database' => 'Keine Datenbank gefunden.',
     'db.backup.dir_creation_failed' => 'Backup-Ordner konnte nicht angelegt werden.',
