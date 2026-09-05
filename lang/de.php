@@ -327,14 +327,17 @@ return [
     'admin.users.msg.email_exists' => 'Für diese E-Mail-Adresse existiert bereits ein Zugang.',
     'admin.users.msg.invalid' => 'Bitte Name und eine gültige E-Mail-Adresse angeben.',
     'admin.users.msg.user_deleted' => 'Zugang entfernt.',
+    'admin.users.msg.managed_cloud_blocked' => 'Personen bitte über dein Kundenportal einladen.',
+    'admin.users.msg.access_updated' => 'Projekt-Zugriff aktualisiert.',
 
     'admin.users.page_title' => 'Benutzer - :project',
     'admin.users.crumb' => 'Benutzer',
     'admin.users.heading' => 'Benutzerverwaltung',
     'admin.users.invite_button' => '+ Person einladen',
-    'admin.users.subtitle' => 'Jede eingeladene Person hat vollen Zugriff auf das gesamte Admin-Panel (alle Projekte) — es gibt keine Rollen oder Rechte einzustellen.',
+    'admin.users.subtitle' => 'Über die Checkboxen legst du fest, auf welche Projekte eine Person Zugriff hat. Ohne Häkchen hat eine Person Zugriff auf alle Projekte.',
     'admin.users.col_name' => 'Name',
     'admin.users.col_email' => 'E-Mail',
+    'admin.users.col_notes' => 'Notiz',
     'admin.users.col_status' => 'Status',
     'admin.users.empty' => 'Noch keine Personen eingeladen.',
     'admin.users.you_suffix' => '(Du)',
@@ -352,6 +355,16 @@ return [
     'admin.users.modal.email_placeholder' => 'z. B. lena@firma.de',
     'admin.users.modal.cancel_button' => 'Abbrechen',
     'admin.users.modal.submit_button' => 'Einladung senden &rarr;',
+
+    'admin.users.access.hint' => 'Kein Häkchen bei einer Person = Zugriff auf alle Projekte (auch neu angelegte). Ein Häkchen = Zugriff nur auf die ausgewählten Projekte.',
+    'admin.users.access.save_title' => 'Projekt-Zugriff speichern',
+    'admin.users.access.confirm_unrestricted' => 'Ohne ausgewähltes Projekt erhält diese Person Zugriff auf ALLE Projekte. Fortfahren?',
+
+    'admin.no_access.page_title' => 'Kein Zugriff',
+    'admin.no_access.heading' => 'Kein Projekt zugewiesen',
+    'admin.no_access.body' => 'Für deinen Zugang ist aktuell kein Projekt freigeschaltet. Bitte wende dich an deinen Administrator.',
+
+    'admin.common.access_denied' => 'Kein Zugriff.',
 
     'admin.audit.col_project' => 'Projekt',
     'admin.common.backup_not_found' => 'Backup nicht gefunden.',
@@ -375,6 +388,8 @@ return [
 
     'admin.users.audit.invited' => 'Person eingeladen: :name (:email)',
     'admin.users.audit.deleted' => 'Zugang entfernt: :name',
+    'admin.users.audit.access_restricted' => 'Projekt-Zugriff für :name auf :count Projekt(e) beschränkt',
+    'admin.users.audit.access_unrestricted' => 'Projekt-Zugriff für :name auf alle Projekte gesetzt',
 
     'admin.settings.webhook_test_message' => 'Paragrafy Webhook Test erfolgreich ausgelöst',
     'admin.settings.smtp_test_missing_recipient' => 'Bitte zuerst eine Empfänger-E-Mail angeben.',

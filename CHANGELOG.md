@@ -8,6 +8,24 @@ Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`) statt SemVer:
 jeden Monat wieder bei `1`. Änderungen vor `2026.9.1` sind nicht rückwirkend
 erfasst — siehe dafür die Git-Historie.
 
+## [2026.9.10] - 2026-09-05
+
+### Added
+- **Projekt-Berechtigungsmatrix für Benutzer**: Bisher hatte jede über „Person einladen"
+  angelegte Person automatisch vollen Zugriff auf alle Projekte der Instanz. Da die
+  SaaS-Plattform (Paragrafy-cloud) ab sofort Benutzer für ihre Kunden direkt anlegt, können
+  Admins jetzt in der Benutzerverwaltung per Checkbox-Matrix festlegen, auf welche Projekte
+  eine Person Zugriff hat — ein direkter Aufruf einer fremden `project_id` (über die URL,
+  Sidebar-Auswahl oder den Editor) wird mit Zugriff verweigert abgelehnt. Ohne gesetztes
+  Häkchen bleibt eine Person weiterhin uneingeschränkt (Abwärtskompatibilität für alle vor
+  diesem Update angelegten Zugänge, kein Zugang wird beim Update ausgesperrt). Neu ist zudem
+  ein informatives Notiz-Feld pro Person, das von der Plattform befüllt werden kann.
+- **Nutzerverwaltung exklusiv für den primären Admin-Login**: Ein über die Benutzertabelle
+  eingeloggter (sekundärer) Nutzer kann jetzt grundsätzlich nie mehr selbst weitere Personen
+  einladen, deren Zugriff ändern oder entfernen — dazu ist ausschließlich der primäre
+  Admin-Login berechtigt. Auf Managed-Cloud-Instanzen ist zusätzlich das lokale „Person
+  einladen" komplett gesperrt, da neue Zugänge dort über das Kundenportal angelegt werden.
+
 ## [2026.9.9] - 2026-09-04
 
 ### Changed

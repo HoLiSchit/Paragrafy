@@ -28,6 +28,12 @@ if (!$doc) {
     exit;
 }
 
+if (!user_can_access_project($db, (int)$doc['project_id'])) {
+    http_response_code(403);
+    echo htmlspecialchars(t('admin.common.access_denied'));
+    exit;
+}
+
 $stmtAll = $db->prepare("SELECT lang, title, content, updated_at, scheduled_at FROM translations WHERE document_id = ?");
 $stmtAll->execute([$docId]);
 $allTranslations = [];

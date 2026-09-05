@@ -90,13 +90,31 @@ if (empty($_SESSION['paragrafy_admin'])) {
     exit;
 }
 
-$projects = $db->query("SELECT * FROM projects ORDER BY name ASC")->fetchAll();
-$projectId = (int)($_GET['project_id'] ?? $_SESSION['admin_project_id'] ?? ($projects[0]['id'] ?? 0));
+$allProjects = $db->query("SELECT * FROM projects ORDER BY name ASC")->fetchAll();
+$accessibleProjectIds = current_user_accessible_project_ids($db);
+$projects = array_values(array_filter($allProjects, fn($p) => in_array((int)$p['id'], $accessibleProjectIds, true)));
+
+$requestedProjectId = isset($_GET['project_id']) ? (int)$_GET['project_id'] : null;
+$projectId = (int)($requestedProjectId ?? $_SESSION['admin_project_id'] ?? ($projects[0]['id'] ?? 0));
+
+if ($projectId > 0 && !in_array($projectId, $accessibleProjectIds, true)) {
+    if ($requestedProjectId !== null) {
+        http_response_code(403);
+        echo htmlspecialchars(t('admin.common.access_denied'));
+        exit;
+    }
+    $projectId = (int)($projects[0]['id'] ?? 0);
+}
 $_SESSION['admin_project_id'] = $projectId;
 
 $stmt = $db->prepare("SELECT * FROM projects WHERE id = ?");
 $stmt->execute([$projectId]);
 $project = $stmt->fetch();
+
+if (!$project) {
+    render_no_access_view();
+    exit;
+}
 
 // 1. SQLite Datenbank-Backup herunterladen
 if (isset($_GET['action']) && $_GET['action'] === 'download_backup') {
@@ -174,7 +192,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'restore_backup_upload') {
 // andere Projekte dieser Instanz bleiben unberührt)
 if (isset($_POST['action']) && $_POST['action'] === 'import_project_upload') {
     $targetProjectId = (int)($_POST['target_project_id'] ?? 0);
-    if (empty($_FILES['project_file']['tmp_name']) || $targetProjectId <= 0) {
+    if (empty($_FILES['project_file']['tmp_name']) || $targetProjectId <= 0 || !in_array($targetProjectId, $accessibleProjectIds, true)) {
         header("Location: /admin/settings?project_id=$projectId&msg=project_import_failed&import_error=" . urlencode(t('db.restore.upload_failed')));
         exit;
     }
@@ -375,7 +393,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Projekt löschen
     if ($action === 'delete_project') {
         $delId = (int)$_POST['delete_project_id'];
-        if (count($projects) > 1) {
+        if (count($projects) > 1 && in_array($delId, $accessibleProjectIds, true)) {
             $delName = '';
             foreach ($projects as $p) { if ((int)$p['id'] === $delId) { $delName = $p['name']; break; } }
             $stmt = $db->prepare("DELETE FROM projects WHERE id = ?");
@@ -490,8 +508,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // Nutzerverwaltung ist ausschliesslich dem primaeren Admin-Login vorbehalten -- ein
+    // ueber die users-Tabelle eingeloggter Benutzer darf nie selbst Benutzer verwalten.
+    if (in_array($action, ['invite_user', 'resend_invite', 'delete_user', 'update_user_projects'], true) && !current_user_is_primary_admin()) {
+        http_response_code(403);
+        echo htmlspecialchars(t('admin.common.access_denied'));
+        exit;
+    }
+
     // Benutzer einladen
     if ($action === 'invite_user') {
+        if (!empty(get_config()['managed_cloud'])) {
+            header('Location: /admin/users?msg=managed_cloud_blocked');
+            exit;
+        }
         $name = trim($_POST['invite_name'] ?? '');
         $email = trim(strtolower($_POST['invite_email'] ?? ''));
 
@@ -546,6 +576,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             log_audit(null, '', t('admin.users.audit.deleted', ['name' => $delUserName]));
         }
         header("Location: /admin/users?msg=user_deleted");
+        exit;
+    }
+
+    // Projekt-Zuordnung eines Benutzers speichern (Berechtigungsmatrix)
+    if ($action === 'update_user_projects') {
+        $uid = (int)($_POST['user_id'] ?? 0);
+        $projectIds = array_map('intval', $_POST['project_ids'] ?? []);
+        $userRow = $db->prepare("SELECT name FROM users WHERE id = ?");
+        $userRow->execute([$uid]);
+        $uName = (string)($userRow->fetchColumn() ?: '');
+
+        if ($uid > 0 && $uName !== '') {
+            $db->prepare("DELETE FROM user_projects WHERE user_id = ?")->execute([$uid]);
+            if (!empty($projectIds)) {
+                $insUp = $db->prepare("INSERT INTO user_projects (user_id, project_id) VALUES (?, ?)");
+                foreach (array_unique($projectIds) as $pid) {
+                    $insUp->execute([$uid, $pid]);
+                }
+                log_audit(null, '', t('admin.users.audit.access_restricted', ['name' => $uName, 'count' => count(array_unique($projectIds))]));
+            } else {
+                log_audit(null, '', t('admin.users.audit.access_unrestricted', ['name' => $uName]));
+            }
+        }
+        header("Location: /admin/users?msg=access_updated");
         exit;
     }
 }
@@ -858,6 +912,11 @@ if (str_starts_with($subRoute, '/admin/settings')) {
 }
 
 if (str_starts_with($subRoute, '/admin/users')) {
+    if (!current_user_is_primary_admin()) {
+        http_response_code(403);
+        echo htmlspecialchars(t('admin.common.access_denied'));
+        exit;
+    }
     render_users_view($db, $project, $projects);
     exit;
 }
@@ -914,6 +973,32 @@ function render_login_view(?string $error): void {
             </div>
         </div>
         <div class="login-disclaimer"><?= htmlspecialchars(t('admin.common.footer_disclaimer')) ?></div>
+    </body>
+    </html>
+    <?php
+}
+
+function render_no_access_view(): void {
+    ?>
+    <!DOCTYPE html>
+    <html lang="<?= htmlspecialchars(current_locale()) ?>">
+    <head>
+        <meta charset="utf-8"><title><?= htmlspecialchars(t('admin.no_access.page_title')) ?></title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" type="image/svg+xml" href="/paragrafy.svg">
+        <?= theme_head_tags_admin() ?>
+        <?= theme_base_css_admin() ?>
+        <style>
+            body { display: flex; flex-direction: column; min-height: 100vh; align-items: center; justify-content: center; gap: 20px; }
+            .no-access-card { background: var(--card); padding: 2.25rem; border-radius: var(--radius); width: 360px; text-align: center; border: 1px solid var(--border); }
+        </style>
+    </head>
+    <body>
+        <div class="no-access-card">
+            <h2 style="margin:0 0 10px"><?= htmlspecialchars(t('admin.no_access.heading')) ?></h2>
+            <p style="font-size:13px;color:var(--text-muted);margin:0 0 18px"><?= htmlspecialchars(t('admin.no_access.body')) ?></p>
+            <a href="/admin?logout=1" class="pg-btn-secondary" style="display:inline-block"><?= htmlspecialchars(t('admin.common.sidebar.logout_title')) ?></a>
+        </div>
     </body>
     </html>
     <?php
@@ -2185,6 +2270,10 @@ function render_settings_view(PDO $db, array $project, array $projects): void {
 
 function render_users_view(PDO $db, array $project, array $projects): void {
     $users = $db->query("SELECT * FROM users ORDER BY (status = 'active') DESC, name ASC")->fetchAll();
+    $accessMap = [];
+    foreach ($db->query("SELECT user_id, project_id FROM user_projects") as $row) {
+        $accessMap[(int)$row['user_id']][] = (int)$row['project_id'];
+    }
     $msg = $_GET['msg'] ?? '';
     $msgMap = [
         'invited' => ['ok', t('admin.users.msg.invited')],
@@ -2192,6 +2281,8 @@ function render_users_view(PDO $db, array $project, array $projects): void {
         'email_exists' => ['err', t('admin.users.msg.email_exists')],
         'invalid' => ['err', t('admin.users.msg.invalid')],
         'user_deleted' => ['ok', t('admin.users.msg.user_deleted')],
+        'managed_cloud_blocked' => ['err', t('admin.users.msg.managed_cloud_blocked')],
+        'access_updated' => ['ok', t('admin.users.msg.access_updated')],
     ];
     ?>
     <!DOCTYPE html>
@@ -2229,24 +2320,36 @@ function render_users_view(PDO $db, array $project, array $projects): void {
                         </div>
                         <p class="pg-card-sub" style="margin-bottom:16px"><?= htmlspecialchars(t('admin.users.subtitle')) ?></p>
 
+                        <p class="pg-card-sub" style="margin:-4px 0 14px;font-size:12px"><?= htmlspecialchars(t('admin.users.access.hint')) ?></p>
+
+                        <div style="overflow-x:auto">
                         <table class="pg-table users-table" style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
                             <thead>
                                 <tr>
                                     <th><?= htmlspecialchars(t('admin.users.col_name')) ?></th>
                                     <th><?= htmlspecialchars(t('admin.users.col_email')) ?></th>
+                                    <th><?= htmlspecialchars(t('admin.users.col_notes')) ?></th>
                                     <th><?= htmlspecialchars(t('admin.users.col_status')) ?></th>
-                                    <th style="width:90px"></th>
+                                    <?php foreach ($projects as $p): ?>
+                                        <th style="text-align:center;white-space:nowrap"><?= htmlspecialchars($p['name']) ?></th>
+                                    <?php endforeach; ?>
+                                    <th style="width:120px"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($users)): ?>
-                                    <tr><td colspan="4" style="color:var(--text-faint);font-style:italic"><?= htmlspecialchars(t('admin.users.empty')) ?></td></tr>
+                                    <tr><td colspan="<?= 5 + count($projects) ?>" style="color:var(--text-faint);font-style:italic"><?= htmlspecialchars(t('admin.users.empty')) ?></td></tr>
                                 <?php endif; ?>
                                 <?php foreach ($users as $u): ?>
-                                    <?php $isSelf = (int)$u['id'] === (int)($_SESSION['paragrafy_user_id'] ?? 0); ?>
+                                    <?php
+                                        $isSelf = (int)$u['id'] === (int)($_SESSION['paragrafy_user_id'] ?? 0);
+                                        $userProjectIds = $accessMap[(int)$u['id']] ?? [];
+                                        $formId = 'uf-' . (int)$u['id'];
+                                    ?>
                                     <tr>
                                         <td style="font-weight:600"><?= htmlspecialchars($u['name']) ?><?= $isSelf ? ' <span style="color:var(--text-faint);font-weight:500">' . htmlspecialchars(t('admin.users.you_suffix')) . '</span>' : '' ?></td>
                                         <td style="color:var(--text-muted)"><?= htmlspecialchars($u['email']) ?></td>
+                                        <td style="color:var(--text-muted)"><?= htmlspecialchars($u['notes'] ?? '') ?></td>
                                         <td>
                                             <?php if ($u['status'] === 'active'): ?>
                                                 <span class="pg-pill pg-pill-green"><span class="pg-pill-dot"></span><?= htmlspecialchars(t('admin.users.status_active')) ?></span>
@@ -2254,8 +2357,18 @@ function render_users_view(PDO $db, array $project, array $projects): void {
                                                 <span class="pg-pill pg-pill-muted"><?= htmlspecialchars(t('admin.users.status_invited')) ?></span>
                                             <?php endif; ?>
                                         </td>
+                                        <?php foreach ($projects as $p): ?>
+                                            <td style="text-align:center">
+                                                <input type="checkbox" form="<?= $formId ?>" name="project_ids[]" value="<?= (int)$p['id'] ?>" <?= in_array((int)$p['id'], $userProjectIds, true) ? 'checked' : '' ?>>
+                                            </td>
+                                        <?php endforeach; ?>
                                         <td>
                                             <div style="display:flex;justify-content:flex-end;gap:4px">
+                                                <?php if (!empty($projects)): ?>
+                                                    <button type="submit" form="<?= $formId ?>" class="pg-icon-btn" title="<?= htmlspecialchars(t('admin.users.access.save_title')) ?>" onclick="return confirmAccessSave('<?= $formId ?>')">
+                                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8l2 2v8H3z"/><path d="M5 3v4h6V3"/><path d="M5 13v-4h6v4"/></svg>
+                                                    </button>
+                                                <?php endif; ?>
                                                 <?php if ($u['status'] === 'invited'): ?>
                                                     <form method="post" style="margin:0">
                                                         <input type="hidden" name="action" value="resend_invite">
@@ -2282,6 +2395,14 @@ function render_users_view(PDO $db, array $project, array $projects): void {
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
+                        </div>
+
+                        <?php foreach ($users as $u): ?>
+                            <form id="uf-<?= (int)$u['id'] ?>" method="post" hidden>
+                                <input type="hidden" name="action" value="update_user_projects">
+                                <input type="hidden" name="user_id" value="<?= (int)$u['id'] ?>">
+                            </form>
+                        <?php endforeach; ?>
                     </div>
                 </div>
 
@@ -2318,6 +2439,13 @@ function render_users_view(PDO $db, array $project, array $projects): void {
             }
             function closeInviteModal() {
                 document.getElementById('inviteModal').style.display = 'none';
+            }
+            function confirmAccessSave(formId) {
+                var checked = document.querySelectorAll('input[type=checkbox][form="' + formId + '"]:checked');
+                if (checked.length === 0) {
+                    return confirm(<?= json_encode(t('admin.users.access.confirm_unrestricted')) ?>);
+                }
+                return true;
             }
         </script>
     </body>

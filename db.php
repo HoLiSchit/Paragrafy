@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 // CalVer: JAHR.MONAT.BUILD - BUILD zaehlt Releases innerhalb des Monats hoch (startet bei 1).
 // Siehe CHANGELOG.md fuer die Aenderungen je Version.
-define('PARAGRAFY_VERSION', '2026.9.9');
+define('PARAGRAFY_VERSION', '2026.9.10');
 define('PARAGRAFY_DIR', __DIR__);
 // Where persistent data (DB, config, backups, .env) lives. Defaults to the
 // code directory (bare-metal installs); set PARAGRAFY_DATA_DIR to point this
@@ -175,6 +175,9 @@ function ensure_schema_migrations(PDO $pdo): void {
             if (!in_array('locale', $userColNames)) {
                 $pdo->exec("ALTER TABLE users ADD COLUMN locale TEXT DEFAULT 'de'");
             }
+            if (!in_array('notes', $userColNames)) {
+                $pdo->exec("ALTER TABLE users ADD COLUMN notes TEXT DEFAULT ''");
+            }
         }
 
         $stmtTrans = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='translations'");
@@ -292,6 +295,16 @@ function ensure_schema_migrations(PDO $pdo): void {
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             );
         ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS user_projects (
+                user_id INTEGER NOT NULL,
+                project_id INTEGER NOT NULL,
+                PRIMARY KEY (user_id, project_id),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+        ");
     } catch (Throwable $e) {
     }
 }
@@ -393,7 +406,16 @@ function init_database_schema(PDO $pdo): void {
             invite_token TEXT DEFAULT '',
             invited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             activated_at DATETIME DEFAULT NULL,
-            locale TEXT DEFAULT 'de'
+            locale TEXT DEFAULT 'de',
+            notes TEXT DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS user_projects (
+            user_id INTEGER NOT NULL,
+            project_id INTEGER NOT NULL,
+            PRIMARY KEY (user_id, project_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS audit_log (
@@ -1444,6 +1466,38 @@ function t(string $key, array $params = [], ?int $count = null): string {
     return strtr($raw, $replacements);
 }
 
+/**
+ * Der primaere Admin-Login (Legacy-Master-Passwort bzw. SSO) hat keine
+ * paragrafy_user_id in der Session -- nur er darf Benutzer verwalten.
+ */
+function current_user_is_primary_admin(): bool {
+    return empty($_SESSION['paragrafy_user_id']);
+}
+
+/**
+ * Ohne paragrafy_user_id (primaerer Admin) oder ohne jede Zeile in
+ * user_projects (Bestandsnutzer vor Einfuehrung der Zuordnung) gilt
+ * unbeschraenkter Zugriff -- erst eine explizite Zuordnung schraenkt ein.
+ */
+function current_user_accessible_project_ids(PDO $db): array {
+    $allIds = array_column($db->query("SELECT id FROM projects")->fetchAll(), 'id');
+    $userId = (int)($_SESSION['paragrafy_user_id'] ?? 0);
+    if ($userId <= 0) {
+        return array_map('intval', $allIds);
+    }
+    $stmt = $db->prepare("SELECT project_id FROM user_projects WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $assigned = array_column($stmt->fetchAll(), 'project_id');
+    if (empty($assigned)) {
+        return array_map('intval', $allIds);
+    }
+    return array_map('intval', $assigned);
+}
+
+function user_can_access_project(PDO $db, int $projectId): bool {
+    return in_array($projectId, current_user_accessible_project_ids($db), true);
+}
+
 function log_audit(?int $projectId, string $projectName, string $action): void {
     try {
         $db = get_db();
@@ -2376,10 +2430,12 @@ function theme_base_css_admin(string $accent = '#F0A63C', bool $enableDarkMode =
 function render_sidebar(string $active, array $project, array $projects): string {
     $items = [
         'dashboard' => ['/admin', t('admin.common.nav.dashboard'), 'grid'],
-        'users' => ['/admin/users', t('admin.common.nav.users'), 'users'],
-        'audit' => ['/admin/audit?project_id=' . $project['id'], t('admin.common.nav.audit'), 'clock'],
-        'consent_log' => ['/admin/consent-log?project_id=' . $project['id'], t('admin.common.nav.consent_log'), 'shield'],
     ];
+    if (current_user_is_primary_admin()) {
+        $items['users'] = ['/admin/users', t('admin.common.nav.users'), 'users'];
+    }
+    $items['audit'] = ['/admin/audit?project_id=' . $project['id'], t('admin.common.nav.audit'), 'clock'];
+    $items['consent_log'] = ['/admin/consent-log?project_id=' . $project['id'], t('admin.common.nav.consent_log'), 'shield'];
     $currentUserName = $_SESSION['paragrafy_user_name'] ?? 'Admin';
     $initials = '';
     foreach (preg_split('/\s+/', trim($currentUserName)) as $part) {

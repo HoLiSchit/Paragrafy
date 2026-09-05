@@ -302,14 +302,17 @@ return [
     'admin.users.msg.email_exists' => 'An account already exists for this email address.',
     'admin.users.msg.invalid' => 'Please provide a name and a valid email address.',
     'admin.users.msg.user_deleted' => 'Access removed.',
+    'admin.users.msg.managed_cloud_blocked' => 'Please invite people via your customer portal.',
+    'admin.users.msg.access_updated' => 'Project access updated.',
 
     'admin.users.page_title' => 'Users - :project',
     'admin.users.crumb' => 'Users',
     'admin.users.heading' => 'User management',
     'admin.users.invite_button' => '+ Invite person',
-    'admin.users.subtitle' => 'Every invited person has full access to the entire admin panel (all projects) — there are no roles or permissions to configure.',
+    'admin.users.subtitle' => 'Use the checkboxes to control which projects a person can access. With no box checked, a person has access to all projects.',
     'admin.users.col_name' => 'Name',
     'admin.users.col_email' => 'Email',
+    'admin.users.col_notes' => 'Notes',
     'admin.users.col_status' => 'Status',
     'admin.users.empty' => 'No people invited yet.',
     'admin.users.you_suffix' => '(You)',
@@ -327,6 +330,16 @@ return [
     'admin.users.modal.email_placeholder' => 'e.g. jane@company.com',
     'admin.users.modal.cancel_button' => 'Cancel',
     'admin.users.modal.submit_button' => 'Send invitation &rarr;',
+
+    'admin.users.access.hint' => 'No box checked for a person = access to all projects (including newly created ones). A checked box = access limited to the selected projects.',
+    'admin.users.access.save_title' => 'Save project access',
+    'admin.users.access.confirm_unrestricted' => 'With no project selected, this person will have access to ALL projects. Continue?',
+
+    'admin.no_access.page_title' => 'No access',
+    'admin.no_access.heading' => 'No project assigned',
+    'admin.no_access.body' => 'No project is currently enabled for your account. Please contact your administrator.',
+
+    'admin.common.access_denied' => 'Access denied.',
 
     'admin.audit.col_project' => 'Project',
     'admin.common.backup_not_found' => 'Backup not found.',
@@ -350,6 +363,8 @@ return [
 
     'admin.users.audit.invited' => 'Person invited: :name (:email)',
     'admin.users.audit.deleted' => 'Access removed: :name',
+    'admin.users.audit.access_restricted' => 'Project access for :name limited to :count project(s)',
+    'admin.users.audit.access_unrestricted' => 'Project access for :name set to all projects',
 
     'admin.settings.webhook_test_message' => 'Paragrafy webhook test triggered successfully',
     'admin.settings.smtp_test_missing_recipient' => 'Please provide a recipient email address first.',
