@@ -1,92 +1,152 @@
-# § Paragrafy - Multi-Project Legal CMS & Compliance Engine
+<div align="center">
 
-Paragrafy ist ein leichtgewichtiges, selbstgehostetes Content-Management-System und Headless-Backend zur zentralen Verwaltung, Übersetzung und Bereitstellung rechtlicher Pflichttexte (Impressum, Datenschutz, AGB, Cookie-Richtlinien etc.) für mehrere Web- und App-Projekte auf Basis von **PHP** und **SQLite**.
+<img src="https://raw.githubusercontent.com/mineco-de/Paragrafy/main/paragrafy.svg" width="88" alt="Paragrafy logo" />
 
-Die Versionsnummer folgt **CalVer** (`JAHR.MONAT.BUILD`, z. B. `2026.9.1`) statt SemVer — so ist auf einen Blick erkennbar, wie aktuell eine Instanz ist. Änderungen je Version stehen in [CHANGELOG.md](CHANGELOG.md).
+# § Paragrafy
 
----
+**Multi-Project Legal CMS & Compliance Engine**
 
-## 🚀 Kernfunktionen
+Self-hosted headless backend for managing, translating, and publishing legal boilerplate — imprint, privacy policy, terms & conditions, cookie policies — across any number of web and app projects.
 
-- **Multi-Tenant / Multi-Domain Routing**:
-  Erkennt die aufrufende Subdomain (`legal.deinedomain.de`, `legal.projekt-b.de`) automatisch und liefert die passenden Rechtstexte, Farben und Firmen-Stammdaten des jeweiligen Projekts aus.
-- **Compliance-Matrix mit One-Click Toggle & Copy-URL**:
-  Das Admin-Dashboard visualisiert auf einen Blick, welche Pflichttexte in welchen Sprachen (`DE`, `EN`, `ES`, `FR` etc.) vorhanden, als Entwurf gespeichert oder noch unvollständig sind. Mit Instant-Toggles und 1-Klick-Kopierbuttons für alle Sprach-URLs.
-- **Zeitgesteuerte Veröffentlichung (Scheduled Publishing)**:
-  Änderungen an AGB oder Datenschutzerklärungen können im Voraus mit einem Stichtag (z. B. `31.08. 00:00`) geplant werden. Die bestehende Fassung bleibt bis zum Stichtag live und wird zum Zielzeitpunkt automatisch abgelöst.
-- **Vollwertige Webhooks mit Warteschlange, Retry & Delivery-Logs**:
-  Benachrichtigt verbundene Web-Apps per `POST`-Webhook bei Live-Schaltungen (`legal_text.updated`) und Vorankündigungen (`legal_text.scheduled`, inkl. `preview_url`) mit vollständigen Feldern (`effective_date`, `url`, `api_url`, `status`, `was_scheduled`). Zustellung läuft asynchron über eine Warteschlange (per Cron `/api/cron/webhooks` abzuarbeiten) mit automatischem Retry (bis zu 5 Versuche, steigender Abstand) — ein langsamer Empfänger blockiert nie das Speichern. Ein integriertes Protokoll im Admin-Bereich zeigt HTTP-Statuscodes, Server-Antworten und Latenzen an. *(Siehe [WEBHOOKS.md](WEBHOOKS.md) für die Spezifikation).*
-- **Öffentliche Vorschau geplanter Änderungen**:
-  Unter `/{lang}/{slug}/preview` (und als JSON-API) ist eine geplante, noch nicht live geschaltete Fassung schon vor dem Stichtag einsehbar — z. B. um Nutzer:innen vorab über anstehende AGB-Änderungen zu informieren.
-- **Automatische rollierende Backups (7 Tage)**:
-  Ein Cron-Endpunkt (`/api/cron/backup`) sichert die Datenbank täglich und löscht ältere Stände automatisch. Die letzten Backups lassen sich einzeln in den Einstellungen herunterladen.
-- **Vollwertiger WYSIWYG & Code-Editor**:
-  Visuelle Formatierungsleiste (H2, H3, Fett, Kursiv, Listen, Links) mit 1-Klick-Umschaltung zum reinen HTML-Quellcode.
-- **Bidirektionale DeepL-Übersetzung**:
-  Übersetze jeden beliebigen Quelltext mit geschützten Platzhaltern (z. B. `DE → EN`, `EN → DE`, `ES → DE`) direkt im Side-by-Side-Editor.
-- **Automatische Versions-Synchronisation (Hash-Diff)**:
-  Wird ein Quelltext inhaltlich geändert, markiert Paragrafy alle anderen Sprachfassungen automatisch als `⚠ Veraltet`. Ein integrierter Diff-Viewer hebt Änderungen optisch hervor (Grün = Neu, Rot = Gelöscht).
-- **Audit- & Fristenkontrolle mit SMTP-E-Mail**:
-  Warnt bei Texten, die länger als das konfigurierte Intervall (z. B. 12 Monate) nicht überprüft wurden, und sendet auf Wunsch Prüfberichte per E-Mail.
-- **Headless JSON-API & In-App Embed Drawer**:
-  Stellt Endpunkte unter `/api/:lang/:slug` bereit und liefert ein modales Sheet-Script (`/embed.js`) für das direkte Einbinden in Web-Apps.
-- **DSGVO Cookie-Consent-Banner**:
-  Integriertes, leichtgewichtiges Consent-Skript (`/consent.js`) ohne externe Abhängigkeiten.
-- **Consent-Nachweise (IP-Consent-Logging)**:
-  Optionales, serverseitiges Nachweisprotokoll jeder Consent-Entscheidung — Zeitpunkt, Aktion,
-  anonymisierte IP, Browser und ein Hash des angezeigten Banner-Texts. Für Prüfungen als
-  CSV exportierbar, mit konfigurierbarer Aufbewahrungsdauer.
-- **Notion/Stripe-Style Public Viewer**:
-  Mitscrollendes Inhaltsverzeichnis (Sticky TOC mit Scroll-Spy), Lesezeit-Berechnung, Direktlink-Anker (`#`) und Live-Textfilter in allen Zielsprachen.
-- **Backups & Exporte**:
-  Lade in den Einstellungen eine Sicherungskopie der kompletten Datenbank oder alle veröffentlichten Rechtstexte als Textdateien (ZIP, nach Sprache/Slug sortiert) herunter.
-- **Beliebig viele eigene Rechtstext-Typen**:
-  Über die Pflichtseiten hinaus lassen sich projektübergreifend zusätzliche Dokumente anlegen (z. B. AGB B2B, Sponsoring-Vereinbarung, Lizenzbedingungen) und optional als Pflichtseite markieren.
-- **Multi-User-Verwaltung mit E-Mail-Einladung**:
-  Lade beliebig viele Personen per E-Mail ein; sie legen über einen Aktivierungslink ihr eigenes Passwort fest. Jede eingeladene Person hat vollen Zugriff auf das gesamte Admin-Panel — es gibt keine Rollen oder Rechte einzustellen. Ein "Passwort vergessen"-Link ermöglicht das eigenständige Zurücksetzen.
-- **Änderungsprotokoll (Audit-Trail) mit CSV-Export**:
-  Ein eigener Tab "Protokoll" zeigt, wer wann was geändert hat — Projekteinstellungen, Rechtstext-Typen, Veröffentlichungen und Benutzerverwaltung. Lässt sich als CSV-Datei herunterladen.
-- **Versionshistorie mit Diff & Wiederherstellen**:
-  Jede Veröffentlichung eines Rechtstexts legt eine neue Version an. Der Editor zeigt den vollständigen Versionsverlauf pro Sprache inklusive Diff-Ansicht gegen den aktuellen Stand und einer nicht-destruktiven "Wiederherstellen"-Funktion.
-- **Sprachen-Tabs im Editor**:
-  Aktive Sprachen erscheinen als Tabs; eine optionale Vergleichsansicht blendet die Referenzsprache bei Bedarf side-by-side ein.
-- **Dunkelmodus**:
-  Hell/Dunkel/Automatisch-Umschalter in den Einstellungen, pro Browser gespeichert — ohne Auswirkung auf andere Personen oder die öffentlichen Rechtstext-Seiten.
-- **Login-Schutz**:
-  Fehlgeschlagene Anmeldeversuche werden pro IP-Adresse gedrosselt (5 Versuche / 15 Minuten), um Brute-Force-Angriffe zu erschweren.
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+[![CalVer](https://img.shields.io/badge/versioning-CalVer-informational)](CHANGELOG.md)
+[![PHP](https://img.shields.io/badge/PHP-8.x-777bb4?logo=php&logoColor=white)](#)
+[![SQLite](https://img.shields.io/badge/DB-SQLite-003b57?logo=sqlite&logoColor=white)](#)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ed?logo=docker&logoColor=white)](#-docker-setup--deployment)
+[![GitHub stars](https://img.shields.io/github/stars/mineco-de/Paragrafy?style=social)](https://github.com/mineco-de/Paragrafy/stargazers)
+
+[Website](https://paragrafy.cloud) · [Live Demo](https://demo.paragrafy.cloud) · [Documentation](https://docs.paragrafy.cloud) · [Changelog](CHANGELOG.md)
+
+</div>
 
 ---
 
-## 📁 Projektstruktur
+## Why Paragrafy?
 
-```text
-/var/www/paragrafy/
-├── index.php             # Öffentlicher Router, Viewer, JSON-API & Cron-Handler
-├── admin.php             # Admin-Dashboard, Compliance-Matrix, Webhook-Logs & Einstellungen
-├── editor.php            # Sprachen-Tabs-Editor mit Scheduled Publishing & Versionshistorie
-├── install.php           # Interaktiver Setup-Wizard für die Erstinstallation
-├── db.php                # SQLite-Datenbankanbindung, Migrationen, Webhooks, SMTP-Client & Theme
-├── assets/fonts/         # Self-hosted Webfonts (Fraunces, Inter, JetBrains Mono) für Admin/Editor
-├── Dockerfile            # Container-Image-Definition
-├── docker-compose.yaml   # Docker-Compose-Setup für den Betrieb via Container
-├── docker-entrypoint.sh  # Setzt beim Container-Start Dateirechte auf das Daten-Volume
-├── WEBHOOKS.md           # Detaillierte Webhook-Dokumentation, Spezifikation & Payloads
-├── paragrafy.svg         # Vektor-Logo
-├── .htaccess             # Apache Routing & Schutz sensibler Dateien
-├── .gitignore            # Git-Ausschlussregeln
-├── config.php            # Admin-Passwort-Hash & Cron-Secret (wird bei Setup generiert)
-├── .env.local            # Optional: DEEPL_API_KEY als Fallback
-├── backups/              # Rollierende 7-Tage-Backups (automatisch angelegt)
-└── paragrafy_data.sqlite # SQLite-Datenbank (wird automatisch angelegt)
+If you run more than one website or client project, you already know the pain: the same imprint, privacy policy, and terms of service scattered across a dozen repos, in a dozen slightly-out-of-sync versions, in one language, with no idea when they were last checked.
+
+Paragrafy centralizes all of that in a single lightweight PHP + SQLite backend. One instance, many domains — each gets its own legal texts, languages, and branding, served through a clean JSON API, an embeddable widget, or a polished public viewer.
+
+Built for agencies, SaaS operators, and anyone who maintains legal pages for more than one project.
+
+> Versioning follows **CalVer** (`YEAR.MONTH.BUILD`, e.g. `2026.9.1`) instead of SemVer, so you can tell at a glance how current an instance is. See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+---
+
+## Screenshots
+
+<!-- TODO: swap in real screenshots from paragrafy.cloud/assets/ — dashboard, public viewer, editor, settings -->
+
+| Compliance Dashboard | Public Viewer |
+|---|---|
+| ![Paragrafy dashboard with compliance matrix](https://paragrafy.cloud/assets/paragrafy-dashboard.webp) | ![Paragrafy public legal text viewer](https://paragrafy.cloud/assets/paragrafy-frontend.webp) |
+
+| Editor with Language Tabs | Settings & Cron Endpoints |
+|---|---|
+| ![Paragrafy editor with language tabs and HTML view](https://paragrafy.cloud/assets/paragrafy-editor.webp) | ![Paragrafy settings with cron endpoints](https://paragrafy.cloud/assets/paragrafy-settings.webp) |
+
+👉 Try it live: **[demo.paragrafy.cloud](https://demo.paragrafy.cloud)** (freely configurable, resets every 10 minutes).
+
+---
+
+## ✨ Key Features
+
+- **Multi-tenant / multi-domain routing** — detects the calling subdomain (`legal.yourdomain.com`, `legal.project-b.com`) and serves the matching project's legal texts, colors, and company data automatically.
+- **Compliance matrix with one-click toggle & copy-URL** — the admin dashboard shows at a glance which required texts exist in which languages (`DE`, `EN`, `ES`, `FR`, …), which are drafts, and which are missing, with instant toggles and one-click copy for every language URL.
+- **Scheduled publishing** — plan changes to your terms or privacy policy ahead of time with an effective date; the current version stays live until the deadline and is swapped automatically.
+- **Full-featured webhooks** — with queue, retry, and delivery logs. Notifies connected apps via `POST` on go-live (`legal_text.updated`) and upcoming changes (`legal_text.scheduled`, including a `preview_url`). Delivery runs asynchronously through a queue with automatic retry (up to 5 attempts, increasing backoff), so a slow receiver never blocks saving. See [WEBHOOKS.md](WEBHOOKS.md) for the full spec.
+- **Public preview of scheduled changes** — a scheduled, not-yet-live version is viewable ahead of time at `/{lang}/{slug}/preview` (and as JSON), e.g. to notify users in advance of upcoming ToS changes.
+- **Automatic rolling backups (7 days)** — a cron endpoint backs up the database daily and prunes older copies; the latest backups can be downloaded individually from settings.
+- **Full WYSIWYG & code editor** — a visual formatting toolbar (H2, H3, bold, italic, lists, links) with one-click toggle to raw HTML.
+- **Bidirectional DeepL translation** — translate any source text with protected placeholders (e.g. `DE → EN`, `EN → DE`, `ES → DE`) directly in the side-by-side editor.
+- **Automatic version sync (hash-diff)** — when a source text changes, Paragrafy flags every other language version as `⚠ Outdated`, with a built-in diff viewer (green = added, red = removed).
+- **Audit & deadline tracking with SMTP email** — get warned when texts haven't been reviewed within a configurable interval (e.g. 12 months), with optional email audit reports.
+- **Headless JSON API & in-app embed drawer** — endpoints under `/api/:lang/:slug`, plus a modal sheet script (`/embed.js`) for dropping legal text straight into your web apps.
+- **GDPR cookie consent banner** — a lightweight, dependency-free consent script (`/consent.js`).
+- **Consent proof logging** — optional, server-side proof-of-consent log per decision: timestamp, action, anonymized IP, browser, and a hash of the displayed banner text. Exportable as CSV, with configurable retention.
+- **Notion/Stripe-style public viewer** — sticky table of contents with scroll-spy, reading time estimate, deep-link anchors, and live text filtering across all target languages.
+- **Backups & exports** — download a full database backup or all published legal texts as a sorted ZIP archive (by language/slug) from settings.
+- **Unlimited custom document types** — go beyond the standard required pages and add project-wide documents (e.g. B2B terms, sponsorship agreements, license terms), optionally flagged as required.
+- **Multi-user management with email invites** — invite as many people as you like via email; they set their own password through an activation link. Every invited user gets full admin access — no roles or permissions to configure. Self-service "forgot password" included.
+- **Audit trail with CSV export** — a dedicated log tab shows who changed what and when — project settings, document types, publications, and user management — downloadable as CSV.
+- **Version history with diff & restore** — every publish creates a new version. The editor shows full version history per language, including a diff against the current version and a non-destructive restore.
+- **Language tabs in the editor** — active languages appear as tabs, with an optional side-by-side comparison view against a reference language.
+- **Dark mode** — light/dark/auto toggle in settings, stored per browser, with no effect on other users or public legal pages.
+- **Login protection** — failed login attempts are throttled per IP address (5 attempts / 15 minutes) to slow down brute-force attacks.
+
+---
+
+## 🏗️ How It Fits Together
+
+```
+                     ┌────────────────────────────┐
+                     │        Paragrafy            │
+                     │   (PHP + SQLite, 1 instance)│
+                     └─────────────┬────────────────┘
+                                   │
+              multi-domain routing by subdomain
+                                   │
+        ┌──────────────┬──────────┴──────────┬──────────────┐
+        ▼              ▼                     ▼              ▼
+ legal.project-a   legal.project-b     legal.project-c   legal.project-d
+   (DE / EN)         (DE / FR)            (DE / ES)         (DE only)
+        │              │                     │              │
+        └── JSON API, embed.js, consent.js, webhooks → your websites & apps
 ```
 
-Bei Docker liegen `config.php`, `.env.local`, `backups/` und `paragrafy_data.sqlite` stattdessen unter `PARAGRAFY_DATA_DIR` (`/var/www/html/data`, auf `./data` gemountet).
+One Paragrafy instance can serve an unlimited number of projects, each with its own domain, languages, branding, and document set — this is what makes it a good fit for agencies managing legal pages across many client sites.
 
 ---
 
-## 🛠️ Installation & Webserver-Setup
+## 📁 Project Structure
 
-### 1. Dateien hochladen & Berechtigungen setzen
+```
+/var/www/paragrafy/
+├── index.php             # Public router, viewer, JSON API & cron handler
+├── admin.php             # Admin dashboard, compliance matrix, webhook logs & settings
+├── editor.php            # Language-tab editor with scheduled publishing & version history
+├── install.php           # Interactive setup wizard for first installation
+├── db.php                # SQLite connection, migrations, webhooks, SMTP client & theming
+├── assets/fonts/         # Self-hosted webfonts (Fraunces, Inter, JetBrains Mono) for admin/editor
+├── Dockerfile            # Container image definition
+├── docker-compose.yaml   # Docker Compose setup for container operation
+├── docker-entrypoint.sh  # Fixes file permissions on the data volume at container start
+├── WEBHOOKS.md           # Detailed webhook documentation, spec & payloads
+├── paragrafy.svg         # Vector logo
+├── .htaccess             # Apache routing & protection of sensitive files
+├── config.php            # Admin password hash & cron secret (generated during setup)
+├── .env.local            # Optional: DEEPL_API_KEY fallback
+├── backups/              # Rolling 7-day backups (created automatically)
+└── paragrafy_data.sqlite # SQLite database (created automatically)
+```
+
+With Docker, `config.php`, `.env.local`, `backups/`, and `paragrafy_data.sqlite` live under `PARAGRAFY_DATA_DIR` instead (`/var/www/html/data`, mounted to `./data`).
+
+---
+
+## 🚀 Getting Started
+
+### Option A: Docker (recommended)
+
+```bash
+# Clone the full repository (not just the Docker files!)
+git clone https://github.com/mineco-de/Paragrafy.git
+cd Paragrafy
+
+# Build and start the container
+docker compose up -d --build
+
+# Then open the setup wizard in your browser
+https://your-domain.example/install.php
+```
+
+The image is built from your local checkout (`COPY . /var/www/html/` in the Dockerfile) — it doesn't pull code from GitHub itself, so `docker compose up -d --build` reliably reflects your current state instead of getting stuck on an old layer cache.
+
+**Persistence:** `docker-compose.yaml` mounts `./data` to `/var/www/html/data` and sets `PARAGRAFY_DATA_DIR=/var/www/html/data` — this is where `paragrafy_data.sqlite`, `config.php`, `/backups`, and an optional `.env.local` live. Without this volume, your database and admin credentials are lost on every `--build`. The container automatically sets correct file permissions on this folder at startup (via `docker-entrypoint.sh`), even if the host directory didn't previously exist.
+
+### Option B: Apache / bare metal
+
+**1. Upload files & set permissions**
 
 ```bash
 sudo chown -R www-data:www-data /var/www/paragrafy
@@ -94,12 +154,12 @@ sudo find /var/www/paragrafy -type d -exec chmod 755 {} +
 sudo find /var/www/paragrafy -type f -exec chmod 644 {} +
 ```
 
-### 2. Apache VirtualHost Konfiguration
+**2. Apache VirtualHost**
 
 ```apache
 <VirtualHost *:80>
-    ServerName legal.deinedomain.de
-    ServerAlias legal.projekt-b.de
+    ServerName legal.yourdomain.com
+    ServerAlias legal.project-b.com
     DocumentRoot /var/www/paragrafy
 
     <Directory /var/www/paragrafy>
@@ -112,148 +172,153 @@ sudo find /var/www/paragrafy -type f -exec chmod 644 {} +
 </VirtualHost>
 ```
 
-## 🚀 Docker Setup & Deployment
+`PARAGRAFY_DATA_DIR` is not needed here — the database and config live directly in the project folder, as usual.
 
-Paragrafy lässt sich am schnellsten und saubersten über Docker und Docker Compose betreiben.
+### First run
 
-### Voraussetzungen
-* Docker & Docker Compose auf dem Server installiert.
-
-### Schnellanleitung
-
-1. Repository **komplett klonen** (nicht nur die Docker-Dateien!): `git clone https://github.com/mineco-de/Paragrafy.git && cd Paragrafy`. Das Image wird aus diesem lokalen Checkout gebaut (`COPY . /var/www/html/` in der Dockerfile) — es holt den Code nicht mehr selbst von GitHub, damit `docker compose up -d --build` zuverlässig deinen aktuellen Stand verwendet und nicht an einem alten Docker-Layer-Cache-Stand hängen bleibt.
-2. Container im Hintergrund starten:
-   ```bash
-   docker compose up -d --build
-   ```
-
-**Persistenz:** `docker-compose.yaml` mountet `./data` nach `/var/www/html/data` und setzt `PARAGRAFY_DATA_DIR=/var/www/html/data` — dort liegen `paragrafy_data.sqlite`, `config.php`, `/backups` und ein optionales `.env.local`. Ohne dieses Volume gehen Datenbank und Admin-Zugangsdaten bei jedem `--build` verloren. Der Container setzt beim Start automatisch die richtigen Dateirechte auf diesen Ordner (per `docker-entrypoint.sh`), auch wenn das Host-Verzeichnis vorher nicht existierte.
-
-Für einen Bare-Metal-/Apache-Betrieb (siehe unten) ist `PARAGRAFY_DATA_DIR` nicht nötig — dann liegen Datenbank und Config wie gewohnt direkt im Projektordner.
+Open your subdomain in the browser (e.g. `https://legal.yourdomain.com`). The **Paragrafy setup wizard** launches automatically and creates the database, admin password, and a random cron secret.
 
 ---
 
-## 🔑 Erstinstallation & Cron-Jobs
+## ⏱️ Cron Jobs
 
-Gilt unabhängig davon, ob Apache oder Docker verwendet wird.
+Four endpoints should be called regularly from outside so scheduled publications go live, backups are created, and webhooks get delivered. All four are protected by a secret key (`?secret=...` query parameter), which you'll find pre-assembled under **Settings → Automation (Cron)** — and can regenerate there if needed.
 
-### Erstinstallation
+```bash
+# Publish scheduled changes (every minute, across all projects)
+* * * * * curl -fsS "https://legal.yourdomain.com/api/cron/publish?secret=YOUR_CRON_SECRET" > /dev/null
 
-Rufe deine Subdomain im Browser auf (z. B. `https://legal.deinedomain.de`). Der **Paragrafy Setup-Wizard** startet automatisch und legt Datenbank, Admin-Passwort und ein zufälliges Cron-Secret an.
+# Process the webhook queue (every 5 minutes)
+*/5 * * * * curl -fsS "https://legal.yourdomain.com/api/cron/webhooks?secret=YOUR_CRON_SECRET" > /dev/null
 
-### Cron-Jobs einrichten (empfohlen)
+# Daily rolling backup (7 days retention)
+0 3 * * * curl -fsS "https://legal.yourdomain.com/api/cron/backup?secret=YOUR_CRON_SECRET" > /dev/null
 
-Vier Endpunkte sollten von außen regelmäßig aufgerufen werden, damit geplante Veröffentlichungen live gehen, Backups entstehen und Webhooks zugestellt werden. Alle vier sind mit einem geheimen Schlüssel geschützt (Query-Parameter `?secret=...`), den du fertig zusammengesetzt in **Einstellungen → Automatisierung (Cron)** findest — dort lässt er sich bei Bedarf auch neu generieren.
-
-```cron
-# Geplante Veröffentlichungen live schalten (jede Minute, projektübergreifend)
-* * * * * curl -fsS "https://legal.deinedomain.de/api/cron/publish?secret=DEIN_CRON_SECRET" > /dev/null
-
-# Webhook-Warteschlange abarbeiten (alle 5 Minuten)
-*/5 * * * * curl -fsS "https://legal.deinedomain.de/api/cron/webhooks?secret=DEIN_CRON_SECRET" > /dev/null
-
-# Tägliches rollierendes Backup (7 Tage)
-0 3 * * * curl -fsS "https://legal.deinedomain.de/api/cron/backup?secret=DEIN_CRON_SECRET" > /dev/null
-
-# Prüfbericht per E-Mail, falls Rechtstexte überfällig sind (täglich)
-0 8 * * * curl -fsS "https://legal.deinedomain.de/api/cron/audit?secret=DEIN_CRON_SECRET" > /dev/null
+# Email audit report if any legal texts are overdue (daily)
+0 8 * * * curl -fsS "https://legal.yourdomain.com/api/cron/audit?secret=YOUR_CRON_SECRET" > /dev/null
 ```
 
-Alternativ eignet sich auch ein externer Uptime-Monitor (z. B. Uptime Kuma, healthchecks.io) als "Cron", der diese URLs im gewünschten Intervall abruft.
+An external uptime monitor (e.g. Uptime Kuma, healthchecks.io) works just as well as a "cron" here, as long as it calls these URLs on the desired interval.
 
-Ohne eingerichteten Cron ist Paragrafy dennoch nutzbar: Geplante Veröffentlichungen werden zusätzlich automatisch geprüft, sobald jemand die jeweilige Projekt-Domain besucht (Zero-Config-Fallback) — bei sehr wenig Traffic kann das aber verzögert live gehen. Backup und Webhook-Warteschlange lassen sich in den Einstellungen jederzeit manuell anstoßen; ein aufgerufener Endpunkt ohne oder mit falschem `secret` antwortet mit HTTP 403.
-
----
-
-## ⚙️ Konfiguration & Umgebungsvariablen
-
-Die meisten Einstellungen (SMTP-Zugangsdaten, Webhook-URL/-Secret, DeepL-API-Key, Firmendaten, Cookie-Banner-Text, Akzentfarbe etc.) sind **projektbezogen** und liegen in der SQLite-Datenbank — sie werden ausschließlich über die Einstellungen-Oberfläche im Admin-Bereich gepflegt, nicht über Umgebungsvariablen oder Config-Dateien.
-
-Nur folgende Werte kommen tatsächlich aus Dateien statt aus der Datenbank:
-
-| Datei / Variable | Zweck |
-| :--- | :--- |
-| `config.php` (auto-generiert) | Admin-Passwort-Hash (Legacy-Login) und das Cron-Secret. Wird beim Setup-Wizard angelegt, nicht manuell bearbeiten. Optional: `project_limit` (int) begrenzt die Anzahl `projects`-Zeilen dieser Instanz — fehlt der Schlüssel (Standard), gilt kein Limit. Gedacht für Betreiber, die Paragrafy hinter einer eigenen SaaS-/Abrechnungsschicht mit einer Instanz pro Account/Plan betreiben. |
-| `.env` / `.env.local` (optional) | `DEEPL_API_KEY=...` als projektübergreifender Fallback, falls im jeweiligen Projekt kein eigener DeepL-Key hinterlegt ist. Beide Dateien sind optional — ohne sie funktioniert alles außer diesem Fallback. |
-| `PARAGRAFY_DATA_DIR` (Umgebungsvariable) | Nur für Docker relevant: verlegt `config.php`, die SQLite-Datenbank, `/backups` und `.env.local` in ein persistentes Verzeichnis. Siehe Abschnitt „Docker Setup & Deployment" weiter oben. |
+Paragrafy is usable without cron configured, too: scheduled publications are also checked automatically whenever someone visits the relevant project domain (zero-config fallback) — though with very low traffic this can delay going live. Backups and the webhook queue can be triggered manually from settings at any time. An endpoint called without or with an incorrect `secret` responds with HTTP 403.
 
 ---
 
-## 🔐 API-Zugriff & Authentifizierung
+## ⚙️ Configuration & Environment Variables
 
-- **Öffentliche JSON-API** (`/api/:lang/:slug`, siehe unten) ist bewusst **unauthentifiziert und rein lesend** — Rechtstexte sollen von jeder verbundenen Website ohne Zugangsdaten abrufbar sein. Es gibt keine Möglichkeit, Inhalte über diese API zu schreiben oder zu ändern.
-- **Bearbeiten von Rechtstexten** ist ausschließlich über die eingeloggte `/admin`-Session möglich (Passwort- bzw. Multi-User-Login) — es existiert keine separate API mit Bearer-Token oder API-Keys für schreibende Zugriffe.
-- **Cron-Endpunkte** (`/api/cron/...`) erfordern das oben beschriebene `?secret=`-Query-Parameter (oder eine aktive Admin-Session) und lösen Server-Aktionen aus (Backup, Webhook-Versand, Live-Schaltung, Audit-Mail) — sie geben aber keine Inhalte oder Zugangsdaten preis.
+Most settings (SMTP credentials, webhook URL/secret, DeepL API key, company data, cookie banner text, accent color, etc.) are **per-project** and live in the SQLite database — managed entirely through the settings UI in the admin area, not via environment variables or config files.
 
----
+Only the following values actually come from files instead of the database:
 
-## ⬆️ Upgrade-Guide
-
-Ein Update ist unkompliziert, da Schema-Änderungen automatisch beim ersten Request nach dem Update laufen:
-
-1. **Vor dem Update:** Sicherung erstellen (Einstellungen → Sicherung & Export, oder `/backups` bei Docker sichern).
-2. **Apache:** Neue Dateien über die alten kopieren bzw. `git pull` — `config.php`, `paragrafy_data.sqlite` und `/backups` dabei **nicht** überschreiben/löschen.
-   **Docker:** Zuerst im lokalen Checkout `git pull`, dann `docker compose up -d --build` — das Image wird aus dem lokalen Code gebaut, ein reines `--build` ohne vorheriges `git pull` verwendet weiterhin den alten Stand. `config.php`, `paragrafy_data.sqlite`, `/backups` und `.env.local` bleiben durch das `data`-Volume automatisch erhalten.
-3. Beim nächsten Aufruf einer beliebigen Seite legt `ensure_schema_migrations()` fehlende Tabellen und Spalten automatisch an (z. B. `users`, `audit_log`, `translation_versions`, `webhook_queue`, neue Spalten in `projects`) — kein manuelles Migrationsskript nötig.
-4. Bestehende Installationen ohne `cron_secret` in `config.php` bekommen beim ersten Aufruf eines `/api/cron/...`-Endpunkts automatisch eines generiert (sichtbar unter Einstellungen → Automatisierung).
-
-Es gab bislang keine Breaking Changes, die manuelles Eingreifen über die automatische Migration hinaus erfordern.
+| File / Variable | Purpose |
+| --- | --- |
+| `config.php` (auto-generated) | Admin password hash (legacy login) and the cron secret. Created by the setup wizard — don't edit manually. Optional: `project_limit` (int) caps the number of `projects` rows for this instance; if unset (default), there's no limit. Useful for operators running Paragrafy behind their own SaaS/billing layer with one instance per account/plan. |
+| `.env` / `.env.local` (optional) | `DEEPL_API_KEY=...` as a cross-project fallback if a project has no DeepL key of its own configured. Both files are optional — everything works without them except this fallback. |
+| `PARAGRAFY_DATA_DIR` (env variable) | Docker only: relocates `config.php`, the SQLite database, `/backups`, and `.env.local` into a persistent directory. See [Getting Started](#-getting-started) above. |
 
 ---
 
-## 🔧 Webhooks & Integrationen
+## 🔐 API Access & Authentication
+
+- The **public JSON API** (`/api/:lang/:slug`) is intentionally **unauthenticated and read-only** — legal texts should be retrievable from any connected website without credentials. There's no way to write or modify content through this API.
+- **Editing legal texts** is only possible through the logged-in `/admin` session (password or multi-user login) — there's no separate bearer-token/API-key API for write access.
+- **Cron endpoints** (`/api/cron/...`) require the `?secret=` query parameter described above (or an active admin session) and trigger server actions (backup, webhook delivery, publishing, audit email) — but never expose content or credentials.
+
+---
+
+## 🔧 Integrations
 
 ### Webhooks
 
-Paragrafy unterstützt zwei Event-Typen für automatisierte Workflows in deinen Frontends:
-- `legal_text.scheduled`: Vorankündigung einer geplanten Änderung (inkl. Stichtag).
-- `legal_text.updated`: Live-Schaltung eines Dokuments (sofort oder am Stichtag).
+Two event types for automating workflows in your frontends:
 
-Ausführliche Payloads, HMAC-Signaturprüfungen und Code-Beispiele findest du in der Datei **[WEBHOOKS.md](WEBHOOKS.md)**.
+- `legal_text.scheduled` — advance notice of a planned change (including effective date).
+- `legal_text.updated` — a document goes live (immediately or on its effective date).
 
-### Headless JSON-API
+Full payloads, HMAC signature verification, and code examples: **[WEBHOOKS.md](WEBHOOKS.md)**.
 
-```http
-GET https://legal.deinedomain.de/api/de/datenschutz
-GET https://legal.deinedomain.de/api/agb-b2c
+### Headless JSON API
+
+```
+GET https://legal.yourdomain.com/api/en/privacy-policy
+GET https://legal.yourdomain.com/api/terms-b2c
 ```
 
-### In-App Embed-Drawer (`/embed.js`)
+### In-app embed drawer (`/embed.js`)
 
 ```html
-<script src="https://legal.deinedomain.de/embed.js"></script>
-<button data-paragrafy-slug="datenschutz" data-paragrafy-lang="de">Datenschutz anzeigen</button>
+<script src="https://legal.yourdomain.com/embed.js"></script>
+<button data-paragrafy-slug="privacy-policy" data-paragrafy-lang="en">Show Privacy Policy</button>
 ```
 
-### DSGVO Cookie-Consent-Banner (`/consent.js`)
+### GDPR cookie consent banner (`/consent.js`)
 
 ```html
-<script src="https://legal.deinedomain.de/consent.js"></script>
+<script src="https://legal.yourdomain.com/consent.js"></script>
 ```
 
-#### Consent-Nachweise (IP-Consent-Logging)
+**Consent proof logging** — simply embedding the banner does not by itself trigger a server-side log; consent logging must be enabled per project under **Settings → Consent Proof**. Once active, `/consent.js` sends an additional fire-and-forget request to `/api/consent-log` on every "Accept"/"Necessary only" click, creating a proof record containing:
 
-Das reine Einbinden des Banners löst noch kein serverseitiges Protokoll aus — dafür muss das
-Consent-Logging pro Projekt in **Einstellungen → Consent-Nachweise** aktiviert werden. Ist es
-aktiv, sendet `/consent.js` bei jedem Klick auf "Akzeptieren"/"Nur notwendige" zusätzlich einen
-Fire-and-Forget-Request an `/api/consent-log`, der einen Nachweis-Eintrag anlegt.
+- timestamp and action (accepted/rejected)
+- an **anonymized** IP address (last octet zeroed for IPv4, last 80 bits zeroed for IPv6) — the full IP is never stored
+- browser (`User-Agent`)
+- a random consent ID (also stored in the website's `localStorage` as `paragrafy_consent_id`, for correlation)
+- a SHA-256 hash of the banner text shown at that time (proof of *what* was accepted)
 
-Gespeichert wird pro Entscheidung:
-- Zeitpunkt und Aktion (akzeptiert/abgelehnt)
-- eine **anonymisierte** IP-Adresse (letztes Oktett bei IPv4 bzw. die letzten 80 Bit bei IPv6
-  auf `0` gesetzt) — die vollständige IP wird zu keinem Zeitpunkt gespeichert
-- der Browser (`User-Agent`)
-- eine zufällige Consent-ID (auch im `localStorage` der Website unter `paragrafy_consent_id`
-  hinterlegt, zur Korrelation)
-- ein SHA-256-Hash des zu diesem Zeitpunkt angezeigten Banner-Texts (Nachweis, *was* akzeptiert
-  wurde)
+Viewable and exportable as CSV under **Admin → Consent Proof** (`/admin/consent-log`). A retention period in days can be configured under **Settings → Consent Proof** (default: 1095 days / ~3 years, `0` = unlimited); expired entries are cleaned up automatically during the daily rolling-backup cron (`/api/cron/backup`) — no extra cron job needed.
 
-Einsehbar und als CSV exportierbar unter **Admin → Consent-Nachweise**
-(`/admin/consent-log`). Über **Einstellungen → Consent-Nachweise** lässt sich außerdem eine
-Aufbewahrungsdauer in Tagen festlegen (Standard: 1095 Tage / ~3 Jahre, `0` = unbegrenzt);
-abgelaufene Einträge werden automatisch beim täglichen rollierenden Backup-Cron
-(`/api/cron/backup`) bereinigt, es ist also kein zusätzlicher Cron-Job nötig.
+> This is a technical aid for record-keeping, not legal advice — whether and how long retention makes sense or is required for your specific case should be reviewed individually.
 
-Dies ist ein technisches Hilfsmittel zur Nachweisführung, keine Rechtsberatung — ob und wie
-lange eine Aufbewahrung im jeweiligen Anwendungsfall sinnvoll oder erforderlich ist, sollte im
-Zweifel individuell geprüft werden.
+---
+
+## ⬆️ Upgrading
+
+Updates are straightforward — schema changes run automatically on the first request after updating:
+
+1. **Before updating:** create a backup (Settings → Backup & Export, or back up `/backups` for Docker).
+2. **Apache:** copy new files over the old ones, or `git pull` — don't overwrite/delete `config.php`, `paragrafy_data.sqlite`, or `/backups`.
+   **Docker:** `git pull` in your local checkout first, then `docker compose up -d --build` — the image is built from local code, so `--build` alone without a prior `git pull` still uses the old state. `config.php`, `paragrafy_data.sqlite`, `/backups`, and `.env.local` are preserved automatically via the `data` volume.
+3. On the next page load, `ensure_schema_migrations()` automatically creates any missing tables and columns (e.g. `users`, `audit_log`, `translation_versions`, `webhook_queue`, new columns on `projects`) — no manual migration script needed.
+4. Existing installations without a `cron_secret` in `config.php` get one generated automatically on the first call to a `/api/cron/...` endpoint (visible under Settings → Automation).
+
+There have been no breaking changes to date that require manual intervention beyond the automatic migration.
+
+---
+
+## 🌐 Self-Hosted vs. Managed Cloud
+
+Paragrafy is fully open source (AGPL-3.0) and free to self-host with the complete feature set — no paywalled functionality. If you'd rather not run your own server, [paragrafy.cloud](https://paragrafy.cloud) offers a managed cloud version with hosting, automatic backups, and support plans starting at a single project.
+
+| | Self-Hosted | Managed Cloud |
+|---|---|---|
+| Cost | Free, forever | From €7.99/month |
+| Feature set | Full | Full (identical) |
+| Infrastructure | Your own server, Docker or bare metal | Hosted for you, incl. SSL |
+| Data ownership | Fully yours | Yours, hosted by Paragrafy |
+| Support | Community (GitHub) | Included |
+
+Learn more: [Hosting & Pricing](https://paragrafy.cloud/#pricing)
+
+---
+
+## 📚 Documentation
+
+Full documentation, guides, and API reference: **[docs.paragrafy.cloud](https://docs.paragrafy.cloud)**
+
+---
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome. If you're planning a larger change, please open an issue first to discuss the approach.
+
+## 📄 License
+
+Paragrafy is licensed under the [AGPL-3.0](LICENSE).
+
+## 🔗 Links
+
+- Website: [paragrafy.cloud](https://paragrafy.cloud)
+- Live demo: [demo.paragrafy.cloud](https://demo.paragrafy.cloud)
+- Documentation: [docs.paragrafy.cloud](https://docs.paragrafy.cloud)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- Webhook spec: [WEBHOOKS.md](WEBHOOKS.md)
